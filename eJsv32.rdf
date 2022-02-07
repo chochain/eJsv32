@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RadiantProject version="4.2" title="ej32" device="iCE40UP5K-SG48I" performance_grade="High-Performance_1.2V" default_implementation="impl_1">
+    <Options/>
+    <Implementation title="impl_1" dir="impl_1" description="impl_1" synthesis="lse" default_strategy="Strategy1">
+        <Options def_top="eJsv32k"/>
+        <Source name="source/divide.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="source/mult.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="source/ram_memory.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="source/shifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="source/ushifter.v" type="Verilog" type_short="Verilog">
+            <Options/>
+        </Source>
+        <Source name="source/eJ32k.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog" top_module="eJsv32k"/>
+        </Source>
+        <Source name="vsim/vsim.spf" type="Simulation Project File" type_short="SPF">
+            <Options/>
+        </Source>
+    </Implementation>
+    <Strategy name="Strategy1" file="ej321.sty"/>
+</RadiantProject>

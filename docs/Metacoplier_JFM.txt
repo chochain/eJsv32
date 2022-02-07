@@ -1,0 +1,1071 @@
+JavaForthMachine
+
+
+
+Metacompiler eJ32i.fex
+
+The metacompiler was used to produce a memory image for the JavaForthMachine(JFM) to execute. The memory image consist of a Forth dictionary, system variables to run the Forth outer interpreter, input and output text buffers. The dictionary contains word records of al primitive words, with Java Bytecode in their code fields. eJ32i.fex is a Forth (F#) project file build and testing the JFM.
+
+Since JFM executes Java bytecode, this metacompiler is much simpler than that for eP32 which executes a set of 5-bit opcode.
+
+F# loads in Meta32i.fex, setting up F# enviroment and then loads in META32i.f, constructing a byte memory image in eJ32i.mif to instantiate a RAM memory core to be synthesized inti JFM.
+
+( eJ32i, 13dec21cht, Java bytecode, input, output)
+( eJ32h, 29nov21cht, Java bytecode, >r,r@, >r)
+( eJ32g, 17nov21cht, Java bytecode, case, top)
+( eP32s, 23jun21cht, bytecode, subrouting threading )
+( JFM_56, 06MAR19cht )
+\ HTTP server
+( JFM_54, 02MAR19cht )
+\ HTTP server
+( JFM_53, 19feb19cht )
+\ load LOAD.TXT from flash on boot
+( ep32r, move to F#, 6/3/2021 cht )
+( copy ep32q to JFM_50 )
+( JFM_52, 22jan19cht )
+\ fugues and musete
+( JFM_51, 21jan19cht )
+\ add peeks.txt and organ1.txt 
+( JFM_50, 15jan19cht )
+\ Move from JFMto ESP32, for AIR robot
+\ cEFa  10sep09cht
+\ Goal is to produce a dictionary file to be compiled by a C compiler
+\ Assume 31 eForth primitives are coded in C
+\ Each FORTH word contains a link field, a name field, a code field
+\    and a parameter field, as in standard eForth model
+\ The code field contains a token pointing to a primitive word
+\ Low level primitive FORTH words has 1 cell of code field
+\ High level FORTH word has call in code field and a address list
+\ Variable has doVAR in code field and a cell for value
+\ Array is same as variable, but with many cells in parameter field
+\ User variable has doUSE in code, and an offset as parameter
+\
+\
+
+ FLOAD init.f         \ initial stuff
+ FLOAD win32.f        \ win32 system interface
+ FLOAD consolei.f     \ api and constant defination
+ 
+ FLOAD ui.f           \ user interface helper routine ( reposition )
+ 
+ FLOAD console.f      \ the main program
+ FLOAD ansi.f
+ FLOAD fileinc.f
+ FLOAD META32i.f
+ 
+cr .( Version FIX eJ32 forth )
+        
+        
+
+
+
+META32j.f
+
+Metacompiler is a term used by Forth programmers to describe the process of building a new Forth system on an existing Forth system. The new Forth system may run on the same platform as the old Forth system. It may be targeted to a new platform, or to a new CPU. The new Forth system may share a large portion of Forth code with the old system, hence the term metacompilation. In a sense, a metacompiler is very similar to a conventional cross assembler/compiler.
+
+The JFM metacompiler is contained in file META32j.f. It allocates a data array ram, and deposits records of primitive commands and compound commands to build a dictionary for JFM. The JFM was programmed in eJ32k.vhd in VHDL, eJv32k in Verilog, and in eJev32k.v in SystemVerilog. All JFM functions are Java bytecode assembled into the code fields of Forth commands. The addresses of code fields are compiled into token lists in the code fields of compound commands. It turns out that tokens are 3-byte Java byte code 'call', which can be intermixed with other bytecode freely, and primitive commands and compound commands are indistinguishabe. They are used because of Forth conventions. 
+
+Meta32j.f file carries out the first step of metacompilation. It declares a big memory ararry RAM to host the dictionary of JFM. Java bytecode and other information are deposit in to the RAM array with RAMC! ( for bytes), RAMW! ( for shorts), and RAMC@ ( for integers). RAMC@ ( for bytes), RAMC@ ( for shorts), and RAM! ( for integers).  RAMC@ ( for bytes), RAMW@ ( for shorts), and RAMC! ( for integers) will be used to retrieve information from the RAM array. Memory addresses are all byte address offset into the RAM array.
+
+After setting up the environment to build a target dictionary, META32i.f loads source code from three other files to do specific jobs:
+
+ASM32i.f
+ is the assembler. 
+KERN32i.f assembles a set of macros to optimize JFM bytecode. 
+EF32i.f 
+Compiles all compound commands to complete the Forth operating system for JFM, or what I now call the Outer Interpreter.  Source code in META32i.f is lengthy, and it is best to comment each command to bring out its function and meaning.
+
+debugging? ( -- a ) A variable containing a switch to turn break points on and off. When debugging? is set to -1, compilation will stop and the data stack is dumped when a ¡§cr¡¨ command is executed. Sprinkling ¡§cr¡¨ commands in the source code file allows you to watch the progress of metacompilation and even stops it when necessary.
+variable debugging?
+.head ( a ¡V a ) Display name of a command that is about to be compiled. It is used to display a symbol table. You can look up the code field address of any command in this table.
+cr ( -- ) Stop metacompilation if debugging? is -1, and dump data stack. If you press control-A, metacompilation is aborted. Otherwise, metacompilation continues. It is a NOP if debugging? is 0.
+break ( -- ) Pause metacompilation and dump data stack. If you press Return, metacompilation is aborted. Otherwise, metacompilation continues. It sets a break point.
+
+During metacompilation, Forth commands will be redefined so that they will compile tokens or assemble bytecode into the target dictionary. There are numerous occasions where the original behavior of a Forth command must be exercised. To preserve the original behavior of a Forth command, it is assigned a different name. Thereby after a command is redefined, we can still exercise its original behavior by invoking the alternate name.
+
+For example, ¡§+¡¨ is a Forth command that adds the top two numbers on the data stack in the F# system. Then in the cefKERNai.f file, a new ¡§DUP¡¨ command is defined to assemble a dup, instruction in the target JFM system. If you still need to duplicate a number, you must use the alternate command ¡§forth_dup¡¨ as shown below. All the F# commands you need to use later must be redefined as ¡§forth_xxx¡¨ commands. If you neglect to redefine them, you will find that the system behaves very strangely.
+
+: forth_dup DUP ;
+: forth_drop DROP ;
+: forth_over OVER ;
+: forth_swap SWAP ;
+: forth_@ @ ;
+: CRR cr ;
+
+The JFM executes commands and accesses data in the dictionary, range 0-1FFF. In F# we allocate a 8k byte memory array, ¡§ram¡¨, to hold the JFM target dictionary. This array contains code and data to be copied into JFM data[] arry, to be executed on the JFMchip.
+
+RAM ( -- a) Memory array in F# for the JFM target dictionary. It has a logical base address of 0 for the JFM. Commands and data words in the target are stored in this array.
+RESET ( -- ) Clear ¡§ram¡¨ image array, preparing it to receive code and data for the JFM.
+RAM@ ( a ¡V n ) Replace a logical address on stack with data stored in ¡§ram¡¨ dictionary.
+RAMC@ ( a ¡V c ) Replace a logical address on stack with byte data stored in ¡§ram¡¨ dictionary.
+RAM! ( a n -- ) Store second integer on stack into logical address of ¡§ram¡¨ dictionary.
+RAM! ( a c -- ) Store second byte on stack into logical address of ¡§ram¡¨ dictionary.
+FOUR ( a -- ) Display four consecutive words in target dictionary.
+SHOW ( a ¡V a+128 ) Display 128 words in target from address ¡§a¡¨. It also returns a+128 to ¡§show¡¨ the next block of 128 words.
+SHOWRAM ( -- ) Display the entire JFM dictionary of 2K words.
+
+The JFM  metacompiler builds a target dictionary for JFM in RAM. This dictionary eventually will be synthesized into JFM. This dictionary is written to a text file eJ32i.mif.
+hFile ( -- handle ) A variable holding a file handle.
+CRLF-ARRAY ( -- a ) A byte array containing CR and LF characters.
+CRLF ( -- ) Insert a carriage return and a line feed into the currently opened file.
+open-mif-file ( -- ) Open a file named eJ32i.mif for writing.
+write-mif-header ( -- ) Write a header required by Arduino into current file.
+write-mif-trailer ( -- ) Write last line of text into current file.
+write-mif-data ( -- ) Write a 8K byte image of the JFM from RAM to the eJ32i.mif file. 
+close-mif-file ( -- )Close eJ32i.mif file.
+write-mif-file ( -- ) open eJ32i.mif file, write a header, write data, write trailer, and then closes the file. eJ32i.mif containing 8K bytes of the JFM dictionary.
+
+The JFM metacompiler continues to load the JFM assembler in ASM32i.f. In the assembler, all bytecode of VFM are defined, and the ways they are assembled into code fields of Forth commands. Means to compile link fields and name fields to form headers of commands are also defined. It is now almost ready to assemble primitive commands for JFM.
+FLOAD fASM32i.f
+
+After the assembler is built, we are ready to build the kernel part of JFM dictionary. All system variable are assembled starting at 0x40. Optimized assembly macros are defined. The JFM dictioary starts at location 0x100, 
+FLOAD KERN32i.f
+
+Forth high level compound commands are compiled starting at 0x100, by loading cEF32i.f. Then all the macro assembly words are redefined as regular Forth compound commands to be interpreted and compiled correctly by the JFM outer interpreter.
+FLOAD cEF32i.f
+At last, write the contents of JVM dictionary to eJ32i.mif.
+write-mif-file
+
+I wrote a simulator of JFM on top of the metacompiler to validate that the Java bytecode run correctly. The RAM array is still intact, and the simulator executes JFM bytecode starting at RAM location 0.
+
+
+
+
+
+ASM32i.f Assembler
+
+
+Byte Code Assembler
+
+The ASM32i.f file contains a bytecode assembler for JFM. It packs bytecode into JFM memory pointed to by a by a variable ¡§h¡¨. Assembly commands are executed to insert bytecode into consecutive bytes, from right to left in the big endian order. Assembly commands make necessary decisions as to whether to add more data bytese to the current bytecode, or start a new bytecode.
+
+JFM has variable length bytecode. Byte codeare executed from right to left. Assembly commands for single byte code are defined by a defining word INST. Two byte code are defined by a defining word INSB. Three byte code are defined by a defining word INSW. 5  byte code are defined by a defining word INSI. Defining words in Forth makes this optimizing assembler very simple and very efficient.
+
+JFM is based on a Subroutine Threading Model, in which a primitive command has bytecode in its code field. To assemble a primitive command, the assemble first build a header, with a link field and a name field. After that, the assembler simply packs consecutive bytecode until the primitive commands is completed.
+
+h ( -- a )A variable pointing to the next free memory cell at the top of the target dictionary. 
+VARIABLE h
+lastH ( -- a )A variable pointing to the name field of the current target command under construction.
+NAMER! ( d -- )Compile an integer value, ¡§d¡¨, to the top of the target dictionary. 
+COMPILE-ONLY ( -- ) Patch Bit 6 in first word of name field in current target command. Text interpreter checks it to avoid executing compiler commands.
+IMMEDIATE ( -- )Patch Bit 7 in first word of name field in current target command. Compiler checks it to execute commands while compiling.
+ORG ( a -- )Initialize pointer ¡§h¡¨ to a new address to start assembling. 
+#, ( d -- ) Compile an integer d to top of target dictionary. It is the most primitive assembler and compiler. The JFM assembler is an extension of this primitive assembly command.
+,W ( d -- ) Compile a short w to the program word pointed to by h. It generally fills the address field in the current byte code.
+,I ( d -- ) Compile a Java bytecode to dictionary. 
+INST ( b -- ) Define an one byte bytecode assembly commands. It creates a byte code assembly command like a constant. When a byte code assembly command is later executed, this byte ¡§b¡¨ is retrieved and a byte code is assembled into the current dictionary.
+INST ( b -- ) Define an one byte bytecode assembly commands. It creates a byte code assembly command like a constant. When a byte code assembly command is later executed, this byte ¡§b¡¨ is retrieved and a byte code is assembled into the current dictionary.
+INSC ( b b -- ) Define an one byte bytecod with one additional data byte. 
+INSW ( b w -- ) Define an one byte bytecod with 2 additional data byte. 
+INSI ( b i -- ) Define an one byte bytecode with 4 additional data byte. 
+
+All JVM bytecode are then defined with a few more bytecode needed by the underlying Forth Machine.
+
+Command Headers
+
+In JFM, all Forth commands are compiled in a dictionary, and linked as a list. Each command has a link field of one 16-bit word, a variable length name field in which the first byte contains a length followed by the ASCII code of the name, and a variable length code field. A primitive command has bytecode in its code field. A compound command has  a token list in its code field. Here are commands to build headers, which include link and name fields.
+
+( -- ) Build a header for a new target command. The header includes a link field and a name field. The address of the name field in the last target command is stored in ¡§lasth¡¨, and is compiled into the link field. ¡§h¡¨ points to the name field of the new command, and is copied into ¡§lasth¡¨. Now, the following string is packed into the name field, starting with its length byte, and null filled to the word boundary. Now, ¡§h¡¨ points to the code field of this new target command.
+makehead ( -- ) Build a header with and save the name string to define a compiler command in metacompiler. It displays the name and code field address. A string can be used repeatedly by saving and restoring its pointer in ¡§>IN¡¨.
+$LIT ( -- ) Compile a packed string for a string literal inside a token list. It works similarly as (makehead). However, the name string is delimited by space character (ASCII 0x20), while a string literal is delimited by a double-quote character (ASCII 0x22).
+
+Structured Assembler
+
+The JFM assembler is pushed further to assemble short branches and loops for s number of more complicated macros.
+
+ldb assembles byte literals.
+ldw assembles short literals.
+LIT assembles integer literals. May be changed later to byte literals.
+
+begin implements begin-again, begin-until, begin-while-repeat.
+bz implements if, until, and while.
+Ifeq implements if, until, and while.
+bra implements else and repeat.
+jmp implements else and repeat.
+if implements if.
+ifeqq implements >.
+ifneg implements 0<.
+ifgreat implements >.
+ifless implements <.
+skip implements bra.
+else implements skip.
+until implements bz.
+while implements if.
+repeat implements bra.
+again implements bra.
+aft ( a -- a' a" ) implements skip.
+for ( -- a ) implements pushr.
+next ( a -- ) implements donext.
+
+
+Compilers for Primitive and Compound Commands
+
+We are now at the peak of our metacompiler. All commands have a link field and a name field. Primitive commands have acode field. Compound commands have a code field with token lists. Tokens are 3-bytes bytecode, and are subroutine call bytecode. In JFM, bytecode and token can be intermixed freely. Two defining commands are now created to build the primitive and compound commands. 
+CODE creates a header for a primitive commands, and its following code field can now be packed with byte code. (colon-colon) creates a header for a compound command, and its following parameter field can be stuffed with a token list. CODE and are defined identically though.
+
+CODE ( -- ) Create a new primitive command in JFM target dictionary. It creates a new header with a link field and a name field, and is ready to assemble byte code in the following code field. It also creates an assembly command in the metacompiler, storing its code field address. When this assembly command is encountered by metacompiler, it compiles its code field address as a token to extend the token list currently under construction. 
+( -- ) Create a new compound command in JFM target dictionary. It creates a link field and a name field, and then is ready to compile a new token list. Now, a token list is built in the code field, to become a new compound command in target dictionary. It also creates an assembly command in the metacompiler, storing its code field address. When this assembly command is encountered by metacompiler, it compiles its code field address as a token to extend the token list currently under construction.
+
+
+
+
+
+KERN32i.f
+
+
+System Variables
+
+Constant and variable store in page 0 JFM memory can be accessed most efficiently by the Java bytecode bipush. A set of system variables are implemented as constants pointing to specific addresses in the variable area, allocated in the beginning of the dictionary 0X40-73. 
+
+: BASE    40 LIT ;    \ number base
+: COMPI   44 LIT ;    \ compile flag
+: >IN     48 LIT ;    \ ptr to input char
+: HLD     4C LIT ;    \ ptr to output digit
+: CONTEXT 50 LIT ;    \ ptr to vocabulary
+: LAST    54 LIT ;    \ ptr to last name 
+: CP      58 LIT ;    \ ptr dictionary top
+: DP      5C LIT ;    \ ptr to last dictionary entry
+: FENCE   60 LIT ;    \ ptr to boot dictionary 
+: tmp     64 LIT ;    \ scratch
+: ucase   68 LIT ;    \ case insensitive, $FFFFFFDF
+: input   6C LIT ;    \ input buffer
+: output  70 LIT ;    \ output buffer
+
+Assembly Macros
+
+Most of the JFM bytecode are similar to Forth commands, but not exactly. These Forth commands are used extensively in writing the outer interpreter, and must assemble optimized Java bytecode for the best performance. A set of assembly macros are implemented to assemble optimized outer interpreter. Eventually they will be redefined as regular Forth commands which will be interpreted and compiled correctly in the final JFM with less efficiency.
+
+: EXIT return ;
+: ! ( n a -- ) swap iastore ;
+: @ ( a - n ) iaload ;
+: C! ( n a -- ) swap bastore ;
+: C@ ( a - n ) baload ;
+: W! ( n a -- ) swap sastore ;
+: W@ ( a - n ) saload ;
+: >R ( n ) pushr ;
+: R> ( - n ) popr ;
+: R@ ( - n ) dupr ;
+: DUP ( n - n n ) dup ;
+: SWAP ( n1 n2 - n2 n1 )  swap ;
+: DROP ( w w  -- )  pop ;
+: 2DROP ( w w  -- )  pop2 ;
+: + iadd ;
+: - isub ;
+: * imul ;
+: / idiv ;
+: MOD irem ;
+: OR ( n n - n )  ior ;
+: AND iand ;
+: XOR ixor ;
+: OVER dup2 pop ;
+: NEGATE ( n -- -n )  ineg ;
+: 1- ( a -- a )  iconst_m1 iadd ;
+: 1+ ( a -- a )  iconst_1 iadd ;
+: 2- ( a -- a )  iconst_2 isub ;
+: 2+ ( a -- a )  iconst_2 iadd ;
+: CELL- ( a -- a )  iconst_4 isub ;
+: CELL+ ( a -- a )  iconst_4 iadd ;
+: NOT ( w -- w ) iconst_m1 ixor ;
+: BL ( -- 32 )  20 LIT ;
+: +! ( n a -- )  dup pushr iaload iadd 
+   popr swap iastore ;
+: ROT ( w1 w2 w3 -- w2 w3 w1 )
+   pushr swap popr swap ;
+: -ROT ( w1 w2 w3 -- w3 w1 w2 )
+   dup_x2 pop ;
+: 2DUP ( w1 w2 -- w1 w2 w1 w2 )
+   dup2 ;
+: 2! dup2 ! swap pop iconst_4 iadd ! ;
+: 2@ dup @ swap iconst_4 iadd @ swap ;
+: COUNT ( b -- b+1 c )
+   dup baload swap 1+ swap ;
+: 0< ( n - f )
+   ifneg iconst_0 else iconst_m1 then ;
+: = ( w w -- t )
+   ifeqq iconst_0 else iconst_m1 then ;
+: > ( n1 n2 - f )
+   ifgreat iconst_0 else iconst_m1 then ;
+: < ( n1 n2 - f )
+   ifless iconst_0 else iconst_m1 then ;
+: ?DUP ( w -- w w | 0 )
+   dup if dup then ;
+: ABS ( n -- +n )
+   dup ifneg else ineg then ;
+
+
+
+EF32i.f
+
+
+The JFM dictionary contains records of all Forth commands. The low level primitive commands were discussed in the ASM32i.f and KERN32i.f sections. The high level compound commands are discussed here. All compound commands are defined in this file. They are discussed in their loading order. The loading order is very important in the JFM metacompiler, because forward referencing is not allowed. All assembling and compiling processes are accomplished in a single pass.
+
+JFM metacompiler behaves very similar to a regular Forth system. However, to compile primitive commands into a dictionary, the command CODE was changed to accomplish this goal. To compile high level compound commands to the dictionary, as we do here, a new set of commands (colon-colon) and (semicolon-semicolon) are used instead of the Forth commands : (colon) and ; (semicolon). Unlike : (colon), (colon-colon) does not have a compiling state, and the metacompiler remains in the interpretive state throughout. New commands defined by the metacompiler would just add new tokens to the dictionary. 
+
+Control structure commands like IF, ELSE, THEN, BEGIN, WHILE, REPEAT, etc, are all redeined in the metacompiler so they can construct control structures properly in the JFM dictionary. The only exception is the handling of literals. An integer encountered into metacompiler remain on the data stack. If you intended to compiler it as a literal in the dictionary, you would have to use the special command LIT. If you are familiar with Forth language, you would notice that the compound commands in EF32i.f read identically like regular Forth code, except that integer literals have to be entered explicitly. 
+
+Terminal IO
+bye   ext ;;      
+key   get ;;      
+emit  put ;;
+
+Common Commands
+
+max ( n n -- n ) 2DUP      < if SWAP then DROP ;;
+min ( n n -- n ) 2DUP SWAP < if SWAP then DROP ;;
+/mod ( n n -- r q )
+*/ ( n n n -- q ) 
+
+Memory access
+execute ( a ) >R ;;
+here ( -- a ) CP @ ;;
+pad ( -- a ) CP @ 50 LIT + ;;
+cmove ( b b u -- ) 
+fill ( b u c -- ) 
+
+Numeric Output 
+digit ( u -- c )
+extract ( n base -- n c )
+<# ( -- ) pad HLD ! ;;
+hold ( c -- ) HLD @ 1- DUP HLD ! C! ;;
+# ( u -- u ) BASE @ extract hold ;;
+#s ( u -- 0 ) begin # DUP while repeat ;;
+sign ( n -- ) 0< if ( CHAR - ) 2D LIT hold then ;;
+#> ( w -- b u ) DROP HLD @ pad OVER - ;;
+str ( n -- b u ) DUP >R ABS <# #s R> sign #> ;;
+hex ( -- ) 10 LIT BASE ! ;;
+decimal ( -- ) 0A LIT BASE ! ;;
+>CHAR is very important in converting a non-printable character to a harmless 'underscore' character (ASCII 95). As eForth is designed to communicate with you through a serial I/O device, it is important that eForth will not emit control characters to the host and causes unexpected behavior on the host computer. >CHAR thus filters the characters before they are sent out by TYPE. 
+ALIGNED changes the address to the next cell boundary so that it can be used to address 32 bit word in memory.
+ALIGNED ( b -- a ) 3 LIT + FFFFFFFC LIT AND ;;
+HERE returns the address of the first free location above the code dictionary, where new commands are compiled. 
+PAD returns the address of the text buffer where numbers are constructed and text strings are stored temporarily. 
+TIB returns the terminal input buffer where input text string is held. 
+@EXECUTE is a special command supporting the vectored execution commands in eForth. It fetches the code field address of a token and executes the token. 
+CMOVE copies a memory array from one location to another. It copies one byte at a time.
+MOVE copies a memory array from one location to another. It copies one word at a time.
+FILL fills a memory array with the same byte. 
+space ( -- ) BL emit ;;
+spaces ( +n -- ) for aft space then next ;;
+>char ( c -- c )
+type ( b u -- )
+cr ( -- ) ( =Cr )
+do$ ( -- a , get prior frame )
+
+String Output
+$"| ( -- a ) do$ ;; 
+."| ( -- ) do$ COUNT type ;;
+ .r ( n +n -- )
+ . ( n -- )
+? ( a -- ) @ . ;;
+
+Numeric Input 
+digit? ( c base -- u t | x 0 )
+number? ( a -- n T | a F )
+
+Parsing 
+parse ( c a -- a-1 )
+token ( -- a , parser buffer )
+word ( c -- a , word buffer )
+  CP @ 1+ parse ;;
+
+Dictionary Search
+name> ( na -- ca ) COUNT 1F LIT AND +  ;;
+same? ( a na -- a na diff ) 
+name? ( a -- cfa nfa | a 0 )
+
+compiler
+[ ( -- )
+] ( -- )
+, ( n -- ) here DUP CELL+ CP ! ! CP @ DP ! ;;
+w, ( w -- ) here DUP 2+ CP ! W! CP @ DP ! ;;
+c, ( c -- ) here DUP 1+ CP ! C! CP @ DP ! ;;
+allot ( n -- ) 
+compil ( w -- ) B6 LIT c, w, ;; 
+literal ( n ) 
+
+outer interpreter
+ok ( -- )
+quit ( -- )
+abort"| ( f -- )
+error ( a -- )
+
+colon compiler
+compile ( -- )
+?unique ( a -- a )
+$,n ( a -- )
+dm+ ( b u -- b+u )
+dump ( b u -- )
+>name ( ca -- na | F )
+id ( a -- )
+see ( -- ; <string> )
+words ( -- )
+case if $FFFFFFDF ldi else $FFFFFFFF ldi then ucase ! ;;error
+overt ( -- ) LAST @ CONTEXT W! ;;
+; ( -- )
+: ( -- ; <string> )
+
+
+Numeric Output
+
+DIGIT converts an integer to an ASCII digit. 
+EXTRACT extracts the least significant digit from a number n. n is divided by the radix in BASE and returned on the stack. 
+<# initiates the output number conversion process by storing PAD buffer address into variable HLD, which points to the location next numeric digit will be stored.
+HOLD appends an ASCII character whose code is on the top of the parameter stack, to the numeric output string at HLD. HLD is decremented to receive the next digit.
+# (dig) extracts one digit from integer on the top of the parameter stack, according to radix in BASE, and add #S (digs) extracts all digits to output string until the integer on the top of the parameter stack is divided down to 0.
+#S ( u -- 0 ) BEGIN # DUP WHILE REPEAT ;;
+SIGN inserts a - sign into the numeric output string if the integer on the top of the parameter stack is negative.
+SIGN ( n -- ) 0< IF ( CHAR - ) 2D LIT HOLD THEN ;;
+#> terminates the numeric conversion and pushes the address and length of output numeric string on the parameter stack.
+str converts a signed integer on the top of data stack to a numeric output string.
+HEX sets numeric conversion radix in BASE to 16 for hexadecimal conversions.
+DECIMAL sets numeric conversion radix in BASE to 10 for decimal conversions.
+
+Numeric Input
+
+DIGIT? converts a digit to its numeric value according to the current base, and NUMBER? converts a number string to a single integer. 
+NUMBER? converts a string of digits to a single integer. If the first character is a $ sign, the number is assumed to be in hexadecimal. Otherwise, the number will be converted using the radix value stored in BASE. For negative numbers, the first character should be a - sign. No other characters are allowed in the string. If a non-digit character is encountered, the address of the string and a false flag are returned. Successful conversion returns the integer value and a true flag. If the number is larger than 2**n, where n is the bit width of a single integer, only the modulus to 2**n will be kept. 
+
+Character Output
+
+SPACE outputs a blank space character. 
+CHARS outputs n characters c. 
+SPACES outputs n blank space characters. 
+TYPE outputs n characters from a string in memory. Non ASCII characters are replaced by a underscore character.
+CR outputs a carriage-return and a line-feed. Prior output characters are accumulated in a UDP packet buffer. do$ retrieves the address of a string stored as the second item on the return stack. do$ is a bit difficult to understand, because the starting address of the following string is the second item on the return stack. This address is pushed on the data stack so that the string can be accessed. This address must be changed so that the address interpreter will return to the token right after the compiled string. This address will allow the address interpreter to skip over the string literal and continue to execute the token list as intended. Both $¡¨| push the address of the following string on stack. Other commands can use this address to access data ¡¨| displays the following string on stack. This is a very convenient way to send helping messages to you at run time.
+."| ( -- ) do$ COUNT TYPE ;;
+.R displays a signed integer n , the second item on the parameter stack, right-justified in a field of +n U.R displays an unsigned integer n right-justified in a field of +n characters.
+U. displays an unsigned integer u in free format, followed by a space.
+. (dot) displays a signed integer n in free format, followed by a space.
+ . ( n -- )
+? displays signed integer stored in memory a on the top of the parameter stack, in free format followed by a space.
+? ( a -- ) @ . ;;
+
+Parser
+
+(parse) ( b1 u1 c --b2 u2 n ) From the source string starting at b1 and of u1 characters long, parse out the PACK$ copies a source string (b u) to target address at a. The target string is null filled to the cell boundary. The target address a is returned.
+PACK$ ( b u a -- a ) \ always word-aligned
+PARSE scans the source string in the terminal input buffer from where >IN points to till the end of the buffer, for a word delimited by character c. It returns the address and length of the word parsed out. PARSE calls (parse) to do the dirty work. 
+TOKEN parses the next word from the input buffer and copy the counted string to the top of the name dictionary. Return the address of this counted string. 
+WORD parses out the next word delimited by the ASCII character c. Copy the word to the top of the code dictionary and return the address of this counted string. 
+
+Dictionary Search 
+
+NAME> ( nfa ¡V cfa) Return a code field address from the name field address of a command.
+SAME? ( a1 a2 n ¡V a1 a2 f) Compare n/4 words in strings at a1 and a2. If the strings are the same, return a 0. SAME? ( a a u -- a a f \ -0+ )
+NAME? ( a -- cfa na | a 0 )
+
+Text Interpreter
+
+ABORT resets system and re-enters into the text interpreter loop QUIT. It actually executes QUIT stored in abort¡¨| ( f -- ) A runtime string command compiled in front of a string of error message. If flag f is true, display the following string and jump to ABORT. If flag f is false, ignore the following string and continue executing tokens after the error message.
+ERROR displays an error message at a with a ? mark, and ABORT.
+[ (left-paren) activates the text interpreter by storing the execution address of $INTERPRET into the variable OK used to be a command which displays the familiar 'ok' prompt after executing to the end of a line. In JFM, it displays the top 4 elements on data stack so you can see what is happening on the stack. It is more informative than the plain ¡¥ok¡¦, which only give you a warm and fuzzy feeling about the system. When text interpreter is in compiling mode, the display is suppressed.
+QUIT is the operating system, or a shell, of the eForth system. It is an infinite loop eForth will not leave. It uses QUERY to accept a line of text from the terminal and then let EVAL parse out the tokens and execute them. After a line is processed, it displays the top of data stack and wait for the next line of text. When an error occurred during execution, it displays the command which caused the error with an error message. After the error is reported, it re-initializes the system by jumping to ABORT. Because the behavior of EVAL can be changed by storing either $INTERPRET or $COMPILE into 'EVAL, QUIT exhibits the dual nature of a text interpreter and a compiler. 
+
+Colon Compiler 
+
+, (comma) adds the execution address of a token on the top of the data stack to the code dictionary, and thus compiles a token to the growing token list of the command currently under construction. 
+LITERAL compiles an integer literal to the current compound command under construction. The integer literal is taken from the data stack, and is preceded by the token DOLIT. When this compound command is executed, DOLIT will extract the integer from the token list and push it back on the data stack. LITERAL compiles an address literal if the compiled integer happens to be an execution address of a token. The address will be pushed on the data stack at the run time by DOLIT. 
+ALLOT allocates n bytes of memory on the top of the dictionary. Once allocated, the compiler will not touch the memory locations. It is possible to allocate and initialize this array using the command¡¦, (comma)¡¦.
+ALLOT ( n -- ) ALIGNED CP +! ;;
+$," ( -- ) ( CHAR " ) 22 LIT WORD COUNT + ALIGNED CP ! ;;
+
+?UNIQUE is used to display a warning message to show that the name of a new command already existing in dictionary. eForth does not mind your reusing the same name for different commands. However, giving many commands the same name is a potential cause of problems in maintaining software projects. It is to be avoided if possible and ?UNIQUE reminds you of it. 
+$,n builds a new name field in dictionary using the name already moved to the top of dictionary by PACK$. It pads the link field with the address stored in LAST. A new token can now be built in the code dictionary. 
+$,n ( a -- )
+' (tick) searches the next word in the input stream for a token in the dictionary. It returns the code field address of the token if successful. Otherwise, it displays an error message. 
+[COMPILE] acts similarly, except that it compiles the next command immediately. It causes the following command to be compiled, even if the following command is usually an immediate command which would otherwise be executed. 
+COMPILE is used in a compound command. It causes the next token after COMPILE to be added to the top of the code dictionary. It therefore forces the compilation of a token at the run time. 
+OVERT links a new command to the dictionary and thus makes it available for dictionary searches. 
+] (right paren) turns the interpreter to a compiler. 
+: (colon) creates a new header and start a new compound command. It takes the following string in the input stream to be the name of the new compound command, by building a new header with this name in the name dictionary. It then compiles a call, byte code at the beginning of the code field in the code dictionary. Now, the code dictionary is ready to accept a token list. ] (right paren)  is now invoked to turn the text interpreter into a compiler, which will compile the following words in the input stream to a token list in the code dictionary. The new compound command is terminated by ;, which compiles an EXIT to terminate the token list, and executes [ (left paren) to turn the compiler back to text interpreter. 
+; (semi-colon) terminates a compound command. It compiles an EXIT to the end of the token list, links this new command to the dictionary, and then reactivates the interpreter. 
+
+Debugging Tools
+
+dm+ dumps u bytes starting at address b to the terminal. It dumps 8 words. A line begins with the address of DUMP dumps u bytes starting at address b to the terminal. It dumps 8 words to a line. A line begins with the address of the first byte, followed by 8 words shown in hex. At the end of a line are the 32 bytes shown in ASCII code. 
+>NAME finds the name field address of a token from its code field address. If the token does not exist in the dictionary, it returns a false flag. >NAME is the mirror image of the command NAME>, which returns the code field address of a token from its name field address. Since the code field is right after the name field, whose length is stored in the lexicon byte, NAME> is trivial. >NAME is more complicated because we have to search the dictionary to acertain the name field address. 
+.ID displays the name of a token, given its name field address. It also replaces non-printable characters in a name by under-scores. 
+WORDS displays all the names in the dictionary. The order of commands is reversed from the compiled order. The last defined command is shown first. 
+FORGET searches the dictionary for a name following it. If it is a valid command, trim dictionary below this command. Do nothing if it is not a valid command.
+COLD is a high level word executed upon power-up. It sends out sign-on message, and then falls into the text interpreter loop through QUIT. 
+
+Control Structures 
+
+THEN terminates a conditional branch structure. It uses the address of next token to resolve the address literal at A left by IF or ELSE.
+FOR starts a FOR-NEXT loop structure in a colon definition. It compiles >R, which pushes a loop count on return stack. It also leaves the address of next token on data stack, so that NEXT will compile a DONEXT address literal with the correct branch address.
+BEGIN starts an infinite or indefinite loop structure. It does not compile anything, but leave the current token address on data stack to resolve address literals compiled later.
+NEXT Terminate a FOR-NEXT loop structure, by compiling a DONEXT address literal, branch back to the address A on data stack.
+UNTIL terminate a BEGIN-UNTIL indefinite loop structure. It compiles a QBRANCH address literal using the address on data stack.
+AGAIN terminate a BEGIN-AGAIN infinite loop structure. . It compiles a BRANCH address literal using the address on data stack.
+IF starts a conditional branch structure. It compiles a QBRANCH address literal, with a 0 in the address field. It leaves the address of this address field on data stack. This address will later be resolved by ELSE or THEN in closing the true clause in the branch structure.
+AHEAD starts a forward branch structure. It compiles a BRANCH address literal, with a 0 in the address field. It leaves the address of this address field on data stack. This address will later be resolved when the branch structure is closed.
+REPEAT terminates a BEGIN-WHILE-REPEAT indefinite loop structure. It compiles a BRANCH address literal with address a left by BEGIN, and uses the address of next token to resolve the address literal at A.
+AFT jumps to THEN in a FOR-AFT-THEN-NEXT loop the first time through. It compiles a BRANCH address literal and leaves its address field on stack. This address will be resolved by THEN. It also replaces address A left by FOR by the address of next token so that NEXT will compile a DONEXT address literal to jump back here at run time.
+ELSE (A--A) starts the false clause in an IF-ELSE-THEN structure. It compiles a BRANCH address literal. It uses the current token address to resolve the branch address in A, and replace A with the address of its address literal.
+WHILE (a--Aa) compiles a QBRANCH address literal in a BEGIN-WHILE-REPEAT loop. The address A of this address literal is swapped with address a left by BEGIN, so that REPEAT will resolve all loose ends and build the loop structure correctly.
+
+String Literals 
+
+ABORT" compiles an error message. This error message is display if top item on the stack is non-zero. The rest of the commands in the command is skipped and eForth resets to ABORT. If top of stack is 0, ABORT¡¨ skips over the error message and continue executing the following token list.
+$" compiles a character string. When it is executed, only the address of the string is left on the data stack. You will use this address to access the string and individual characters in the string as a string array. 
+." (dot-quot) compiles a character string which will be displayed when the command containing it is executed in the runtime. This is the best way to present messages to the user. 
+
+Defining Words 
+
+CODE creates a command header, ready to accept byte code for a new primitive command. Without a bytecode assembler, you can use the command , (comma) to add words with bytecode in them.
+CREATE creates a new array without allocating memory. Memory is allocated using ALLOT. 
+VARIABLE creates a new variable, initialized to 0. 
+CONSTANT creates a new constant, initialized to the value on top of stack.
+
+Immediate Commands 
+
+.(  (dot-paren) types the following string till the next ). It is used to output text to the terminal. 
+\ (back-slash) ignores all characters till end of input buffer. It is used to insert comment lines in text. 
+( (paren) ignores the following string till the next ). It is used to place comments in source text. 
+IMMEDIATE sets the immediate lexicon bit in the name field of the new command just compiled. When the compiler encounters a command with this bit set, it will not compile this command into the token list under construction, but execute the token immediately. This bit allows structure commands to build special structures in a compound command, and to process special conditions when the compiler is running. 
+
+Forth Primitives
+r> $CC LIT c, return IMMEDIATE
+r@ $CE LIT c, return IMMEDIATE
+>r $CD LIT c, return IMMEDIATE
+.( ( -- ) $29 LIT parse type ;; IMMEDIATE
+( $29 LIT parse 2DROP ;; IMMEDIATE
+immediate $80 LIT LAST +! ;;
+exit return
+! swap iastore return
+@ iaload return
+c! swap bastore return
+c@ baload return
+w! swap sastore return
+w@ saload return
+swap swap return
+drop pop return
+2drop pop2 return
+over dup2 pop return
+2dup dup2 return
++  iadd return
+-  isub return
+*  imul return
+/  idiv return
+mod  irem return
+or  ior return
+and  iand return
+xor  ixor return
+not iconst_m1 ixor return
+negate ineg return
+1- iconst_m1 iadd return
+1+ iconst_1 iadd return
+2- iconst_2 isub return
+2+ iconst_2 iadd return
+cell- iconst_4 isub return
+cell+ iconst_4 iadd return
+
+bl $20 LIT return
++!
+rot
+-rot
+2!
+2@
+count 
+dup dup return
+
+RAM Initializatio
+
+h forth_@ forth_dup forth_dup 
+0 org 
+cold 0 #, 0 #, 0 #, 0 #,
+$40 org
+$10 #,
+$0  #, 
+$0  #, 
+$0  #,
+lasth forth_@ $10 LSHIFT #,
+( h )         #,
+( h )         #,
+( h )         #,
+$0  #, 
+$0  #,
+$FFFFFFDF  #,
+$1000 #,
+$1400 #,
+
+
+
+eJ32Isim.f
+
+ D0B1 forth_' key  >body forth_@ ramw!
+ D1B1 forth_' emit >body forth_@ ramw!
+
+forth_forget h
+
+DECIMAL
+$3F CONSTANT LIMIT ( stack depth )
+$1FFF CONSTANT RANGE ( program memory size in byte )
+VARIABLE CLOCK 
+VARIABLE (REGISTER) ( where registers and stacks are )
+VARIABLE BREAK
+VARIABLE input $1000 input !
+VARIABLE output $1400 output !
+
+: REGISTER  PAD ;
+
+: P     REGISTER ;
+: RP    REGISTER 8 + ;
+: SP    REGISTER 12 + ;
+: T     REGISTER 16 + ;
+: RSTACK  RP C@ LIMIT AND 4 * REGISTER + $100 + ;
+: SSTACK  SP C@ LIMIT AND 4 * REGISTER + $200 + ;
+: S	SSTACK ;
+: R	RSTACK ;
+
+: RPUSH ( n -- , push n on return stack )
+        4 RP +! RSTACK ! ;
+: RPOPP ( -- n , pop n from return stack )
+        RSTACK @ -4 RP +! ;
+: SPUSH ( n -- , push n on data stack )
+        T @ 1 SP +! SSTACK ! T ! ;
+: SPOPP ( -- n , pop n from data stack )
+        T @ SSTACK @ T ! -1 SP +! ;
+: CYCLE 1 CLOCK +! ;
+
+: continue 1 P +! ;
+: JUMP  2 P +! ;
+: bra   P @ 1+ ramw@ 1- P ! ; 
+: bz    SPOPP IF JUMP ELSE bra THEN ;
+: call  P @ 3 + RPUSH bra ;
+: return R @ 1- P ! -4 RP +!  ;
+: ret   R P @ 1+ ramc@ CELLS - @ 1- P ! ;
+
+: get   KEY DUP $1B = ABORT" done"
+        SPUSH ;
+: put   SPOPP $7F AND EMIT ;
+
+DECIMAL
+
+: execute ( code -- )
+ DUP 00 = ( 0x00 nop ) IF DROP EXIT THEN 
+ DUP 01 = ( 0x01 aconst_null ) IF DROP 0 SPUSH EXIT THEN
+ DUP 02 = ( 0x02 iconst_m1 ) IF DROP -1 SPUSH EXIT THEN
+ DUP 03 = ( 0x03 iconst_0 ) IF DROP 0 SPUSH EXIT THEN
+ DUP 04 = ( 0x04 iconst_1 ) IF DROP 1 SPUSH EXIT THEN
+ DUP 05 = ( 0x05 iconst_2 ) IF DROP 2 SPUSH EXIT THEN
+ DUP 06 = ( 0x06 iconst_3 ) IF DROP 3 SPUSH EXIT THEN
+ DUP 07 = ( 0x07 iconst_4 ) IF DROP 4 SPUSH EXIT THEN
+ DUP 08 = ( 0x08 iconst_5 ) IF DROP 5 SPUSH EXIT THEN
+ DUP 09 = ( 0x09 lconst_0 ) IF DROP EXIT THEN
+ DUP 10 = ( 0x0a lconst_1 ) IF DROP EXIT THEN
+ DUP 11 = ( 0x0b fconst_0 ) IF DROP EXIT THEN
+ DUP 12 = ( 0x0c fconst_1 ) IF DROP EXIT THEN
+ DUP 13 = ( 0x0d fconst_2 ) IF DROP EXIT THEN
+ DUP 14 = ( 0x0e dconst_0 ) IF DROP EXIT THEN
+ DUP 15 = ( 0x0f dconst_1 ) IF DROP EXIT THEN
+ DUP 16 = ( 0x10 bipush ) IF DROP P @ 1+ RAMC@ DUP $80 AND IF $FFFFFF00 + THEN
+     SPUSH 1 P +! EXIT THEN
+ DUP 17 = ( 0x11 sipush ) IF DROP p @ 1+ RAMW@ DUP $8000 AND IF $FFFF0000 + THEN 
+     SPUSH 2 P +! EXIT THEN
+ DUP 18 = ( 0x12 ldc ) IF DROP EXIT THEN
+ DUP 19 = ( 0x13 ldc_w ) IF DROP EXIT THEN
+ DUP 20 = ( 0x14 ldc2_w ) IF DROP EXIT THEN
+ DUP 21 = ( 0x15 iload ) IF DROP R P @ 1+ ramc@ 4 * 
+     - @ SPUSH 1 P +! EXIT THEN
+ DUP 22 = ( 0x16 lload ) IF DROP EXIT THEN
+ DUP 23 = ( 0x17 fload ) IF DROP EXIT THEN
+ DUP 24 = ( 0x18 dload ) IF DROP EXIT THEN
+ DUP 25 = ( 0x19 aload ) IF DROP EXIT THEN
+ DUP 26 = ( 0x1a iload_0 ) IF DROP R @ SPUSH EXIT THEN
+ DUP 27 = ( 0x1b iload_1 ) IF DROP R 4 - @ SPUSH EXIT THEN
+ DUP 28 = ( 0x1c iload_2 ) IF DROP R 8 - @ SPUSH EXIT THEN
+ DUP 29 = ( 0x1d iload_3 ) IF DROP R 12 - @ SPUSH EXIT THEN
+ DUP 30 = ( 0x1e lload_0 ) IF DROP EXIT THEN
+ DUP 31 = ( 0x1f lload_1 ) IF DROP EXIT THEN
+ DUP 32 = ( 0x20 lload_2 ) IF DROP EXIT THEN
+ DUP 33 = ( 0x21 lload_3 ) IF DROP EXIT THEN
+ DUP 34 = ( 0x22 fload_0 ) IF DROP EXIT THEN
+ DUP 35 = ( 0x23 fload_1 ) IF DROP EXIT THEN
+ DUP 36 = ( 0x24 fload_2 ) IF DROP EXIT THEN
+ DUP 37 = ( 0x25 fload_3 ) IF DROP EXIT THEN
+ DUP 38 = ( 0x26 dload_0 ) IF DROP EXIT THEN
+ DUP 39 = ( 0x27 dload_1 ) IF DROP EXIT THEN
+ DUP 40 = ( 0x28 dload_2 ) IF DROP EXIT THEN
+ DUP 41 = ( 0x29 dload_3 ) IF DROP EXIT THEN
+ DUP 42 = ( 0x2a aload_0 ) IF DROP EXIT THEN
+ DUP 43 = ( 0x2b aload_1 ) IF DROP EXIT THEN
+ DUP 44 = ( 0x2c aload_2 ) IF DROP EXIT THEN
+ DUP 45 = ( 0x2d aload_3 ) IF DROP EXIT THEN
+ DUP 46 = ( 0x2e iaload ) IF DROP SPOPP ram@ SPUSH EXIT THEN
+ DUP 47 = ( 0x2f laload ) IF DROP EXIT THEN
+ DUP 48 = ( 0x30 faload ) IF DROP EXIT THEN
+ DUP 49 = ( 0x31 daload ) IF DROP EXIT THEN
+ DUP 50 = ( 0x32 aaload ) IF DROP EXIT THEN
+ DUP 51 = ( 0x33 baload ) IF DROP SPOPP ramc@ SPUSH EXIT THEN
+ DUP 52 = ( 0x34 caload ) IF DROP EXIT THEN
+ DUP 53 = ( 0x35 saload ) IF DROP SPOPP ramw@ SPUSH EXIT THEN
+ DUP 54 = ( 0x36 istore ) IF DROP SPOPP R P @ 1+ ramc@ 4 * 
+     - ! 1 P +! EXIT THEN
+ DUP 55 = ( 0x37 lstore ) IF DROP EXIT THEN
+ DUP 56 = ( 0x38 fstore ) IF DROP EXIT THEN
+ DUP 57 = ( 0x39 dstore ) IF DROP EXIT THEN
+ DUP 58 = ( 0x3a astore ) IF DROP EXIT THEN
+ DUP 59 = ( 0x3b istore_0 ) IF DROP SPOPP R ! EXIT THEN
+ DUP 60 = ( 0x3c istore_1 ) IF DROP SPOPP R 4 - ! EXIT THEN
+ DUP 61 = ( 0x3d istore_2 ) IF DROP SPOPP R 8 - ! EXIT THEN
+ DUP 62 = ( 0x3e istore_3 ) IF DROP SPOPP R 12 - ! EXIT THEN
+ DUP 63 = ( 0x3f lstore_0 ) IF DROP EXIT THEN
+ DUP 64 = ( 0x40 lstore_1 ) IF DROP EXIT THEN
+ DUP 65 = ( 0x41 lstore_2 ) IF DROP EXIT THEN
+ DUP 66 = ( 0x42 lstore_3 ) IF DROP EXIT THEN
+ DUP 67 = ( 0x43 fstore_0 ) IF DROP EXIT THEN
+ DUP 68 = ( 0x44 fstore_1 ) IF DROP EXIT THEN
+ DUP 69 = ( 0x45 fstore_2 ) IF DROP EXIT THEN
+ DUP 70 = ( 0x46 fstore_3 ) IF DROP EXIT THEN
+ DUP 71 = ( 0x47 dstore_0 ) IF DROP EXIT THEN
+ DUP 72 = ( 0x48 dstore_1 ) IF DROP EXIT THEN
+ DUP 73 = ( 0x49 dstore_2 ) IF DROP EXIT THEN
+ DUP 74 = ( 0x4a dstore_3 ) IF DROP EXIT THEN
+ DUP 75 = ( 0x4b astore_0 ) IF DROP EXIT THEN
+ DUP 76 = ( 0x4c astore_1 ) IF DROP EXIT THEN
+ DUP 77 = ( 0x4d astore_2 ) IF DROP EXIT THEN
+ DUP 78 = ( 0x4e astore_3 ) IF DROP EXIT THEN
+ DUP 79 = ( 0x4f iastore ) IF DROP SPOPP SPOPP ram! EXIT THEN
+ DUP 80 = ( 0x50 lastore ) IF DROP EXIT THEN
+ DUP 81 = ( 0x51 fastore ) IF DROP EXIT THEN
+ DUP 82 = ( 0x52 dastore ) IF DROP EXIT THEN
+ DUP 83 = ( 0x53 aastore ) IF DROP EXIT THEN
+ DUP 84 = ( 0x54 bastore ) IF DROP SPOPP SPOPP RAMC! EXIT THEN
+ DUP 85 = ( 0x55 castore ) IF DROP EXIT THEN
+ DUP 86 = ( 0x56 sastore ) IF DROP SPOPP SPOPP RAMW! EXIT THEN
+ DUP 87 = ( 0x57 pop ) IF DROP SPOPP DROP EXIT THEN
+ DUP 88 = ( 0x58 pop2 ) IF DROP SPOPP DROP SPOPP DROP EXIT THEN
+ DUP 89 = ( 0x59 dup ) IF DROP T @ SPUSH EXIT THEN
+ DUP 90 = ( 0x5a dup_x1 ) IF DROP SPOPP SPOPP OVER SPUSH SPUSH SPUSH EXIT THEN
+ DUP 91 = ( 0x5b dup_x2 ) IF DROP SPOPP SPOPP OVER SPOPP SWAP 
+     SPUSH SPUSH SPUSH SPUSH EXIT THEN
+ DUP 92 = ( 0x5c dup2 ) IF DROP SPOPP SPOPP OVER OVER SPUSH SPUSH SPUSH SPUSH EXIT THEN
+ DUP 93 = ( 0x5d dup2_x1 ) IF DROP EXIT THEN
+ DUP 94 = ( 0x5e dup2_x2 ) IF DROP EXIT THEN
+ DUP 95 = ( 0x5f swap ) IF DROP SPOPP SPOPP SWAP SPUSH SPUSH EXIT THEN
+ DUP 96 = ( 0x60 iadd ) IF DROP SPOPP SPOPP + SPUSH EXIT THEN
+ DUP 97 = ( 0x61 ladd ) IF DROP EXIT THEN
+ DUP 98 = ( 0x62 fadd ) IF DROP EXIT THEN
+ DUP 99 = ( 0x63 dadd ) IF DROP EXIT THEN
+ DUP 100 = ( 0x64 isub ) IF DROP SPOPP SPOPP SWAP - SPUSH EXIT THEN
+ DUP 101 = ( 0x65 lsub ) IF DROP EXIT THEN
+ DUP 102 = ( 0x66 fsub ) IF DROP EXIT THEN
+ DUP 103 = ( 0x67 dsub ) IF DROP EXIT THEN
+ DUP 104 = ( 0x68 imul ) IF DROP SPOPP SPOPP * SPUSH EXIT THEN
+ DUP 105 = ( 0x69 lmul ) IF DROP EXIT THEN
+ DUP 106 = ( 0x6a fmul ) IF DROP EXIT THEN
+ DUP 107 = ( 0x6b dmul ) IF DROP EXIT THEN
+ DUP 108 = ( 0x6c idiv ) IF DROP SPOPP SPOPP SWAP / SPUSH EXIT THEN
+ DUP 109 = ( 0x6d ldiv ) IF DROP EXIT THEN
+ DUP 110 = ( 0x6e fdiv ) IF DROP EXIT THEN
+ DUP 111 = ( 0x6f ddiv ) IF DROP EXIT THEN
+ DUP 112 = ( 0x70 irem ) IF DROP SPOPP SPOPP SWAP MOD SPUSH EXIT THEN
+ DUP 113 = ( 0x71 lrem ) IF DROP EXIT THEN
+ DUP 114 = ( 0x72 frem ) IF DROP EXIT THEN
+ DUP 115 = ( 0x73 drem ) IF DROP EXIT THEN
+ DUP 116 = ( 0x74 ineg ) IF DROP SPOPP NEGATE SPUSH EXIT THEN
+ DUP 117 = ( 0x75 lneg ) IF DROP EXIT THEN
+ DUP 118 = ( 0x76 fneg ) IF DROP EXIT THEN
+ DUP 119 = ( 0x77 dneg ) IF DROP EXIT THEN
+ DUP 120 = ( 0x78 ishl ) IF DROP SPOPP SPOPP SWAP LSHIFT SPUSH EXIT THEN
+ DUP 121 = ( 0x79 lshl ) IF DROP EXIT THEN
+ DUP 122 = ( 0x7a ishr ) IF DROP SPOPP SPOPP SWAP RSHIFT SPUSH EXIT THEN
+ DUP 123 = ( 0x7b lshr ) IF DROP EXIT THEN
+ DUP 124 = ( 0x7c iushr ) IF DROP EXIT THEN
+ DUP 125 = ( 0x7d lushr ) IF DROP EXIT THEN
+ DUP 126 = ( 0x7e iand ) IF DROP SPOPP SPOPP AND SPUSH EXIT THEN
+ DUP 127 = ( 0x7f land ) IF DROP EXIT THEN
+ DUP 128 = ( 0x80 ior ) IF DROP SPOPP SPOPP OR SPUSH EXIT THEN
+ DUP 129 = ( 0x81 lor ) IF DROP EXIT THEN
+ DUP 130 = ( 0x82 ixor ) IF DROP SPOPP SPOPP XOR SPUSH EXIT THEN
+ DUP 131 = ( 0x83 lxor ) IF DROP EXIT THEN
+ DUP 132 = ( 0x84 iinc ) IF DROP SPOPP SPOPP DUP ram@ ROT + SWAP ram! EXIT THEN
+ DUP 133 = ( 0x85 i2l ) IF DROP EXIT THEN
+ DUP 134 = ( 0x86 i2f ) IF DROP EXIT THEN
+ DUP 135 = ( 0x87 i2d ) IF DROP EXIT THEN
+ DUP 136 = ( 0x88 l2i ) IF DROP EXIT THEN
+ DUP 137 = ( 0x89 l2f ) IF DROP EXIT THEN
+ DUP 138 = ( 0x8a l2d ) IF DROP EXIT THEN
+ DUP 139 = ( 0x8b f2i ) IF DROP EXIT THEN
+ DUP 140 = ( 0x8c f2l ) IF DROP EXIT THEN
+ DUP 141 = ( 0x8d f2d ) IF DROP EXIT THEN
+ DUP 142 = ( 0x8e d2i ) IF DROP EXIT THEN
+ DUP 143 = ( 0x8f d2l ) IF DROP EXIT THEN
+ DUP 144 = ( 0x90 d2f ) IF DROP EXIT THEN
+ DUP 145 = ( 0x91 i2b ) IF DROP EXIT THEN
+ DUP 146 = ( 0x92 i2c ) IF DROP EXIT THEN
+ DUP 147 = ( 0x93 i2s ) IF DROP EXIT THEN
+ DUP 148 = ( 0x94 lcmp ) IF DROP EXIT THEN
+ DUP 149 = ( 0x95 fcmpl ) IF DROP EXIT THEN
+ DUP 150 = ( 0x96 fcmpg ) IF DROP EXIT THEN
+ DUP 151 = ( 0x97 dcmpl ) IF DROP EXIT THEN
+ DUP 152 = ( 0x98 dcmpg ) IF DROP EXIT THEN
+ DUP 153 = ( 0x99 ifeq ) IF DROP SPOPP IF JUMP ELSE bra THEN EXIT THEN
+ DUP 154 = ( 0x9a ifne ) IF DROP SPOPP IF bra ELSE JUMP THEN EXIT THEN
+ DUP 155 = ( 0x9b iflt ) IF DROP SPOPP 0< IF bra ELSE JUMP THEN EXIT THEN
+ DUP 156 = ( 0x9c ifge ) IF DROP SPOPP 0< IF JUMP ELSE bra THEN EXIT THEN
+ DUP 157 = ( 0x9d ifgt ) IF DROP SPOPP 0 > IF bra ELSE JUMP THEN EXIT THEN
+ DUP 158 = ( 0x9e ifle ) IF DROP SPOPP 0 > IF JUMP ELSE bra THEN EXIT THEN
+ DUP 159 = ( 0x9f if_icmpeq ) IF DROP SPOPP SPOPP = IF bra ELSE JUMP THEN EXIT THEN
+ DUP 160 = ( 0xa0 if_icmpne ) IF DROP EXIT THEN
+ DUP 161 = ( 0xa1 if_icmplt ) IF DROP SPOPP SPOPP SWAP < IF bra ELSE JUMP THEN EXIT THEN
+ DUP 162 = ( 0xa2 if_icmpge ) IF DROP EXIT THEN
+ DUP 163 = ( 0xa3 if_icmpgt ) IF DROP SPOPP SPOPP SWAP > IF bra ELSE JUMP THEN EXIT THEN
+ DUP 164 = ( 0xa4 if_icmple ) IF DROP EXIT THEN
+ DUP 165 = ( 0xa5 if_acmpeq ) IF DROP EXIT THEN
+ DUP 166 = ( 0xa6 if_acmpne ) IF DROP EXIT THEN
+ DUP 167 = ( 0xa7 goto ) IF DROP P @ 1+ RAMW@ 1- P ! EXIT THEN
+ DUP 168 = ( 0xa8 jsr ) IF DROP bra P @ 2+ SPUSH EXIT THEN
+ DUP 169 = ( 0xa9 ret ) IF DROP ret EXIT THEN
+ DUP 170 = ( 0xaa tableswitch ) IF DROP EXIT THEN
+ DUP 171 = ( 0xab lookupswitch ) IF DROP EXIT THEN
+ DUP 172 = ( 0xac ireturn ) IF DROP EXIT THEN
+ DUP 173 = ( 0xad lreturn ) IF DROP EXIT THEN
+ DUP 174 = ( 0xae freturn ) IF DROP EXIT THEN
+ DUP 175 = ( 0xaf dreturn ) IF DROP EXIT THEN
+ DUP 176 = ( 0xb0 areturn ) IF DROP EXIT THEN
+ DUP 177 = ( 0xb1 return ) IF DROP return EXIT THEN
+ DUP 178 = ( 0xb2 getstatic ) IF DROP EXIT THEN
+ DUP 179 = ( 0xb3 putstatic ) IF DROP EXIT THEN
+ DUP 180 = ( 0xb4 getfield ) IF DROP EXIT THEN
+ DUP 181 = ( 0xb5 putfield ) IF DROP EXIT THEN
+ DUP 182 = ( 0xb6 invokevirtual ) IF DROP call EXIT THEN
+ DUP 183 = ( 0xb7 invokespecial ) IF DROP EXIT THEN
+ DUP 184 = ( 0xb8 invokestatic ) IF DROP EXIT THEN
+ DUP 185 = ( 0xb9 invokeinterface ) IF DROP EXIT THEN
+ DUP 186 = ( 0xba invokedynamic ) IF DROP EXIT THEN
+ DUP 187 = ( 0xbb new ) IF DROP EXIT THEN
+ DUP 188 = ( 0xbc newarray ) IF DROP EXIT THEN
+ DUP 189 = ( 0xbd anewarray ) IF DROP EXIT THEN
+ DUP 190 = ( 0xbe arraylength ) IF DROP EXIT THEN
+ DUP 191 = ( 0xbf athrow ) IF DROP EXIT THEN
+ DUP 192 = ( 0xc0 checkcast ) IF DROP EXIT THEN
+ DUP 193 = ( 0xc1 instanceof ) IF DROP EXIT THEN
+ DUP 194 = ( 0xc2 monitorenter ) IF DROP EXIT THEN
+ DUP 195 = ( 0xc3 monitorexit ) IF DROP EXIT THEN
+ DUP 196 = ( 0xc4 wide ) IF DROP EXIT THEN
+ DUP 197 = ( 0xc5 multianewarray ) IF DROP EXIT THEN
+ DUP 198 = ( 0xc6 ifnull ) IF DROP EXIT THEN
+ DUP 199 = ( 0xc7 ifnonnull ) IF DROP EXIT THEN
+ DUP 200 = ( 0xc8 goto_w ) IF DROP EXIT THEN
+ DUP 201 = ( 0xc9 jsr_w ) IF DROP EXIT THEN
+ DUP 202 = ( 0xca donext ) IF DROP 
+     R -1 OVER +! @ 0< IF -4 RP +! JUMP ELSE bra THEN EXIT THEN
+ DUP 203 = ( 0xcb ldi ) IF DROP P @ 1+ RAM@ SPUSH 4 P +! EXIT THEN
+ DUP 204 = ( 0xcc popr ) IF DROP RPOPP SPUSH EXIT THEN
+ DUP 205 = ( 0xcd pushr ) IF DROP SPOPP RPUSH EXIT THEN
+ DUP 206 = ( 0xce dupr ) IF DROP R @ SPUSH EXIT THEN
+\ DUP 207 = ( 0xcf ext ) IF DROP EXIT THEN
+\ DUP 208 = ( 0xd0 get ) IF DROP KEY SPUSH EXIT THEN
+\ DUP 209 = ( 0xd1 put ) IF DROP SPOPP EMIT EXIT THEN
+ DUP 208 = ( 0xd0 get ) IF DROP  input @ ramc@ SPUSH 1  input +! EXIT THEN
+ DUP 209 = ( 0xd1 put ) IF DROP SPOPP output @ ramc! 1 output +! EXIT THEN
+ . -1 ABORT" : Illegel instruction" ;
+HEX
+: .stack ( add # ) FOR AFT DUP @ U. 4 - THEN NEXT DROP CR ;
+: .sstack ." S:" T ? SSTACK SP C@ .stack ;
+: .rstack ." R:" RSTACK RP C@ .stack ;
+: .registers ."  P=" P @ DUP . ."  code=" ram@ . CR ;
+: S  CR ." CLOCK=" CLOCK @ . .registers .sstack .rstack ;
+: exec  P @ ramc@ execute 1 P +! ;
+: C     exec CYCLE S .S ;
+: reset P $300 0 FILL 0 CLOCK ! ;
+reset
+
+: G     ( addr -- )
+        CR ." Press any key to stop." CR
+        BREAK !
+        BEGIN exec P @ BREAK @ =
+              IF CYCLE C EXIT
+              ELSE CYCLE
+              THEN 
+              ?KEY
+        UNTIL ;
+
+: D     P @ 1- FOUR ;
+: M     show ;
+: RUN   CR ." Press ESC to stop." CR
+        BEGIN C KEY 1B = UNTIL ;
+\ : P     DUP RANGE AND P ! RANGE AND P ! ;
+
+: HELP  CR ." eP32 Simulator, copyright eForth Group, 2000"
+        CR ." C: execute next cycle"
+        CR ." S: show all registers"
+        CR ." D: display next 8 words"
+        CR ." addr M: display 128 words from addr"
+        CR ." addr P: start execution at addr"
+        CR ." addr G: run and stop at addr"
+        CR ." RUN: execute, one key per cycle"
+        CR ;
+HELP
+ -1 G[T1]
+
+
+Chapter 7. Implementation Notes
+
+Byte Code Sequencer vs Finite State Machine
+
+A Finite State Machine (FSM) was adopted from eP32 chip design to run VFM in ceForth. This FSM assumed that we had a 32 bit machine, running on 32 bit memory. It used 6 phases to execute code stored in memory. In phase 0, it read a 32 bit program word, and decoded 4 byte code in it. In phase 1 to 4 it executes these 4 byte code in sequence. In phase 5, it resets the phase counter to 0, so it will fetch the next program word from memory, and run through the phases again. This FSM is described completely in the loop() routine:
+
+void loop() {
+    phase = clk & 7;
+    switch(phase) {
+      case 0: fetch_decode(); yield(); break;
+      case 1: execute(I1); break;
+      case 2: execute(I2); break;
+      case 3: execute(I3); break;
+      case 4: execute(I4); break;
+      case 5: jump(); break;
+      case 6: jump(); break;
+      case 7: jump(); 
+    } 
+    clk += 1; 
+}
+
+In JFM, the dictionary is an array of 32 bit words. However, this array can be read either in 32 bit words, or in 8 bit bytes. Therefore, byte code in the dictionary can be fetched directly and executed without a FSM. A much simpler byte code sequencer can be coded as follows:
+
+void loop() {
+  while (TRUE) {
+    bytecode = (unsigned char)cData[P++];
+    execute(bytecode); 
+  } }
+
+The sequence has only two steps: fetching next byte from memory, and execute the byte code. It is just like a hardware computer, sequencing through its memory to execute machine instructions.
+
+In the design of JFM VFM, byte code are packed into code fields of primitive commands, and can be accessed either by 32 bit words, or by byte sequence. The same dictionary accommodates both design equally well. No modification in ceForth dictionary is necessary. 
+
+Stacks
+
+Stacks are big headaches in operating systems, and in application programs. In C programming, stacks are hidden from you to prevent you from messing them up. However, in Forth programming, the data stack and the return stacks are open to you, and most of the times, the data stack becomes the focus of your attention. Both stacks have to work perfectly. There is no margin of error.
+
+With stacks implemented in memory of finite size, the most obvious problems are stack overflow and stack underflow. Generally, operating systems allocate large chucks of memory for stacks, and impose traps on overflow and underflow conditions. With these traps, you can write interrupt routines to handle these error conditions in your software. These traps are very difficult to handle, especially for those without advanced computer science degrees.
+
+The most prevalent problem in Forth programming is underflow of data stack, when you try to access data below the memory allocated to data stack. After Forth interpreter finished interpreting a sequence of Forth words, it always check the stack pointer. If the stack point is below mark, Forth interpreter executes the ABORT command, and reinitialized the stacks.
+
+In designing eP32 chip, I put both stacks in the CPU. I allowed 32 levels of stack space, and the system seems to be happy. I checked often the water marks on both stacks, and the water marks were mostly about 12 levels. 32 levels are adequate for most applications, and do not impose a big burden on CPU designs. The stacks used 5 bit stack pointers, and behaved like circular buffers. I also found that it was not really necessary to check the stack pointers. Using circular buffers, underflow and overflow are really not life-threatening error conditions. If useful data were actually overwritten, the system would not behave correctly, but in no danger of crashing. The stack pointers need not be reset. The system would restart with the present pointers.
+
+In JFM_44, I allocated 1KB memory for each stack, and used one byte for each stack pointer. The stacks are 256 cell circular buffers, and will never underflow or overflow. However, the C compiler needs to be reminder constantly that the stack pointers have 8-bit values and must not be leaked to integer or long number. R and S pointers must always be prefixed with (unsigned char) specification. I struggled with data stack underflow conditions for half a year, until I found that the stack pointers tended to overshot the byte boundary in my back.
+
+JFM interpreter always displays top 4 elements on data stack. Always seeing these 4 elements, you do not need utility to dump or examine data stack. I believe this is the best way to use data stack, and relieve you from the anxiety of worrying your misusing it.
+
+MetaCompiler
+
+Conceptually, metacompilation is not much different that the ordinary Forth compiler. Forth compiler compiles new commands on top of its dictionary. CP is the pointer to top of dictionary. If we change CP to point to another memory location, like the target dictionary array we allocated for a target system, then we can compile a new dictionary for the target.
+
+Of course, the devil is in the details. The target memory is a virtual memory. Addresses used by the target machine are virtual addresses relative to the beginning of the dictionary array, not the absolute addresses used in the host Forth system. The target machine may have a different machine instruction set. Byte addressable machine vs word addressable machine. Different linking schemes. On and on.
+
+The art of metacompilation had been practices since Chuck Moore invented Forth. I documented it for polyForth, F83, and FPC, three of the most popular Forth implementations. They all used vocabularies to segregate names of same commands used at various stages of metacompilation. For example, + (plus) command had 3 different behaviors: a regular + (plus) version to add two integers in text interpreter, a version defined in target dictionary which will be used by a target system to add two integers, which is never executed during metacompilation, and one version used by metacompiler to compile a + (plus) token in the body (token list) of a compound command in tart dictionary. 
+
+A dictionary is a linked list of command records. A vocabulary is a branch of a dictionary, which can be searched independent of the main dictionary. Vocabularies allow a command to be redefined multiple times, and different behavior is selected by specifying search order of vocabularies.
+
+In the original eForth Model, Bill Muench reserved system variables to allow building up to 8 vocabularies. However, over the years I had not used this feature in all my applications, and decided to rid of it. Without vocabularies, I could still do metacompilation by carefully arranging the sequence in defining commands to build target dictionary correctly. As commands are redefined, the Forth system morphs and shows unexpected behavior. All eForth commands are redefined to compile tokens. At the end of metacompilation, you can type in any valid eForth command, and the system responds with ¡¥ok¡¦, but does not seem to do anything. The data stack does not change. All the commands do is to add a token to the top of target dictionary, which you cannot observed without great efforts.
+
+After the metacompiler finishes building the target dictionary, it is useless for any other purposes. Close F# and use the eJ32i.mif file to build JFM on Arduino IDE.
+
+Byte Code
+
+I use byte code to bridge the JVM and the eForth system. The dictionary is stored is an integer array data[]. This data array can be addressed either by 32 bit words or by bytes. When addressing by bytes, the array is referred as cData[].
+
+Command records and the fields in them are all word aligned. The link field is a 32 bit word. The name field has a length byte followed by variable length name string, null-filled to the word boundary. In a primitive command, the code field contains byte code, and is null-filled to word boundary. In a compound command, the code field is a 32 bit word, containing the call, byte code. The parameter field contains a token list. All tokens are 32 bit words.
+
+This dictionary design was copied from eP32, which was a 32 bit microcontroller. There I used 6 bit machine instructions, and a 32 bit word contained up to 5 machine instructions. In one of the earlier designs, I used 5 bit machine instruction, and I could pack 6 machine instructions to a word. The assembler was designed so that it could pack as many instructions as a program word could allow. In JFM, I already had 67 machine instructions, and 6-bit fields were not enough for them. For convenience, I just allocate 8 bits for instructions, and give you the possibility of using 256 byte code for machine instructions.
+
+I was not particularly concerned about the numbering of byte code. They were assign consecutive numbers as I coded them. However, there is no reason that the numbering could not follow some preconceived order, like Java Byte Code. In fact, there is no reason that you could not build a Virtual Java Machine with this JFM design.
+
+Socket Programming
+
+As far as WiFi is concerned, I started at ground zero. I had no idea what these terms meant: access point, client side programming, server side programming, etc. I heard of TCP/IP, HTTP, HTTPS, but really did not know what they were good for. 
+
+Playing with NodeMCU, I saw this example on Arduino IDE, WebLED.ino, to turn its LED on and off. It was on almost every website tutorial talking about ESP8266:
+
+#include <ESP8266WiFi.h>
+const char* ssid = "SVFIG";
+const char* password = "12345678";
+int ledPin = 2; // GPIO2 of ESP8266
+WiFiServer server(80);
+void setup() {
+  Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  server.begin();
+}
+void loop() {
+  WiFiClient client = server.available();
+  if (!client) { return; }
+  while(!client.available()){ delay(1); }
+  String request = client.readStringUntil('\r');
+  client.flush();
+  int value = HIGH;
+  if (request.indexOf("/LED=ON") != -1) {
+    digitalWrite(ledPin, LOW); value = LOW; } 
+  if (request.indexOf("/LED=OFF") != -1){
+    digitalWrite(ledPin, HIGH); value = HIGH; }
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println(""); //  do not forget this one
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+  client.print("Led pin is now: ");
+  if(value == HIGH) { client.print("On"); }
+  else { client.print("Off"); }
+  client.println("<br><br>");
+  client.println("Click <a href=\"/LED=ON\">here</a> turn the LED on pin 2 ON<br>");
+  client.println("Click <a href=\"/LED=OFF\">here</a> turn the LED on pin 2 OFF<br>");
+  client.println("</html>");
+  delay(1);
+}
+
+It created a Web client by opening a http webpage with two buttons LED=ON, and LED=OFF. When you click one of the buttons, the client sent back a messages with either ¡¥LED=ON¡¦ or ¡¥LED=OFF¡¦ string embedded. The server examined the message and turned the LED on or off accordingly.
+
+I was fairly confused by this example. Does my server have to manage a client to communicate with myself? I like to send an arbitrary message or command to my server and order it to do something I want to do. I didn¡¦t even know what server and client were. But, I knew what I wanted. I liked to have a WiFi network to replace the serial cable to send commands to my computer, and receive responses from it.
+
+I googled WiFi, and checked out all the WiFi books for dummies, and kept myself confused for some months. Then I saw Auduino had another example wifiSoftAP.ino and tried it. It showed that you could turned NodeMCU Kit into a Soft Access Point. It meant that you could build a local network with NodeMCU. That was interesting.
+
+Amid random searches on Google, I hit a pdf book on Socket Programming from IBM, of all the companies. Sockets made lots of sense, and much of the fog and clouds started to lift. After I learnt how to configure sockets for UDP protocol, all my problems were solved. UDP was all I needed. Never mind TCP.
+
+UDP is all I need, because JFM receives commands in packets, and it sends out responses after commands are executed. If there were errors in transmission, JFM would let me know.
+
+Everything worked out fine, until we went to Maker Faire. Things worked while we set up the benches and workstations. When the crowd moved in, many students just could not turn the LED on and off over WiFi, because network traffic was so intense, even we had our own local router. We had to give away kits, when students demonstrated that they had controlled the LED through serial cable.
+
+Serial Monitor and UDP Packets
+
+To communication with JFM over WiFi, I substantially modified the serial IO design in JFM. Original eForth Model assumed a serial IO system sending and receiving ASCII characters. However, WiFi communication generally assumes sending and receiving packets, a sequence of characters. To make JFM receiving packets, The IO commands are actually significantly simplified. Instead of relying on KEY and ?KEY to receive characters, I use ACCEPT to receive packets, and all the input commands below ACCEPT are eliminated.
+
+eForth provides a line editor so you can edit your input line by backing up and erasing mistyped characters. In WiFi, a client sends packets of characters, and the client always gives you the opportunity to edit the packet before you send it out.
+
+If I could receive a packet directly into the Terminal Input Buffer, then ACCEPT would simple wait for the arrival of a packet and return with the number of characters received. 
+
+Where should I place the Terminal Input Buffer? It seems that the best place is the beginner of data[] array. Forth historical reasons, I leave 512 bytes empty at the beginning of the dictionary. Many microcontrollers use this space for reset and interrupt vectors. When data[] is used as a byte array, it is referenced as cData[]. 
+
+ACCEPT waits for the serial monitor or the UDP receiver to send a packet of characters. If either gets a packets, ACCEPT returns with a character count. Then the text interpreter scans the characters and interprets them.
+
+accept ( b u1 -- b u2 )  Accept u1 characters to b. u2  returned is the actual count of characters received.
+void accep()
+/* UDP accept */
+{ while (Udp.parsePacket()==0 && Serial.available()==0) {};
+  int len;
+  while (!Udp.available()==0) {
+    len = Udp.read(cData, top); }
+  while (!Serial.available()==0) {
+    len = Serial.readBytes(cData, top); }
+  if (len > 0) {
+    cData[len] = 0; }
+  top = len;
+  }
+
+On the transmitter side, EMIT send a character to the serial terminal and the UDP transmitter. However, the UDP transmitter only adds the character to its output buffer. The whole output packet is only transmitted when JFM executes CR command. It does not make sense to ship each character out in a separate UDP packet. The transmitter involves the following commands:
+
+sendPacket( -- ) Send an UDP packet out to WiFi network. It is executed only by CR command.
+CODE sendPacket sendPacket, next,
+void sendPacket(void)
+{  Udp.endPacket();
+   Udp.beginPacket(Udp.remoteIP(), Udp.remotePort()); }
+
+CR outputs a carriage-return and a line-feed. Prior output characters are accumulated in a UDP packet buffer. This packet is sent out by sendPacket.
+CR ( -- ) ( =CR )
+  0A LIT 0D LIT EMIT EMIT sendPacket ;;
+
+
+[T1]

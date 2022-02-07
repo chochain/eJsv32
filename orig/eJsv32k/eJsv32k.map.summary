@@ -1,0 +1,13 @@
+Analysis & Synthesis Status : Successful - Mon Jan 10 22:41:08 2022
+Quartus II Version : 6.0 Build 178 04/27/2006 SJ Full Version
+Revision Name : eJsv32k
+Top-level Entity Name : eJsv32k
+Family : Stratix II
+Total ALUTs : 6512
+Total registers : 2247
+Total pins : 168
+Total virtual pins : 0
+Total memory bits : 67,072
+DSP block 9-bit elements : 8
+Total PLLs : 0
+Total DLLs : 0

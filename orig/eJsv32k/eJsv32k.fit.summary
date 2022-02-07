@@ -1,0 +1,15 @@
+Fitter Status : Successful - Mon Jan 10 22:42:11 2022
+Quartus II Version : 6.0 Build 178 04/27/2006 SJ Full Version
+Revision Name : eJsv32k
+Top-level Entity Name : eJsv32k
+Family : Stratix II
+Device : EP2S15F484C3
+Timing Models : Final
+Total ALUTs : 6,375 / 12,480 ( 51 % )
+Total registers : 2278
+Total pins : 168 / 343 ( 49 % )
+Total virtual pins : 0
+Total memory bits : 67,072 / 419,328 ( 16 % )
+DSP block 9-bit elements : 8 / 96 ( 8 % )
+Total PLLs : 0 / 6 ( 0 % )
+Total DLLs : 0 / 2 ( 0 % )
