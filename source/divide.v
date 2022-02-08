@@ -48,6 +48,10 @@ module divide (
 	wire [31:0] sub_wire1;
 	wire [31:0] quotient = sub_wire0[31:0];
 	wire [31:0] remain = sub_wire1[31:0];
+    
+    // this takes 2200 LUTs on iCE40
+    assign sub_wire0 = denom / numer;
+    assign sub_wire1 = denom % numer;
 /*
 	lpm_divide	lpm_divide_component (
 				.denom (denom),

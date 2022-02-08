@@ -45,6 +45,8 @@ module ushifter (
 	wire [31:0] sub_wire0;
 	wire  sub_wire1 = 1'h1;
 	wire [31:0] result = sub_wire0[31:0];
+    
+    assign sub_wire0 = $unsigned(data) >> distance;
 /*
 	lpm_clshift	lpm_clshift_component (
 				.distance (distance),

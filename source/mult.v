@@ -44,6 +44,8 @@ module mult (
 
 	wire [63:0] sub_wire0;
 	wire [63:0] result = sub_wire0[63:0];
+    
+    assign sub_wire0 = dataa * datab;
 /*
 	lpm_mult	lpm_mult_component (
 				.dataa (dataa),

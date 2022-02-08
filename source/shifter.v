@@ -46,6 +46,8 @@ module shifter (
 
 	wire [31:0] sub_wire0;
 	wire [31:0] result = sub_wire0[31:0];
+    
+    assign sub_wire0 = direction ? data << distance : data >> distance;
 /*
 	lpm_clshift	lpm_clshift_component (
 				.distance (distance),
