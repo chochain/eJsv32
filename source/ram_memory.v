@@ -40,17 +40,15 @@ module ram_memory (
 	wren,
 	q);
 
-	input	[12:0]  address;
-	input	  clock;
+	input	clock, wren;
+	input	[12:0] address;
 	input	[7:0]  data;
-	input	  wren;
 	output	[7:0]  q;
 
 	wire [7:0] sub_wire0;
 	wire [7:0] q = sub_wire0[7:0];
     
     assign q = 0;
-    
 /*
 	altsyncram	altsyncram_component (
 				.wren_a (wren),
