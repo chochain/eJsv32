@@ -1,12 +1,14 @@
 // Java Forth Machine eJsv32k.v in Quartus II SystemVerilog-2005
 // Chen-hanson Ting, 1/10/2022
+`include "../source/forthsuper_if.sv"
 module eJsv32k (
-    input logic clk,clr,
-    output logic[31:0] addr_o_o,t_o,p_o,a_o,
-    output logic[7:0] data_o_o,data_i_o,code_o,
-    output logic[2:0] phase_o,
-    output logic[4:0] sp_o,rp_o,
-    output logic write_o); 
+    input logic        clk, clr,
+    input  logic[7:0]  data_o_i,
+    output logic[31:0] addr_o_o, t_o, p_o, a_o,
+    output logic[7:0]  data_o_o, code_o,
+    output logic[2:0]  phase_o,
+    output logic[4:0]  sp_o,rp_o,
+    output logic       write_o); 
     
     parameter width = 31;
     parameter[7:0] nop        = 8'b00000000;
@@ -102,6 +104,7 @@ module eJsv32k (
     logic[width:0] inptr,outptr;
     logic inload,outload;
 
+  /*
   ram_memory    ram_memory_inst (
     .address ( addr_o[12:0] ),
     .clock ( ~clk ),
@@ -109,6 +112,7 @@ module eJsv32k (
     .wren ( write ),
     .q ( data_i )
     );
+  */
   mult  mult_inst (
     .dataa ( t ),
     .datab ( s ),
@@ -132,7 +136,7 @@ module eJsv32k (
     .result ( iushr_o )
     );
 // direct signals
-    assign data_i_o = data_i ;
+    assign data_i   = data_o_i;
     assign data_o_o = data_o ;
     assign addr_o_o = addr_o ;
     assign write_o  = write ;
