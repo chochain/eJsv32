@@ -29,7 +29,7 @@ module dict_setup #(
         
         $display("fill memory at x%04x from file %d", i, f);
         while (!$feof(f)) begin
-            c = $fscanf(f, "%h\A", v);
+            c = $fscanf(f, "%h", v);
             add_u8(i++, v);
         end
         $fclose(f);
