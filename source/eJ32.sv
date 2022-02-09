@@ -603,26 +603,25 @@ module eJ32 #(
             end
         else if (clk) begin
             phase <= phase_in;
-            if (pload)     begin p <= p_in; end
-            if (aload)     begin a <= a_in; end
-            if (codeload)  begin code <= code_in; end
-             if (addrload) begin addr_sel <= addr_in; end
-            if (dataload)  begin data_sel <= data_in; end
-            if (tload)     begin t <= t_in; end
-            if (sload)     begin s_stack[sp] <= t; end
+            if (pload)     p <= p_in;
+            if (aload)     a <= a_in;
+            if (codeload)  code <= code_in;
+            if (addrload)  addr_sel <= addr_in;
+            if (dataload)  data_sel <= data_in;
+            if (inload)    inptr <= inptr + 1;
+            if (outload)   outptr <= outptr + 1;
+            if (tload)     t <= t_in;
+            if (sload)     s_stack[sp] <= t;
+            if (rload)     r_stack[rp] <= r_in;
+            if (spopp)     begin sp <= sp - 1; sp1 <= sp1 - 1; end
+            if (rpopp)     begin rp <= rp - 1; rp1 <= rp1 - 1; end
             if (spush)     begin
 //              s_stack[sp1] <= t;
                 s_stack[sp] <= t;
                 sp <= sp + 1; sp1 <= sp1 + 1; end
-            if (spopp)     begin
-                sp <= sp - 1; sp1 <= sp1 - 1; end
-            if (rload)     begin r_stack[rp] <= r_in; end
             if (rpush)     begin
                 r_stack[rp1] <= r_in;
                 rp <= rp + 1; rp1 <= rp1 + 1; end
-            if (rpopp)     begin rp <= rp - 1; rp1 <= rp1 - 1; end
-            if (inload)    begin inptr <= inptr + 1; end
-            if (outload)   begin outptr <= outptr + 1; end
         end
     end
 endmodule
