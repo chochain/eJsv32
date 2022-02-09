@@ -3,7 +3,7 @@
 ///
 `timescale 1ps / 1ps
 `include "../source/forthsuper_if.sv"
-`include "../source/eJ32k.sv"
+`include "../source/eJ32.sv"
 module outer_tb #(
    parameter DICT = 'h0,
    parameter ASZ  = 17
@@ -21,7 +21,7 @@ module outer_tb #(
    spram8_128k m0(b8_if.slave, ~clk);
 
    dict_setup  #(DICT) dict(.*, .b8_if(b8_if.master));
-   eJsv32k     u(.clk, .clr(rst), .*);
+   eJ32        u(.clk, .clr(rst), .*);
    
     task verify; 
         $display("validate memory content");
