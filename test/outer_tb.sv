@@ -18,7 +18,7 @@ module outer_tb #(
    logic [ASZ-1:0] ctx, here;
    
    mb8_io      b8_if();
-   spram8_128k m0(b8_if.slave, clk);
+   spram8_128k m0(b8_if.slave, ~clk);
 
    dict_setup  #(DICT) dict(.*, .b8_if(b8_if.master));
    eJsv32k     u(.clk, .clr(rst), .*);
