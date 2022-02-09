@@ -28,7 +28,7 @@ typedef enum logic [7:0] {
         iadd    = 'h60,
         isub    = 'h64,
         imul    = 'h68,
-        idivv   = 'h6c,
+        idiv    = 'h6c,
         irem    = 'h70,
         ineg    = 'h74,
         ishl    = 'h78,
