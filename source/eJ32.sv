@@ -1,7 +1,17 @@
-// Java Forth Machine eJsv32k.v in Quartus II SystemVerilog-2005
-// Chen-hanson Ting, 1/10/2022
+//
+// eJ32 - Java Forth Machine 
+//
+// Chen-hanson Ting, 20220110 eJsv32k.v in Quartus II SystemVerilog-2005
+// Chochain          20220209 to eJ32 for Lattice and future versions
+//
 `include "../source/forthsuper_if.sv"
-module eJsv32k (
+`include "../source/eJ32.vh"
+module eJ32 #(
+    parameter DSZ = 32,
+    parameter ASZ = 32,
+    parameter SS_DEPTH = 32,
+    parameter RS_DEPTH = 32
+    ) (
     input logic        clk, clr,
     input  logic[7:0]  data_o_i,
     output logic[31:0] addr_o_o, t_o, p_o, a_o,
@@ -10,100 +20,35 @@ module eJsv32k (
     output logic[4:0]  sp_o,rp_o,
     output logic       write_o);
 
-    parameter width = 31;
-    parameter[7:0] nop        = 8'b00000000;
-    parameter[7:0] aconst_null= 8'b00000001;
-    parameter[7:0] iconst_m1  = 8'b00000010;
-    parameter[7:0] iconst_0   = 8'b00000011;
-    parameter[7:0] iconst_1 = 8'b00000100;
-    parameter[7:0] iconst_2 = 8'b00000101;
-    parameter[7:0] iconst_3 = 8'b00000110;
-    parameter[7:0] iconst_4 = 8'b00000111;
-    parameter[7:0] iconst_5 = 8'b00001000;
-    parameter[7:0] bipush   = 8'b00010000;
-    parameter[7:0] sipush   = 8'b00010001;
-    parameter[7:0] iload    = 8'b00010101;
-    parameter[7:0] iload_0  = 8'b00011010;
-    parameter[7:0] iload_1  = 8'b00011011;
-    parameter[7:0] iload_2  = 8'b00011100;
-    parameter[7:0] iload_3  = 8'b00011101;
-    parameter[7:0] iaload   = 8'b00101110;
-    parameter[7:0] baload   = 8'b00110011;
-    parameter[7:0] saload   = 8'b00110101;
-    parameter[7:0] istore_0 = 8'b00111011;
-    parameter[7:0] iastore  = 8'b01001111;
-    parameter[7:0] bastore  = 8'b01010100;
-    parameter[7:0] sastore  = 8'b01010110;
-    parameter[7:0] pop      = 8'b01010111;
-    parameter[7:0] pop2     = 8'b01011000;
-    parameter[7:0] dup      = 8'b01011001;
-    parameter[7:0] dup_x1   = 8'b01011010;
-    parameter[7:0] dup_x2   = 8'b01011011;
-    parameter[7:0] dup2     = 8'b01011100;
-    parameter[7:0] swap     = 8'b01011111;
-    parameter[7:0] iadd     = 8'b01100000;
-    parameter[7:0] isub     = 8'b01100100;
-    parameter[7:0] imul  = 8'b01101000;
-    parameter[7:0] idivv  = 8'b01101100;
-    parameter[7:0] irem  = 8'b01110000;
-    parameter[7:0] ineg  = 8'b01110100;
-    parameter[7:0] ishl  = 8'b01111000;
-    parameter[7:0] ishr  = 8'b01111010;
-    parameter[7:0] iushr = 8'b01111100;
-    parameter[7:0] iand  = 8'b01111110;
-    parameter[7:0] ior   = 8'b10000000;
-    parameter[7:0] ixor  = 8'b10000010;
-    parameter[7:0] iinc  = 8'b10000100;
-    parameter[7:0] ifeq  = 8'b10011001;
-    parameter[7:0] ifne  = 8'b10011010;
-    parameter[7:0] iflt  = 8'b10011011;
-    parameter[7:0] ifge  = 8'b10011100;
-    parameter[7:0] ifgt  = 8'b10011101;
-    parameter[7:0] ifle  = 8'b10011110;
-    parameter[7:0] if_icmpeq = 8'b10011111;
-    parameter[7:0] if_icmpne = 8'b10100000;
-    parameter[7:0] if_icmplt = 8'b10100001;
-    parameter[7:0] if_icmpgt = 8'b10100011;
-    parameter[7:0] goto      = 8'b10100111;
-    parameter[7:0] jsr       = 8'b10101000;
-    parameter[7:0] ret       = 8'b10101001;
-    parameter[7:0] jreturn    = 8'b10110001;
-    parameter[7:0] invokevirtual = 8'b10110110;
-    parameter[7:0] donext     = 8'b11001010;
-    parameter[7:0] ldi        = 8'b11001011;
-    parameter[7:0] popr       = 8'b11001100;
-    parameter[7:0] pushr      = 8'b11001101;
-    parameter[7:0] dupr       = 8'b11001110;
-    parameter[7:0] get        = 8'b11010000;
-    parameter[7:0] put        = 8'b11010001;
-    parameter[23:0] zeros     = {24{1'b0}};
 // registers
-    logic[width:0] s_stack[31:0];
-    logic[width:0] r_stack[31:0];
-    logic[4:0] sp,sp1;
-    logic[4:0] rp,rp1;
-    logic[width:0] p,t,a;
-    logic[7:0] code;
-    logic[2:0] phase;
-    logic[1:0] data_sel;
-    logic addr_sel;
+    logic[DSZ-1:0] s_stack[SS_DEPTH-1:0];
+    logic[DSZ-1:0] r_stack[RS_DEPTH-1:0];
+    logic[ASZ-1:0] p, a;
+    logic[DSZ-1:0] t;
+    logic[$clog2(SS_DEPTH)-1:0] sp, sp1;
+    logic[$clog2(RS_DEPTH)-1:0] rp, rp1;
+    logic[2:0]     phase;
+    logic[1:0]     data_sel;
+    logic          addr_sel;
+    jvm_opcode     code;
 // wires
-    logic[width:0] s,r,addr_o;
-    logic[width:0] p_in,t_in,r_in,a_in;
-    logic r_z,t_z;
-    logic tload,sload,spush,spopp,rload,rloada,rpush,rpopp,aload;
-    logic[7:0] code_in;
-    logic[7:0] data_i,data_o;
-    logic[2:0] phase_in;
-    logic[1:0] data_in;
-    logic write,addrload,addr_in,phaseload,dataload,pload,codeload;
-    logic[width:0] quotient,remain;
-    logic[63:0] product;
-    logic[width:0] isht_o,iushr_o;
-    logic right_shift;
-    logic[width:0] inptr,outptr;
-    logic inload,outload;
-
+    logic[DSZ-1:0] s, r;
+    logic[DSZ-1:0] t_in, r_in, a_in;
+    logic[ASZ-1:0] p_in, addr_o;
+    logic          r_z,t_z;
+    logic          tload, sload, spush, spopp;
+    logic          rload, rloada, rpush, rpopp, aload;
+    logic[7:0]     data_i, data_o;
+    logic[2:0]     phase_in;
+    logic[1:0]     data_in;
+    logic          write, addrload, addr_in, phaseload, dataload, pload, codeload;
+    logic[DSZ-1:0] isht_o,iushr_o;
+    logic          right_shift;
+    logic[DSZ-1:0] inptr,outptr;
+    logic          inload, outload;
+    logic[DSZ-1:0] quotient,remain;
+    logic[(DSZ*2)-1:0] product;
+    jvm_opcode     code_in;
   /*
   ram_memory    ram_memory_inst (
     .address (addr_o[12:0]),
@@ -179,14 +124,14 @@ module eJsv32k (
         phaseload = 1'b0;
         phase_in  = 0;
         codeload  = 1'b1;
-        code_in   = data_i;
         write     = 1'b0;
-        t_in      = {width+1{1'b0}};
-        a_in      = {width+1{1'b0}};
-        r_in      = {width+1{1'b0}};
+        t_in      = {DSZ{1'b0}};
+        a_in      = {ASZ{1'b0}};
+        r_in      = {DSZ{1'b0}};
         right_shift   = 1'b0;
         inload    = 1'b0;
         outload   = 1'b0;
+        $cast(code_in, data_i);     // some JVM opcodes are not avialable yet
 // instructions
     case (code)
         nop        : begin phaseload = 1'b1; phase_in = 0; end
@@ -201,14 +146,14 @@ module eJsv32k (
         bipush: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    t_in = {zeros, data_i}; tload = 1'b1; spush = 1'b1;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1;
                     codeload = 1'b0; end
                 default: begin phaseload = 1'b1; phase_in = 0; end
             endcase end
         sipush: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    t_in = {zeros, data_i}; tload = 1'b1; spush = 1'b1;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     t_in = {t[23:0], data_i}; tload = 1'b1;
@@ -237,7 +182,7 @@ module eJsv32k (
                     codeload = 1'b0; pload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {zeros, data_i}; tload = 1'b1;
+                    t_in = data_i; tload = 1'b1;
                     codeload = 1'b0; pload = 1'b0; end
                 2: begin phaseload = 1'b1; phase_in = 3;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
@@ -258,7 +203,7 @@ module eJsv32k (
                     a_in = t; aload = 1'b1; addr_in = 1'b1;
                     codeload = 1'b0; p_in = p - 1; pload = 1'b1; end
                 1: begin phaseload = 1'b1; phase_in = 2;
-                    t_in = {zeros, data_i}; tload = 1'b1;
+                    t_in = data_i; tload = 1'b1;
                     code_in = nop; codeload = 1'b1; pload = 1'b1; end
                 default: begin phaseload = 1'b1; phase_in = 0; end
             endcase end
@@ -269,7 +214,7 @@ module eJsv32k (
                     codeload = 1'b0; pload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {zeros, data_i}; tload = 1'b1;
+                    t_in = data_i; tload = 1'b1;
                     codeload = 1'b0; pload = 1'b0; end
                 2: begin phaseload = 1'b1; phase_in = 3;
                     t_in = {t[23:0], data_i}; tload = 1'b1;
@@ -371,7 +316,7 @@ module eJsv32k (
         isub: begin
             t_in = s - t; tload = 1'b1; spopp = 1'b1; end
         imul: begin
-            t_in = product[width:0]; tload = 1'b1; spopp = 1'b1; end
+            t_in = product[DSZ-1:0]; tload = 1'b1; spopp = 1'b1; end
         idivv: begin
             t_in = quotient; tload = 1'b1; spopp = 1'b1; end
         irem: begin
@@ -405,7 +350,7 @@ module eJsv32k (
         ifeq: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -418,7 +363,7 @@ module eJsv32k (
         ifne: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -431,7 +376,7 @@ module eJsv32k (
         iflt: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -444,7 +389,7 @@ module eJsv32k (
         ifge: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -457,7 +402,7 @@ module eJsv32k (
         ifgt: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -470,7 +415,7 @@ module eJsv32k (
         ifle: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -484,7 +429,7 @@ module eJsv32k (
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -498,7 +443,7 @@ module eJsv32k (
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -512,7 +457,7 @@ module eJsv32k (
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -526,7 +471,7 @@ module eJsv32k (
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     codeload = 1'b0;
@@ -539,7 +484,7 @@ module eJsv32k (
         goto: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     p_in = {a[23:0], data_i};
@@ -552,7 +497,7 @@ module eJsv32k (
                     a_in = t; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     a_in = a + 1; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1;
-                    t_in = {zeros, data_i}; tload = 1'b1; pload = 1'b0; end
+                    t_in = data_i; tload = 1'b1; pload = 1'b0; end
                 default: begin phaseload = 1'b1; phase_in = 0;
                     p_in = {t[23:0], data_i};
                     t_in = p + 2; tload = 1'b1; spush = 1'b1; end
@@ -570,7 +515,7 @@ module eJsv32k (
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
                     r_in = p + 2; rpush = 1'b1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     p_in = {a[23:0], data_i}; aload = 1'b1;
@@ -580,7 +525,7 @@ module eJsv32k (
         donext: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in = 1;
-                    a_in = {zeros, data_i}; aload = 1'b1;
+                    a_in = data_i; aload = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     if (r_z) begin
@@ -595,7 +540,7 @@ module eJsv32k (
         ldi: begin
             case (phase)
                 0: begin phaseload = 1'b1; phase_in =1;
-                    t_in = {zeros, data_i}; tload = 1'b1; spush = 1'b1;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1;
                     codeload = 1'b0; end
                 1: begin phaseload = 1'b1; phase_in = 2;
                     t_in = {t[23:0], data_i}; tload = 1'b1;
@@ -621,7 +566,7 @@ module eJsv32k (
                     a_in = inptr; aload = 1'b1; addr_in = 1'b1;
                     codeload = 1'b0; pload = 1'b0; spush = 1'b1; end
                 default: begin phaseload = 1'b1; phase_in = 0;
-                    t_in = {zeros, data_i}; tload = 1'b1;
+                    t_in = data_i; tload = 1'b1;
                     code_in = nop; codeload = 1'b1; pload = 1'b0;
                     inload = 1'b1; end
             endcase end
@@ -653,9 +598,9 @@ module eJsv32k (
             rp1 <= 1;
             inptr  <= 32'b1000000000000;
             outptr <= 32'b1010000000000;
-            t   <= {width+1{1'b0}};
-            a   <= {width+1{1'b0}};
-            p   <= {width+1{1'b0}};
+            t   <= {DSZ{1'b0}};
+            a   <= {ASZ{1'b0}};
+            p   <= {ASZ{1'b0}};
             end
         else if (clk) begin
             if (pload) begin p <= p_in; end
