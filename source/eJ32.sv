@@ -78,6 +78,35 @@ module eJ32 #(
     .result (iushr_o)
     );
 
+    task cond(f);
+        case (phase)
+        0: begin phase_in = 1; `SAMEOP;
+           a_in = data_i; aload = 1'b1; 
+        end
+        1: begin phase_in = 2; `SAMEOP;
+           if (f) begin p_in = {a[23:0], data_i}; aload = 1'b1; end
+        end
+        default: begin phase_in = 0;
+           t_in = s; tload = 1'b1; spopp = 1'b1; 
+        end
+        endcase
+    endtask; // cond
+
+    task cmp(f);
+        case (phase)
+        0: begin phase_in = 1; `SAMEOP;
+            t_in = s - t; tload = 1'b1; spopp = 1'b1;
+            a_in = data_i; aload = 1'b1; 
+        end
+        1: begin phase_in = 2; `SAMEOP;
+            if (f) begin p_in = {a[23:0], data_i}; aload = 1'b1; end
+        end
+        default: begin phase_in = 0;
+            t_in = s; tload = 1'b1; spopp = 1'b1; 
+        end
+        endcase
+    endtask; // cmp
+
 // direct signals
     assign data_i   = data_o_i;
     assign data_o_o = data_o;
@@ -141,340 +170,219 @@ module eJ32 #(
         iconst_3   : begin t_in = 3;  tload = 1'b1; spush = 1'b1; end
         iconst_4   : begin t_in = 4;  tload = 1'b1; spush = 1'b1; end
         iconst_5   : begin t_in = 5;  tload = 1'b1; spush = 1'b1; end
-        bipush: begin
+        bipush:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
+            0: begin phase_in = 1; `SAMEOP;
                     t_in = data_i; tload = 1'b1; spush = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
-        sipush: begin
+            default: begin phase_in = 0; end
+            endcase
+        sipush:
             case (phase)
                 0: begin phase_in = 1; `SAMEOP;
                     t_in = data_i; tload = 1'b1; spush = 1'b1; end
                 1: begin phase_in = 2; `SAMEOP;
                     t_in = {t[23:0], data_i}; tload = 1'b1; end
                 default: begin phase_in = 0; end
-            endcase end
-        iload: begin
-            t_in = r_stack[rp - data_i]; tload = 1'b1;
-            p_in = p + 1; spush = 1'b1; end
-        iload_0: begin
-            t_in = r_stack[rp]; tload = 1'b1;
-            spush = 1'b1; end
-        iload_1: begin
-            t_in = r_stack[rp - 1]; tload = 1'b1;
-            spush = 1'b1; end
-        iload_2: begin
-            t_in = r_stack[rp - 2]; tload = 1'b1;
-            spush = 1'b1; end
-        iload_3: begin
-            t_in = r_stack[rp - 3]; tload = 1'b1;
-            spush = 1'b1; end
-        iaload: begin
+            endcase
+        iload:   begin t_in = r_stack[rp - data_i]; tload = 1'b1; spush = 1'b1; p_in = p + 1; end
+        iload_0: begin t_in = r_stack[rp];          tload = 1'b1; spush = 1'b1; end
+        iload_1: begin t_in = r_stack[rp - 1];      tload = 1'b1; spush = 1'b1; end
+        iload_2: begin t_in = r_stack[rp - 2];      tload = 1'b1; spush = 1'b1; end
+        iload_3: begin t_in = r_stack[rp - 3];      tload = 1'b1; spush = 1'b1; end
+        iaload:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = t; aload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2; `NPHASE;
-                    a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = data_i; tload = 1'b1; end
-                2: begin phase_in = 3; `NPHASE;
-                    a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {t[23:0], data_i}; tload = 1'b1; end
-                3: begin phase_in = 4; `NPHASE;
-                    a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {t[23:0], data_i}; tload = 1'b1; end
-                4: begin phase_in = 5; `NPHASE;
-                    t_in = {t[23:0], data_i}; tload = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
-        baload: begin
+            0: begin phase_in = 1; `NPHASE; 
+               a_in = t; aload = 1'b1; addr_in = 1'b1; end
+            1: begin phase_in = 2; `NPHASE;
+               a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
+               t_in = data_i; tload = 1'b1; end
+            2: begin phase_in = 3; `NPHASE;
+               a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
+               t_in = {t[23:0], data_i}; tload = 1'b1; end
+            3: begin phase_in = 4; `NPHASE;
+               a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
+               t_in = {t[23:0], data_i}; tload = 1'b1; end
+            4: begin phase_in = 5; `NPHASE;
+               t_in = {t[23:0], data_i}; tload = 1'b1; end
+            default: begin phase_in = 0; end
+            endcase
+        baload:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = t; aload = 1'b1; addr_in = 1'b1;
-                    p_in = p - 1; end
-                1: begin phase_in = 2;
-                    t_in = data_i; tload = 1'b1;
-                    code_in = nop; end
-                default: begin phase_in = 0; end
-            endcase end
-        saload: begin
+            0: begin phase_in = 1; `SAMEOP;
+               a_in = t; aload = 1'b1; addr_in = 1'b1;
+               p_in = p - 1; end
+            1: begin phase_in = 2;
+               t_in = data_i; tload = 1'b1;
+               code_in = nop; end
+            default: begin phase_in = 0; end
+            endcase
+        saload:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = t; aload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2; `NPHASE;
-                    a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = data_i; tload = 1'b1; end
-                2: begin phase_in = 3; `NPHASE;
-                    t_in = {t[23:0], data_i}; tload = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
+            0: begin phase_in = 1; `NPHASE;
+               a_in = t; aload = 1'b1; addr_in = 1'b1; end
+            1: begin phase_in = 2; `NPHASE;
+               a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
+               t_in = data_i; tload = 1'b1; end
+            2: begin phase_in = 3; `NPHASE;
+               t_in = {t[23:0], data_i}; tload = 1'b1; end
+            default: begin phase_in = 0; end
+            endcase
         istore_0: begin
             r_in = t; rload = 1'b1;
             t_in = s; tload = 1'b1; spopp = 1'b1; end
-        iastore: begin
+        iastore:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
-                    dataload = 1'b1; data_in = 0; end
-                1: begin phase_in = 2; `NPHASE;
-                    a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 1; write = 1'b1; end
-                2: begin phase_in = 3; `NPHASE;
-                    a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 2; write = 1'b1; end
-                3: begin phase_in = 4; `NPHASE;
-                    a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 3; write = 1'b1; end
-                4: begin phase_in = 5; `NPHASE;
-                    dataload = 1'b1; data_in = 3; write = 1'b1;
-                    t_in = s; tload = 1'b1; spopp = 1'b1;
-                    p_in = p; end
-                default: begin phase_in = 0; end
-            endcase end
-        bastore: begin
+            0: begin phase_in = 1; `NPHASE;
+               a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
+               dataload = 1'b1; data_in = 0; end
+            1: begin phase_in = 2; `NPHASE;
+               a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
+               dataload = 1'b1; data_in = 1; write = 1'b1; end
+            2: begin phase_in = 3; `NPHASE;
+               a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
+               dataload = 1'b1; data_in = 2; write = 1'b1; end
+            3: begin phase_in = 4; `NPHASE;
+               a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
+               dataload = 1'b1; data_in = 3; write = 1'b1; end
+            4: begin phase_in = 5; `NPHASE;
+               dataload = 1'b1; data_in = 3; write = 1'b1;
+               t_in = s; tload = 1'b1; spopp = 1'b1;
+               p_in = p; end
+            default: begin phase_in = 0; end
+            endcase
+        bastore:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
-                    p_in = p - 1; end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1;
-                    code_in = nop;
-                    dataload = 1'b1; write = 1'b1; addr_in = 1'b0; end
-            endcase end
-        sastore: begin
+            0: begin phase_in = 1; `SAMEOP;
+               a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
+               p_in = p - 1; end
+            default: begin phase_in = 0;
+               t_in = s; tload = 1'b1; spopp = 1'b1;
+               code_in = nop;
+               dataload = 1'b1; write = 1'b1; addr_in = 1'b0; end
+            endcase
+        sastore:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1; end
-                1: begin phase_in = 2; `NPHASE;
-                    a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 2; write = 1'b1; end
-                default: begin phase_in = 0; code_in = nop; `HOLDP; 
-                    t_in = s; tload = 1'b1; spopp = 1'b1;
-                    dataload = 1'b1; write = 1'b1; addr_in = 1'b1; end
-            endcase end
-        pop: begin
-            t_in = s; tload = 1'b1; spopp = 1'b1; end
+            0: begin phase_in = 1; `NPHASE;
+               a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1; end
+            1: begin phase_in = 2; `NPHASE;
+               a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
+               dataload = 1'b1; data_in = 2; write = 1'b1; end
+            default: begin phase_in = 0; code_in = nop; `HOLDP; 
+               t_in = s; tload = 1'b1; spopp = 1'b1;
+               dataload = 1'b1; write = 1'b1; addr_in = 1'b1; end
+            endcase
+        pop: begin t_in = s; tload = 1'b1; spopp = 1'b1; end
         pop2: begin
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
+            0: begin phase_in = 1; `NPHASE;
+               t_in = s; tload = 1'b1; spopp = 1'b1; end
+            default: begin phase_in = 0;
+               t_in = s; tload = 1'b1; spopp = 1'b1; end
             endcase end
-        dup: begin
-            spush = 1'b1; end
-        dup_x1: begin
+        dup: begin spush = 1'b1; end
+        dup_x1:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = s; aload = 1'b1; end
-                default: begin phase_in = 0;
-                    t_in = a; spush = 1'b1; tload = 1'b1; end
-            endcase end
-        dup_x2: begin
-            t_in = s_stack[sp - 1]; spush = 1'b1; tload = 1'b1; end
-        dup2: begin
+            0: begin phase_in = 1; `NPHASE;
+               a_in = s; aload = 1'b1; end
+            default: begin phase_in = 0;
+               t_in = a; spush = 1'b1; tload = 1'b1; end
+            endcase
+        dup_x2: begin t_in = s_stack[sp - 1]; spush = 1'b1; tload = 1'b1; end
+        dup2:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
-                    a_in = s; aload = 1'b1; end
-                1: begin phase_in = 2; `NPHASE;
-                    t_in = a; spush = 1'b1; tload = 1'b1; end
-                2: begin phase_in = 3; `NPHASE;
-                    a_in = s; aload = 1'b1; end
-                default: begin phase_in = 0;
-                    t_in = a; spush = 1'b1; tload = 1'b1; end
-            endcase end
-        swap: begin
-            t_in = s; tload = 1'b1; sload = 1'b1; end
-        iadd: begin
-            t_in = s + t; tload = 1'b1; spopp = 1'b1; end
-        isub: begin
-            t_in = s - t; tload = 1'b1; spopp = 1'b1; end
-        imul: begin
-            t_in = product[DSZ-1:0]; tload = 1'b1; spopp = 1'b1; end
-        idivv: begin
-            t_in = quotient; tload = 1'b1; spopp = 1'b1; end
-        irem: begin
-            t_in = remain; tload = 1'b1; spopp = 1'b1; end
-        ineg: begin
-            t_in = 0 - t; tload = 1'b1; spopp = 1'b1; end
-        ishl: begin
-            t_in = isht_o; tload = 1'b1; spopp = 1'b1; end
-        ishr: begin shr_f = 1'b1;
-            t_in = isht_o; tload = 1'b1; spopp = 1'b1; end
-        iushr: begin
-            t_in = iushr_o; tload = 1'b1; spopp = 1'b1; end
-        iand: begin
-            t_in = s & t; tload = 1'b1; spopp = 1'b1; end
-        ior: begin
-            t_in = s | t; tload = 1'b1; spopp = 1'b1; end
-        ixor: begin
-            t_in = s ^ t; tload = 1'b1; spopp = 1'b1; end
-        iinc: begin
+            0: begin phase_in = 1; `NPHASE;
+               a_in = s; aload = 1'b1; end
+            1: begin phase_in = 2; `NPHASE;
+               t_in = a; spush = 1'b1; tload = 1'b1; end
+            2: begin phase_in = 3; `NPHASE;
+               a_in = s; aload = 1'b1; end
+            default: begin phase_in = 0;
+               t_in = a; spush = 1'b1; tload = 1'b1; end
+            endcase
+        swap: begin t_in = s; tload = 1'b1; sload = 1'b1; end
+        //
+        // ALU ops
+        //
+        iadd: begin t_in = s + t;            tload = 1'b1; spopp = 1'b1; end
+        isub: begin t_in = s - t;            tload = 1'b1; spopp = 1'b1; end
+        imul: begin t_in = product[DSZ-1:0]; tload = 1'b1; spopp = 1'b1; end
+        idiv: begin t_in = quotient;         tload = 1'b1; spopp = 1'b1; end
+        irem: begin t_in = remain;           tload = 1'b1; spopp = 1'b1; end
+        ineg: begin t_in = 0 - t;            tload = 1'b1; spopp = 1'b1; end
+        ishl: begin t_in = isht_o;           tload = 1'b1; spopp = 1'b1; end
+        ishr: begin t_in = isht_o;           tload = 1'b1; spopp = 1'b1; shr_f = 1'b1; end
+        iushr:begin t_in = iushr_o;          tload = 1'b1; spopp = 1'b1; end
+        iand: begin t_in = s & t;            tload = 1'b1; spopp = 1'b1; end
+        ior:  begin t_in = s | t;            tload = 1'b1; spopp = 1'b1; end
+        ixor: begin t_in = s ^ t;            tload = 1'b1; spopp = 1'b1; end
+        iinc:
             case (phase)
-                0: begin phase_in = 1;
+            0: begin phase_in = 1;
                     a_in = s; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2; `HOLDP;
+            1: begin phase_in = 2; `HOLDP;
                     t_in = t + data_i; sload = 1'b1; addrload = 1'b1; addr_in = 1'b1;
                     spopp = 1'b1; end
-                default: begin phase_in = 0; `HOLDP;
+            default: begin phase_in = 0; `HOLDP;
                     t_in = s; tload = 1'b1;
                     dataload = 1'b1; data_in = 0; write = 1'b1;
                     addrload = 1'b1; end
-            endcase end
-        ifeq: begin
+            endcase
+        //          
+        // Logical ops
+        //          
+        ifeq:      cond(t_z);
+        ifne:      cond(t_z == 1'b0);
+        iflt:      cond(t[31]);
+        ifge:      cond(t[31] == 1'b0);
+        ifgt:      cond((t[31]==1'b0) && (t_z==1'b0));
+        ifle:      cond((t[31]==1'b1) || (t_z==1'b1));
+        if_icmpeq: cmp(t_z);
+        if_icmpne: cmp(t_z == 1'b0);
+        if_icmplt: cmp(t[31]);
+        if_icmpgt: cmp((t[31]==1'b0) && (t_z==1'b0));
+        //
+        // branching
+        //
+        goto:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
+            0: begin phase_in = 1; `SAMEOP;
                     a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t_z) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        ifne: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t_z == 1'b0) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        iflt: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t[31]) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        ifge: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t[31] == 1'b0) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        ifgt: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if ((t[31]==1'b0) && (t_z==1'b0)) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        ifle: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if ((t[31]==1'b1) || (t_z==1'b1)) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        if_icmpeq: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t_z) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        if_icmpne: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t_z == 1'b0) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        if_icmplt: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if (t[31]) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        if_icmpgt: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
-                    if ((t[31]==1'b0) && (t_z==1'b0)) begin
-                        p_in = {a[23:0], data_i}; aload = 1'b1;
-                    end end
-                default: begin phase_in = 0;
-                    t_in = s; tload = 1'b1; spopp = 1'b1; end
-            endcase end
-        goto: begin
-            case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
+            1: begin phase_in = 2; `SAMEOP;
                     p_in = {a[23:0], data_i}; end
-                default: begin phase_in = 0; end
-            endcase end
-        jsr: begin
+            default: begin phase_in = 0; end
+            endcase
+        jsr:
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = t; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2; `HOLDP;
+            0: begin phase_in = 1;
+                    a_in = t;     aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
+            1: begin phase_in = 2; `HOLDP;
                     a_in = a + 1; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1;
                     t_in = data_i; tload = 1'b1; end
-                default: begin phase_in = 0;
+            default: begin phase_in = 0;
                     p_in = {t[23:0], data_i};
                     t_in = p + 2; tload = 1'b1; spush = 1'b1; end
-            endcase end
+            endcase
         ret: begin p_in = r; end
-        jreturn: begin
+        jreturn:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
+            0: begin phase_in = 1; `SAMEOP;
                     p_in = r; rpopp = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
-        invokevirtual: begin
+            default: begin phase_in = 0; end
+            endcase
+        invokevirtual:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
+            0: begin phase_in = 1; `SAMEOP;
                     r_in = p + 2; rpush = 1'b1;
                     a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
+            1: begin phase_in = 2; `SAMEOP;
                     p_in = {a[23:0], data_i}; aload = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
-        donext: begin
+            default: begin phase_in = 0; end
+            endcase
+        donext:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
+            0: begin phase_in = 1; `SAMEOP;
                     a_in = data_i; aload = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
+            1: begin phase_in = 2; `SAMEOP;
                     if (r_z) begin
                         rpopp = 1'b1; end
                     else begin
@@ -482,46 +390,46 @@ module eJ32 #(
                         p_in = {a[23:0], data_i};
                     end
                     end
-                default: begin phase_in = 0; end
-            endcase end
-        ldi: begin
+            default: begin phase_in = 0; end
+            endcase
+        ldi:
             case (phase)
-                0: begin phase_in =1; `SAMEOP;
+            0: begin phase_in =1; `SAMEOP;
                     t_in = data_i; tload = 1'b1; spush = 1'b1; end
-                1: begin phase_in = 2; `SAMEOP;
+            1: begin phase_in = 2; `SAMEOP;
                     t_in = {t[23:0], data_i}; tload = 1'b1; end
-                2: begin phase_in = 3; `SAMEOP;
+            2: begin phase_in = 3; `SAMEOP;
                     t_in = {t[23:0], data_i}; tload = 1'b1; end
-                3: begin phase_in = 4; `SAMEOP;
+            3: begin phase_in = 4; `SAMEOP;
                     t_in = {t[23:0], data_i}; tload = 1'b1; end
-                default: begin phase_in = 0; end
-            endcase end
+            default: begin phase_in = 0; end
+            endcase
         popr: begin
             t_in = r; tload = 1'b1; spush = 1'b1; rpopp = 1'b1; end
         pushr: begin
             t_in = s; tload = 1'b1; spopp = 1'b1;
-            r_in = t;  rpush = 1'b1; end
+            r_in = t; rpush = 1'b1; end
         dupr: begin
             t_in = r; tload = 1'b1; spush = 1'b1; end
-        get: begin
+        get:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
+            0: begin phase_in = 1; `NPHASE;
                     a_in = inptr; aload = 1'b1; addr_in = 1'b1;
                     spush = 1'b1; end
-                default: begin phase_in = 0; code_in = nop; `HOLDP;
+            default: begin phase_in = 0; code_in = nop; `HOLDP;
                       t_in = data_i; tload = 1'b1;
                     inload = 1'b1; end
-            endcase end
-        put: begin
+            endcase
+        put:
             case (phase)
-                0: begin phase_in = 1; `NPHASE;
+            0: begin phase_in = 1; `NPHASE;
                     a_in = outptr; aload = 1'b1; addr_in = 1'b1;
                     data_in = 3; dataload = 1'b1; end
-                default: begin phase_in = 0; code_in = nop; `HOLDP;
+            default: begin phase_in = 0; code_in = nop; `HOLDP;
                     t_in = s; tload = 1'b1; spopp = 1'b1;
                     data_in = 3; dataload = 1'b1; write = 1'b1;
                     outload = 1'b1; end
-            endcase end
+            endcase
         default: begin phase_in = 0; end
         endcase
     end
