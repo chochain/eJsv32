@@ -1,14 +1,19 @@
 //
-// eJ32 - Java Forth Machine 
+// eJ32 - Java Forth Machine
 //
 // Chen-hanson Ting, 20220110 eJsv32k.v in Quartus II SystemVerilog-2005
 // Chochain          20220209 to eJ32 for Lattice and future versions
 //
 `include "../source/forthsuper_if.sv"
 `include "../source/eJ32.vh"
+
+`define SAMEOP   codeload = 1'b0;
+`define HOLDP    codeload = 1'b1; pload = 1'b0
+`define NPHASE   codeload = 1'b0; pload = 1'b0
+
 module eJ32 #(
-    parameter DSZ = 32,
-    parameter ASZ = 32,
+    parameter DSZ      = 32,
+    parameter ASZ      = 32,
     parameter SS_DEPTH = 32,
     parameter RS_DEPTH = 32
     ) (
@@ -23,10 +28,10 @@ module eJ32 #(
 // registers
     logic[DSZ-1:0] s_stack[SS_DEPTH-1:0];
     logic[DSZ-1:0] r_stack[RS_DEPTH-1:0];
-    logic[ASZ-1:0] p, a;
-    logic[DSZ-1:0] t;
     logic[$clog2(SS_DEPTH)-1:0] sp, sp1;
     logic[$clog2(RS_DEPTH)-1:0] rp, rp1;
+    logic[ASZ-1:0] p, a;
+    logic[DSZ-1:0] t;
     logic[2:0]     phase;
     logic[1:0]     data_sel;
     logic          addr_sel;
@@ -42,44 +47,37 @@ module eJ32 #(
     logic[2:0]     phase_in;
     logic[1:0]     data_in;
     logic          write, addrload, addr_in, dataload, pload, codeload;
-    logic[DSZ-1:0] isht_o,iushr_o;
-    logic          right_shift;
-    logic[DSZ-1:0] inptr,outptr;
+    logic[DSZ-1:0] isht_o, iushr_o;
+    logic          shr_f;
+    logic[DSZ-1:0] inptr, outptr;
     logic          inload, outload;
-    logic[DSZ-1:0] quotient,remain;
+    logic[DSZ-1:0] quotient, remain;
     logic[(DSZ*2)-1:0] product;
     jvm_opcode     code_in;
-  /*
-  ram_memory    ram_memory_inst (
-    .address (addr_o[12:0]),
-    .clock (~clk),
-    .data (data_o),
-    .wren (write),
-    .q (data_i)
-   );
-  */
-  mult  mult_inst (
+   
+    mult  mult_inst (
     .dataa (t),
     .datab (s),
     .result (product)
-   );
-  divide    divide_inst (
+    );
+    divide    divide_inst (
     .denom (t),
     .numer (s),
     .quotient (quotient),
     .remain (remain)
-   );
-  shifter   shifter_inst (
+    );
+    shifter   shifter_inst (
     .data (s),
-    .direction (right_shift),
+    .direction (shr_f),
     .distance (t[4:0]),
     .result (isht_o)
-   );
-  ushifter  ushifter_inst (
+    );
+    ushifter  ushifter_inst (
     .data (s),
     .distance (t[4:0]),
     .result (iushr_o)
-   );
+    );
+
 // direct signals
     assign data_i   = data_o_i;
     assign data_o_o = data_o;
@@ -92,12 +90,12 @@ module eJ32 #(
     assign phase_o  = phase;
     assign sp_o     = sp;
     assign rp_o     = rp;
-    assign data_o = (data_sel == 3) 
+    assign data_o = (data_sel == 3)
                     ? t[7:0]
-                    : (data_sel == 2) 
+                    : (data_sel == 2)
                         ? t[15:8]
                         : (data_sel == 1)
-                            ? t[23:16] 
+                            ? t[23:16]
                             : t[31:24];
     assign addr_o = (addr_sel) ? a : p;
     assign s      = s_stack[sp];
@@ -105,8 +103,7 @@ module eJ32 #(
     assign t_z    = (t == 0) ? 1'b1 : 1'b0;
     assign r_z    = (r == 0) ? 1'b1 : 1'b0;
 // combinational
-  always_comb
-    begin
+    always_comb begin
         aload     = 1'b0;
         tload     = 1'b0;
         sload     = 1'b0;
@@ -115,24 +112,26 @@ module eJ32 #(
         rload     = 1'b0;
         rpush     = 1'b0;
         rpopp     = 1'b0;
-        pload     = 1'b1;
+
         p_in      = p + 1;
+        codeload  = 1'b1;
+        pload     = 1'b1;
+
         addrload  = 1'b1;
         addr_in   = 1'b0;
         dataload  = 1'b0;
         data_in   = 3;
         phase_in  = 0;
-        codeload  = 1'b1;
         write     = 1'b0;
         t_in      = {DSZ{1'b0}};
         a_in      = {ASZ{1'b0}};
         r_in      = {DSZ{1'b0}};
-        right_shift   = 1'b0;
+        shr_f   = 1'b0;
         inload    = 1'b0;
         outload   = 1'b0;
         $cast(code_in, data_i);     // some JVM opcodes are not avialable yet
 // instructions
-    case (code)
+        case (code)
         nop        : begin /* do nothing */ end
         aconst_null: begin t_in = 0;  tload = 1'b1; spush = 1'b1; end
         iconst_m1  : begin t_in = -1; tload = 1'b1; spush = 1'b1; end
@@ -144,19 +143,16 @@ module eJ32 #(
         iconst_5   : begin t_in = 5;  tload = 1'b1; spush = 1'b1; end
         bipush: begin
             case (phase)
-                0: begin phase_in = 1;
-                    t_in = data_i; tload = 1'b1; spush = 1'b1;
-                    codeload = 1'b0; end
+                0: begin phase_in = 1; `SAMEOP;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         sipush: begin
             case (phase)
-                0: begin phase_in = 1;
-                    t_in = data_i; tload = 1'b1; spush = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; end
+                0: begin phase_in = 1; `SAMEOP;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         iload: begin
@@ -176,48 +172,40 @@ module eJ32 #(
             spush = 1'b1; end
         iaload: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = t; aload = 1'b1; addr_in = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                1: begin phase_in = 2;
+                0: begin phase_in = 1; `NPHASE;
+                    a_in = t; aload = 1'b1; addr_in = 1'b1; end
+                1: begin phase_in = 2; `NPHASE;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = data_i; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                2: begin phase_in = 3;
+                    t_in = data_i; tload = 1'b1; end
+                2: begin phase_in = 3; `NPHASE;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                3: begin phase_in = 4;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
+                3: begin phase_in = 4; `NPHASE;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                4: begin phase_in = 5;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
+                4: begin phase_in = 5; `NPHASE;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         baload: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     a_in = t; aload = 1'b1; addr_in = 1'b1;
-                    codeload = 1'b0; p_in = p - 1; pload = 1'b1; end
+                    p_in = p - 1; end
                 1: begin phase_in = 2;
                     t_in = data_i; tload = 1'b1;
-                    code_in = nop; codeload = 1'b1; pload = 1'b1; end
+                    code_in = nop; end
                 default: begin phase_in = 0; end
             endcase end
         saload: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = t; aload = 1'b1; addr_in = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                1: begin phase_in = 2;
+                0: begin phase_in = 1; `NPHASE;
+                    a_in = t; aload = 1'b1; addr_in = 1'b1; end
+                1: begin phase_in = 2; `NPHASE;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    t_in = data_i; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                2: begin phase_in = 3;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
+                    t_in = data_i; tload = 1'b1; end
+                2: begin phase_in = 3; `NPHASE;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         istore_0: begin
@@ -225,86 +213,73 @@ module eJ32 #(
             t_in = s; tload = 1'b1; spopp = 1'b1; end
         iastore: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `NPHASE;
                     a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
-                    dataload = 1'b1; data_in = 0;
-                    codeload = 1'b0; pload = 1'b0; end
-                1: begin phase_in = 2;
+                    dataload = 1'b1; data_in = 0; end
+                1: begin phase_in = 2; `NPHASE;
                     a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 1; write = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                2: begin phase_in = 3;
+                    dataload = 1'b1; data_in = 1; write = 1'b1; end
+                2: begin phase_in = 3; `NPHASE;
                     a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 2; write = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                3: begin phase_in = 4;
+                    dataload = 1'b1; data_in = 2; write = 1'b1; end
+                3: begin phase_in = 4; `NPHASE;
                     a_in = a + 1  ; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 3; write = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                4: begin phase_in = 5;
+                    dataload = 1'b1; data_in = 3; write = 1'b1; end
+                4: begin phase_in = 5; `NPHASE;
                     dataload = 1'b1; data_in = 3; write = 1'b1;
                     t_in = s; tload = 1'b1; spopp = 1'b1;
-                    codeload = 1'b0; pload = 1'b0;
                     p_in = p; end
                 default: begin phase_in = 0; end
             endcase end
         bastore: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
-                    codeload = 1'b0; p_in = p - 1; pload = 1'b1; end
+                    p_in = p - 1; end
                 default: begin phase_in = 0;
                     t_in = s; tload = 1'b1; spopp = 1'b1;
-                    code_in = nop; codeload = 1'b1; pload = 1'b1;
+                    code_in = nop;
                     dataload = 1'b1; write = 1'b1; addr_in = 1'b0; end
             endcase end
         sastore: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                1: begin phase_in = 2;
+                0: begin phase_in = 1; `NPHASE;
+                    a_in = s; aload = 1'b1; addr_in = 1'b1; spopp = 1'b1; end
+                1: begin phase_in = 2; `NPHASE;
                     a_in = a + 1; aload = 1'b1; addr_in = 1'b1;
-                    dataload = 1'b1; data_in = 2; write = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                default: begin phase_in = 0;
+                    dataload = 1'b1; data_in = 2; write = 1'b1; end
+                default: begin phase_in = 0; code_in = nop; `HOLDP; 
                     t_in = s; tload = 1'b1; spopp = 1'b1;
-                    dataload = 1'b1; write = 1'b1; addr_in = 1'b1;
-                    code_in = nop; codeload = 1'b1; pload = 1'b0; end
+                    dataload = 1'b1; write = 1'b1; addr_in = 1'b1; end
             endcase end
         pop: begin
             t_in = s; tload = 1'b1; spopp = 1'b1; end
         pop2: begin
             case (phase)
-                0: begin phase_in = 1;
-                    t_in = s; tload = 1'b1; spopp = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
+                0: begin phase_in = 1; `NPHASE;
+                    t_in = s; tload = 1'b1; spopp = 1'b1; end
                 default: begin phase_in = 0;
                     t_in = s; tload = 1'b1; spopp = 1'b1; end
             endcase end
-        dup: begin 
+        dup: begin
             spush = 1'b1; end
         dup_x1: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = s; aload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
+                0: begin phase_in = 1; `NPHASE;
+                    a_in = s; aload = 1'b1; end
                 default: begin phase_in = 0;
                     t_in = a; spush = 1'b1; tload = 1'b1; end
             endcase end
         dup_x2: begin
             t_in = s_stack[sp - 1]; spush = 1'b1; tload = 1'b1; end
-        dup2: begin 
+        dup2: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = s; aload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                1: begin phase_in = 2;
-                    t_in = a; spush = 1'b1; tload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                2: begin phase_in = 3;
-                    a_in = s; aload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
+                0: begin phase_in = 1; `NPHASE;
+                    a_in = s; aload = 1'b1; end
+                1: begin phase_in = 2; `NPHASE;
+                    t_in = a; spush = 1'b1; tload = 1'b1; end
+                2: begin phase_in = 3; `NPHASE;
+                    a_in = s; aload = 1'b1; end
                 default: begin phase_in = 0;
                     t_in = a; spush = 1'b1; tload = 1'b1; end
             endcase end
@@ -324,7 +299,7 @@ module eJ32 #(
             t_in = 0 - t; tload = 1'b1; spopp = 1'b1; end
         ishl: begin
             t_in = isht_o; tload = 1'b1; spopp = 1'b1; end
-        ishr: begin right_shift = 1'b1;
+        ishr: begin shr_f = 1'b1;
             t_in = isht_o; tload = 1'b1; spopp = 1'b1; end
         iushr: begin
             t_in = iushr_o; tload = 1'b1; spopp = 1'b1; end
@@ -338,21 +313,19 @@ module eJ32 #(
             case (phase)
                 0: begin phase_in = 1;
                     a_in = s; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2;
+                1: begin phase_in = 2; `HOLDP;
                     t_in = t + data_i; sload = 1'b1; addrload = 1'b1; addr_in = 1'b1;
-                    spopp = 1'b1; pload = 1'b0; end
-                default: begin phase_in = 0;
+                    spopp = 1'b1; end
+                default: begin phase_in = 0; `HOLDP;
                     t_in = s; tload = 1'b1;
                     dataload = 1'b1; data_in = 0; write = 1'b1;
-                    addrload = 1'b1; pload = 1'b0; end
+                    addrload = 1'b1; end
             endcase end
         ifeq: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t_z) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -361,11 +334,9 @@ module eJ32 #(
             endcase end
         ifne: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t_z == 1'b0) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -374,11 +345,9 @@ module eJ32 #(
             endcase end
         iflt: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t[31]) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -387,11 +356,9 @@ module eJ32 #(
             endcase end
         ifge: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t[31] == 1'b0) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -400,11 +367,9 @@ module eJ32 #(
             endcase end
         ifgt: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if ((t[31]==1'b0) && (t_z==1'b0)) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -413,11 +378,9 @@ module eJ32 #(
             endcase end
         ifle: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if ((t[31]==1'b1) || (t_z==1'b1)) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -426,12 +389,10 @@ module eJ32 #(
             endcase end
         if_icmpeq: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t_z) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -440,12 +401,10 @@ module eJ32 #(
             endcase end
         if_icmpne: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t_z == 1'b0) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -454,12 +413,10 @@ module eJ32 #(
             endcase end
         if_icmplt: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (t[31]) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -468,12 +425,10 @@ module eJ32 #(
             endcase end
         if_icmpgt: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     t_in = s - t; tload = 1'b1; spopp = 1'b1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    codeload = 1'b0;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if ((t[31]==1'b0) && (t_z==1'b0)) begin
                         p_in = {a[23:0], data_i}; aload = 1'b1;
                     end end
@@ -482,74 +437,63 @@ module eJ32 #(
             endcase end
         goto: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    p_in = {a[23:0], data_i};
-                    codeload = 1'b0; end
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
+                    p_in = {a[23:0], data_i}; end
                 default: begin phase_in = 0; end
             endcase end
         jsr: begin
             case (phase)
                 0: begin phase_in = 1;
                     a_in = t; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1; end
-                1: begin phase_in = 2;
+                1: begin phase_in = 2; `HOLDP;
                     a_in = a + 1; aload = 1'b1; addrload = 1'b1; addr_in = 1'b1;
-                    t_in = data_i; tload = 1'b1; pload = 1'b0; end
+                    t_in = data_i; tload = 1'b1; end
                 default: begin phase_in = 0;
                     p_in = {t[23:0], data_i};
                     t_in = p + 2; tload = 1'b1; spush = 1'b1; end
             endcase end
-        ret: begin
-            p_in = r; end
+        ret: begin p_in = r; end
         jreturn: begin
             case (phase)
-                0: begin phase_in = 1;
-                    p_in = r; rpopp = 1'b1;
-                    codeload = 1'b0; end
+                0: begin phase_in = 1; `SAMEOP;
+                    p_in = r; rpopp = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         invokevirtual: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `SAMEOP;
                     r_in = p + 2; rpush = 1'b1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    p_in = {a[23:0], data_i}; aload = 1'b1;
-                    codeload = 1'b0; end
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
+                    p_in = {a[23:0], data_i}; aload = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         donext: begin
             case (phase)
-                0: begin phase_in = 1;
-                    a_in = data_i; aload = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
+                0: begin phase_in = 1; `SAMEOP;
+                    a_in = data_i; aload = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
                     if (r_z) begin
                         rpopp = 1'b1; end
                     else begin
                         r_in = r - 1; rload = 1'b1;
                         p_in = {a[23:0], data_i};
                     end
-                    codeload = 1'b0; end
+                    end
                 default: begin phase_in = 0; end
             endcase end
         ldi: begin
             case (phase)
-                0: begin phase_in =1;
-                    t_in = data_i; tload = 1'b1; spush = 1'b1;
-                    codeload = 1'b0; end
-                1: begin phase_in = 2;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; end
-                2: begin phase_in = 3;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; end
-                3: begin phase_in = 4;
-                    t_in = {t[23:0], data_i}; tload = 1'b1;
-                    codeload = 1'b0; end
+                0: begin phase_in =1; `SAMEOP;
+                    t_in = data_i; tload = 1'b1; spush = 1'b1; end
+                1: begin phase_in = 2; `SAMEOP;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
+                2: begin phase_in = 3; `SAMEOP;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
+                3: begin phase_in = 4; `SAMEOP;
+                    t_in = {t[23:0], data_i}; tload = 1'b1; end
                 default: begin phase_in = 0; end
             endcase end
         popr: begin
@@ -561,32 +505,28 @@ module eJ32 #(
             t_in = r; tload = 1'b1; spush = 1'b1; end
         get: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `NPHASE;
                     a_in = inptr; aload = 1'b1; addr_in = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; spush = 1'b1; end
-                default: begin phase_in = 0;
-                    t_in = data_i; tload = 1'b1;
-                    code_in = nop; codeload = 1'b1; pload = 1'b0;
+                    spush = 1'b1; end
+                default: begin phase_in = 0; code_in = nop; `HOLDP;
+                      t_in = data_i; tload = 1'b1;
                     inload = 1'b1; end
             endcase end
         put: begin
             case (phase)
-                0: begin phase_in = 1;
+                0: begin phase_in = 1; `NPHASE;
                     a_in = outptr; aload = 1'b1; addr_in = 1'b1;
-                    data_in = 3; dataload = 1'b1;
-                    codeload = 1'b0; pload = 1'b0; end
-                default: begin phase_in = 0;
+                    data_in = 3; dataload = 1'b1; end
+                default: begin phase_in = 0; code_in = nop; `HOLDP;
                     t_in = s; tload = 1'b1; spopp = 1'b1;
                     data_in = 3; dataload = 1'b1; write = 1'b1;
-                    code_in = nop; codeload = 1'b1; pload = 1'b0;
                     outload = 1'b1; end
             endcase end
         default: begin phase_in = 0; end
-    endcase
+        endcase
     end
 // registers
-    always_ff @(posedge clk, posedge clr)
-    begin
+    always_ff @(posedge clk, posedge clr) begin
         if (clr) begin
             phase <= 1'b0;
             addr_sel <= 1'b0;
@@ -595,17 +535,17 @@ module eJ32 #(
             sp1 <= 1;
             rp  <= 0;
             rp1 <= 1;
-            inptr  <= 32'b1000000000000;
-            outptr <= 32'b1010000000000;
+            inptr  <= 'h1000;
+            outptr <= 'h1400;
             t   <= {DSZ{1'b0}};
             a   <= {ASZ{1'b0}};
             p   <= {ASZ{1'b0}};
             end
         else if (clk) begin
             phase <= phase_in;
+            if (codeload)  code <= code_in;
             if (pload)     p <= p_in;
             if (aload)     a <= a_in;
-            if (codeload)  code <= code_in;
             if (addrload)  addr_sel <= addr_in;
             if (dataload)  data_sel <= data_in;
             if (inload)    inptr <= inptr + 1;
@@ -625,4 +565,3 @@ module eJ32 #(
         end
     end
 endmodule
-
