@@ -10,8 +10,8 @@
 `define SAMEOP   cload = 1'b0;
 `define HOLDP    cload = 1'b1; pload = 1'b0
 `define NPHASE   cload = 1'b0; pload = 1'b0
-`define NEWADR   aload = 1'b1; asel_in = 1'b1
-`define TOS(v)   tload = 1'b1; t_in = v
+`define SETA(a)  aload = 1'b1; asel_in = 1'b1; a_in = (a)
+`define TOS(v)   tload = 1'b1; t_in = (v)
 `define PUSH     tload = 1'b1; spush = 1'b1
 `define POP      tload = 1'b1; spop  = 1'b1
 
@@ -202,31 +202,27 @@ module eJ32 #(
         iaload:
             case (phase)
             0: begin phase_in = 1; `NPHASE; 
-               a_in = t; `NEWADR; end
+               `SETA(t); end
             1: begin phase_in = 2; `NPHASE;
-               a_in = a + 1; `NEWADR; `TOS(data_i); end
+               `SETA(a + 1); `TOS(data_i); end
             2: begin phase_in = 3; `NPHASE;
-               a_in = a + 1; `NEWADR; `TOS({t[23:0], data_i}); end
+               `SETA(a + 1); `TOS({t[23:0], data_i}); end
             3: begin phase_in = 4; `NPHASE;
-               a_in = a + 1; `NEWADR; `TOS({t[23:0], data_i}); end
+               `SETA(a + 1); `TOS({t[23:0], data_i}); end
             4: begin phase_in = 5; `NPHASE; `TOS({t[23:0], data_i}); end
             default: begin phase_in = 0; end
             endcase
         baload:
             case (phase)
-            0: begin phase_in = 1; `SAMEOP;
-               a_in = t; `NEWADR;
-               p_in = p - 1; end
+            0: begin phase_in = 1; `SAMEOP; `SETA(t); p_in = p - 1; end
             1: begin phase_in = 2;
                `TOS(data_i); code_in = nop; end
             default: begin phase_in = 0; end
             endcase
         saload:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-               a_in = t; `NEWADR; end
-            1: begin phase_in = 2; `NPHASE;
-               a_in = a + 1; `NEWADR; `TOS(data_i); end
+            0: begin phase_in = 1; `NPHASE; `SETA(t); end
+            1: begin phase_in = 2; `NPHASE; `SETA(a + 1); `TOS(data_i); end
             2: begin phase_in = 3; `NPHASE; `TOS({t[23:0], data_i}); end
             default: begin phase_in = 0; end
             endcase
@@ -235,17 +231,13 @@ module eJ32 #(
             t_in = s; `POP; end
         iastore:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-               a_in = s; `NEWADR; spop = 1'b1;
+            0: begin phase_in = 1; `NPHASE; `SETA(s); spop = 1'b1;
                dselload = 1'b1; dsel_in = 0; end
-            1: begin phase_in = 2; `NPHASE;
-               a_in = a + 1  ; `NEWADR;
+            1: begin phase_in = 2; `NPHASE; `SETA(a + 1);
                dselload = 1'b1; dsel_in = 1; write = 1'b1; end
-            2: begin phase_in = 3; `NPHASE;
-               a_in = a + 1  ; `NEWADR;
+            2: begin phase_in = 3; `NPHASE; `SETA(a + 1);
                dselload = 1'b1; dsel_in = 2; write = 1'b1; end
-            3: begin phase_in = 4; `NPHASE;
-               a_in = a + 1  ; `NEWADR;
+            3: begin phase_in = 4; `NPHASE; `SETA(a + 1);
                dselload = 1'b1; dsel_in = 3; write = 1'b1; end
             4: begin phase_in = 5; `NPHASE;
                dselload = 1'b1; dsel_in = 3; write = 1'b1;
@@ -255,8 +247,7 @@ module eJ32 #(
             endcase
         bastore:
             case (phase)
-            0: begin phase_in = 1; `SAMEOP;
-               a_in = s; `NEWADR; spop = 1'b1;
+            0: begin phase_in = 1; `SAMEOP; `SETA(s); spop = 1'b1;
                p_in = p - 1; end
             default: begin phase_in = 0;
                t_in = s; `POP;
@@ -265,10 +256,8 @@ module eJ32 #(
             endcase
         sastore:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-               a_in = s; `NEWADR; spop = 1'b1; end
-            1: begin phase_in = 2; `NPHASE;
-               a_in = a + 1; `NEWADR;
+            0: begin phase_in = 1; `NPHASE; `SETA(s); spop = 1'b1; end
+            1: begin phase_in = 2; `NPHASE; `SETA(a + 1);
                dselload = 1'b1; dsel_in = 2; write = 1'b1; end
             default: begin phase_in = 0; code_in = nop; `HOLDP; 
                t_in = s; `POP;
@@ -320,8 +309,7 @@ module eJ32 #(
         ixor: begin t_in = s ^ t;            `POP; end
         iinc:
             case (phase)
-            0: begin phase_in = 1;
-                    a_in = s; `NEWADR; aselload = 1'b1; end
+            0: begin phase_in = 1; `SETA(s); aselload = 1'b1; end
             1: begin phase_in = 2; `HOLDP;
                     t_in = t + data_i; sload = 1'b1; aselload = 1'b1; asel_in = 1'b1;
                     spop = 1'b1; end
@@ -356,9 +344,9 @@ module eJ32 #(
         jsr:
             case (phase)
             0: begin phase_in = 1;
-                    a_in = t;     `NEWADR; aselload = 1'b1; end
+                    `SETA(t); aselload = 1'b1; end
             1: begin phase_in = 2; `HOLDP;
-                    a_in = a + 1; `NEWADR; aselload = 1'b1; 
+                    `SETA(a + 1); aselload = 1'b1; 
                     `TOS(data_i); end
             default: begin phase_in = 0;
                     p_in = {t[23:0], data_i};
@@ -412,17 +400,14 @@ module eJ32 #(
             t_in = r; `PUSH; end
         get:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-                    a_in = iptr; `NEWADR;
-                    spush = 1'b1; end
-            default: begin phase_in = 0; 
+            0: begin phase_in = 1; `NPHASE; `SETA(iptr); spush = 1'b1; end
+            default: begin phase_in = 0;
                     code_in = nop; `HOLDP;
                     `TOS(data_i); iload = 1'b1; end
             endcase
         put:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-                    a_in = optr; `NEWADR;
+            0: begin phase_in = 1; `NPHASE; `SETA(optr);
                     dsel_in = 3; dselload = 1'b1; end
             default: begin phase_in = 0; code_in = nop; `HOLDP;
                     t_in = s; `POP;
