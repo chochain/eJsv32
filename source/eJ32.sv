@@ -77,20 +77,20 @@ module eJ32 #(
     .result (iushr_o)
     );
     
-    task hold();    cload = 1'b1; pload = 1'b0;                  endtask;
-    task holdnop(); hold(); code_in = nop;                       endtask;
-    task nphase(n); cload = 1'b0; phase_in = (n);                endtask;
-    task nfetch(n); nphase(n); pload = 1'b0;                     endtask;
+    task hold();    cload = 1'b1; pload = 1'b0;                    endtask;
+    task holdnop(); hold(); code_in = nop;                         endtask;
+    task nphase(input logic[2:0] n); cload = 1'b0; phase_in = (n); endtask;
+    task nfetch(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
    
-    task TOA(a);    aload = 1'b1; a_in = (a);                    endtask;
-    task SETA(a);   TOA(a); asel_in = 1'b1;                      endtask;
+    task TOA(input logic[ASZ-1:0] a);  aload = 1'b1; a_in = (a);   endtask;
+    task SETA(input logic[ASZ-1:0] a); TOA(a); asel_in = 1'b1;     endtask;
    
-    task TOS(v);    tload = 1'b1; t_in = (v);                    endtask;
-    task PUSH(v);   TOS(v); spush = 1'b1;                        endtask;
-    task POP();     TOS(s); spop  = 1'b1;                        endtask;
-    task ALU(v);    TOS(v); spop  = 1'b1;                        endtask;
+    task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
+    task PUSH(input logic[DSZ-1:0] v); TOS(v); spush = 1'b1;       endtask;
+    task POP();                        TOS(s); spop  = 1'b1;       endtask;
+    task ALU(input logic[DSZ-1:0] v);  TOS(v); spop  = 1'b1;       endtask;
 
-    task dwrite(n); write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
+    task dwrite(input logic[2:0] n); write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
    
     task cond(f);
         case (phase)
@@ -251,27 +251,27 @@ module eJ32 #(
         dup_x2: PUSH(ss[sp - 1]);
         dup2:
             case (phase)
-            0: begin nfetch(1); TOA(s); end
-            1: begin nfetch(2); PUSH(a);  end
-            2: begin nfetch(3); TOA(s); end
+            0: begin nfetch(1); TOA(s);  end
+            1: begin nfetch(2); PUSH(a); end
+            2: begin nfetch(3); TOA(s);  end
             default: begin `ZPHASE; PUSH(a); end
             endcase
         swap: begin TOS(s); sload = 1'b1; end
         //
         // ALU ops
         //
-        iadd: begin ALU(s + t); end
-        isub: begin ALU(s - t); end
-        imul: begin ALU(product[DSZ-1:0]); end
-        idiv: begin ALU(quotient); end
-        irem: begin ALU(remain); end
-        ineg: begin ALU(0 - t); end
-        ishl: begin ALU(isht_o); end
+        iadd: ALU(s + t);
+        isub: ALU(s - t);
+        imul: ALU(product[DSZ-1:0]);
+        idiv: ALU(quotient);
+        irem: ALU(remain);
+        ineg: ALU(0 - t);
+        ishl: ALU(isht_o);
         ishr: begin ALU(isht_o); shr_f = 1'b1; end
-        iushr:begin ALU(iushr_o); end
-        iand: begin ALU(s & t); end
-        ior:  begin ALU(s | t); end
-        ixor: begin ALU(s ^ t); end
+        iushr:ALU(iushr_o);
+        iand: ALU(s & t);
+        ior:  ALU(s | t);
+        ixor: ALU(s ^ t);
         iinc:
             case (phase)
             0: begin phase_in = 1; SETA(s); end
@@ -387,8 +387,8 @@ module eJ32 #(
             if (rload)     rs[rp] <= r_in;
             if (spop)      begin sp <= sp - 1; sp1 <= sp1 - 1; end
             if (rpop)      begin rp <= rp - 1; rp1 <= rp1 - 1; end
-//            if (spush)     begin ss[sp1] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
-            if (spush)     begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
+            if (spush)     begin ss[sp1] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
+//            if (spush)     begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
             if (rpush)     begin rs[rp1] <= r_in; rp <= rp + 1; rp1 <= rp1 + 1; end
         end
     end
