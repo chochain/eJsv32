@@ -46,7 +46,7 @@ module eJ32 #(
     logic[7:0]     data_i, data_o;
     logic[2:0]     phase_in;
     logic[1:0]     dsel_in;
-    logic          write, aselload, asel_in, dselload, cload;
+    logic          write, asel_in, dselload, cload;
     logic[DSZ-1:0] isht_o, iushr_o;
     logic          shr_f;
     logic[DSZ-1:0] iptr, optr;
@@ -77,8 +77,8 @@ module eJ32 #(
     .result (iushr_o)
     );
     
-    task hold();    cload = 1'b1; pload = 1'b0; aselload = 1'b1; endtask;
-    task holdnop(); cload = 1'b1; pload = 1'b0; code_in = nop;   endtask;
+    task hold();    cload = 1'b1; pload = 1'b0;                  endtask;
+    task holdnop(); hold(); code_in = nop;                       endtask;
     task nphase(n); cload = 1'b0; phase_in = (n);                endtask;
     task nfetch(n); nphase(n); pload = 1'b0;                     endtask;
    
@@ -141,7 +141,6 @@ module eJ32 #(
         a_in      = {ASZ{1'b0}};  /// address
         aload     = 1'b0;
         asel_in   = 1'b0;
-        aselload  = 1'b1;
         p_in      = p + 1;        /// advance program counter
         pload     = 1'b1;
         cload     = 1'b1;
@@ -228,7 +227,7 @@ module eJ32 #(
             case (phase)
             0: begin nphase(1); SETA(s); spop = 1'b1; p_in = p - 1; end
             default: begin `ZPHASE; 
-               POP(); dwrite(3); code_in = nop; asel_in = 1'b0; end
+               POP(); dwrite(3); code_in = nop; end
             endcase
         sastore:
             case (phase)
@@ -275,9 +274,8 @@ module eJ32 #(
         ixor: begin ALU(s ^ t); end
         iinc:
             case (phase)
-            0: begin phase_in = 1; SETA(s); aselload = 1'b1; end
-            1: begin phase_in = 2; hold();  asel_in = 1'b1; 
-               t_in = t + data_i; sload = 1'b1; spop = 1'b1; end
+            0: begin phase_in = 1; SETA(s); end
+            1: begin phase_in = 2; hold(); TOS(t + data_i); asel_in = 1'b1; spop = 1'b1; end
             default: begin `ZPHASE; hold(); TOS(s); dwrite(0); end
             endcase
         //          
@@ -304,7 +302,7 @@ module eJ32 #(
             endcase
         jsr:
             case (phase)
-            0: begin phase_in = 1; SETA(t); aselload = 1'b1; end
+            0: begin phase_in = 1; SETA(t); end
             1: begin phase_in = 2; hold(); SETA(a + 1); TOS(data_i); end
             default: begin `ZPHASE; 
                p_in = {t[23:0], data_i}; PUSH(p + 2); end
@@ -325,8 +323,7 @@ module eJ32 #(
             case (phase)
             0: begin nphase(1); TOA(data_i); end
             1: begin nphase(2);
-               if (r_z) begin
-                   rpop = 1'b1; end
+               if (r_z) begin rpop = 1'b1; end
                else begin
                    r_in = r - 1; rload = 1'b1;
                    p_in = {a[23:0], data_i};
@@ -344,7 +341,7 @@ module eJ32 #(
             endcase
         popr: begin PUSH(r); rpop = 1'b1; end
         pushr:begin POP(); r_in = t; rpush = 1'b1; end
-        dupr: begin PUSH(r); end
+        dupr: PUSH(r);
         get:
             case (phase)
             0: begin nfetch(1); SETA(iptr); spush = 1'b1; end
@@ -378,10 +375,10 @@ module eJ32 #(
         end
         else if (clk) begin
             phase <= phase_in;
+            asel  <= asel_in;
             if (cload)     code <= code_in;
             if (pload)     p    <= p_in;
             if (aload)     a    <= a_in;
-            if (aselload)  asel <= asel_in;
             if (dselload)  dsel <= dsel_in;
             if (iload)     iptr <= iptr + 1;
             if (oload)     optr <= optr + 1;
