@@ -7,15 +7,7 @@
 `include "../source/forthsuper_if.sv"
 `include "../source/eJ32.vh"
 
-`define KEEPOP   cload = 1'b0;
-`define HOLD     cload = 1'b1; pload = 1'b0
-`define NOPHOLD  cload = 1'b1; pload = 1'b0; code_in = nop
-`define NPHASE   cload = 1'b0; pload = 1'b0
-`define SETA(a)  aload = 1'b1; asel_in = 1'b1; a_in = (a)
-`define TOS(v)   tload = 1'b1; t_in = (v)
-`define PUSH(v)  tload = 1'b1; spush = 1'b1; t_in = (v)
-`define POP      tload = 1'b1; spop  = 1'b1; t_in = (s)
-`define ALU(v)   tload = 1'b1; spop  = 1'b1; t_in = (v)
+`define ZPHASE phase_in = 0
 
 module eJ32 #(
     parameter DSZ      = 32,
@@ -84,27 +76,36 @@ module eJ32 #(
     .result (iushr_o)
     );
 
+    task hold();    cload = 1'b1; pload = 1'b0;                 endtask;
+    task holdnop(); cload = 1'b1; pload = 1'b0; code_in = nop;  endtask;
+    task nphase(n); cload = 1'b0; pload = 1'b0; phase_in = (n); endtask;
+    task keepop(n); cload = 1'b0; phase_in = (n);               endtask;
+   
+    task SETA(a);   aload = 1'b1; asel_in = 1'b1; a_in = (a);   endtask;
+    task TOS(v);    tload = 1'b1; t_in = (v);                   endtask;
+    task PUSH(v);   tload = 1'b1; spush = 1'b1; t_in = (v);     endtask;
+    task POP();     tload = 1'b1; spop  = 1'b1; t_in = (s);     endtask;
+    task ALU(v);    tload = 1'b1; spop  = 1'b1; t_in = (v);     endtask;
+
+    task dwrite(n); write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
+   
     task cond(f);
         case (phase)
-        0: begin phase_in = 1; `KEEPOP;
-           a_in = data_i; aload = 1'b1; 
-        end
-        1: begin phase_in = 2; `KEEPOP;
+        0: begin keepop(1); a_in = data_i; aload = 1'b1; end
+        1: begin keepop(2);
            if (f) begin p_in = {a[23:0], data_i}; aload = 1'b1; end
         end
-        default: begin phase_in = 0; `POP; end
+        default: begin phase_in = 0; POP(); end
         endcase
     endtask; // cond
 
     task cmp(f);
         case (phase)
-        0: begin phase_in = 1; `KEEPOP; `ALU(s - t);
-            a_in = data_i; aload = 1'b1; 
-        end
-        1: begin phase_in = 2; `KEEPOP;
+        0: begin keepop(1); ALU(s - t); a_in = data_i; aload = 1'b1; end
+        1: begin keepop(2);
             if (f) begin p_in = {a[23:0], data_i}; aload = 1'b1; end
         end
-        default: begin phase_in = 0; `POP; end
+        default: begin phase_in = 0; POP(); end
         endcase
     endtask; // cmp
 
@@ -134,173 +135,148 @@ module eJ32 #(
     assign r_z    = (r == 0) ? 1'b1 : 1'b0;
 // combinational
     always_comb begin
-        // address
-        a_in      = {ASZ{1'b0}};
+        a_in      = {ASZ{1'b0}};  /// address
         aload     = 1'b0;
         asel_in   = 1'b0;
         aselload  = 1'b1;
-        // program counter       
-        p_in      = p + 1;
+        p_in      = p + 1;        /// program counter
         pload     = 1'b1;
         cload     = 1'b1;
-        // TOS
-        t_in      = {DSZ{1'b0}};
+        t_in      = {DSZ{1'b0}};  /// TOS
         tload     = 1'b0;
-        // data stack
-        sload     = 1'b0;
+        sload     = 1'b0;         /// data stack
         spush     = 1'b0;
         spop      = 1'b0;
-        // return stack       
-        r_in      = {DSZ{1'b0}};
+        r_in      = {DSZ{1'b0}};  /// return stack
         rload     = 1'b0;
         rpush     = 1'b0;
         rpop      = 1'b0;
-        // data
-        dselload  = 1'b0;
+        dselload  = 1'b0;         /// data bus
         dsel_in   = 3;
         write     = 1'b0;
         shr_f     = 1'b0;
-        $cast(code_in, data_i);     // some JVM opcodes are not avialable yet
-        // phase and io control
-        phase_in  = 0;
+        $cast(code_in, data_i);   /// JVM opcodes, some are not avialable yet
+       
+        phase_in  = 0;            /// phase and IO controls
         iload     = 1'b0;
         oload     = 1'b0;
        
 // instructions
         case (code)
         nop        : begin /* do nothing */ end
-        aconst_null: begin `PUSH(0); end
-        iconst_m1  : begin `PUSH(-1); end
-        iconst_0   : begin `PUSH(0); end
-        iconst_1   : begin `PUSH(1); end
-        iconst_2   : begin `PUSH(2); end
-        iconst_3   : begin `PUSH(3); end
-        iconst_4   : begin `PUSH(4); end
-        iconst_5   : begin `PUSH(5); end
+        aconst_null: PUSH(0);
+        iconst_m1  : PUSH(-1);
+        iconst_0   : PUSH(0);
+        iconst_1   : PUSH(1);
+        iconst_2   : PUSH(2);
+        iconst_3   : PUSH(3);
+        iconst_4   : PUSH(4);
+        iconst_5   : PUSH(5);
         bipush:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP; `PUSH(data_i); end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); PUSH(data_i); end
+            default: `ZPHASE;
             endcase
         sipush:
             case (phase)
-                0: begin phase_in = 1; `KEEPOP; `PUSH(data_i); end
-                1: begin phase_in = 2; `KEEPOP;
-                    `TOS({t[23:0], data_i}); end
-                default: begin phase_in = 0; end
+            0: begin keepop(1); PUSH(data_i); end
+            1: begin keepop(2); TOS({t[23:0], data_i}); end
+            default: `ZPHASE;
             endcase
-        iload:   begin `PUSH(rs[rp - data_i]); p_in = p + 1; end
-        iload_0: begin `PUSH(rs[rp]); end
-        iload_1: begin `PUSH(rs[rp - 1]); end
-        iload_2: begin `PUSH(rs[rp - 2]); end
-        iload_3: begin `PUSH(rs[rp - 3]); end
+        iload:   begin PUSH(rs[rp - data_i]); p_in = p + 1; end
+        iload_0: PUSH(rs[rp]);
+        iload_1: PUSH(rs[rp - 1]);
+        iload_2: PUSH(rs[rp - 2]);
+        iload_3: PUSH(rs[rp - 3]);
         iaload:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; 
-               `SETA(t); end
-            1: begin phase_in = 2; `NPHASE;
-               `SETA(a + 1); `TOS(data_i); end
-            2: begin phase_in = 3; `NPHASE;
-               `SETA(a + 1); `TOS({t[23:0], data_i}); end
-            3: begin phase_in = 4; `NPHASE;
-               `SETA(a + 1); `TOS({t[23:0], data_i}); end
-            4: begin phase_in = 5; `NPHASE; `TOS({t[23:0], data_i}); end
-            default: begin phase_in = 0; end
+            0: begin nphase(1); SETA(t); end
+            1: begin nphase(2); SETA(a + 1); TOS(data_i); end
+            2: begin nphase(3); SETA(a + 1); TOS({t[23:0], data_i}); end
+            3: begin nphase(4); SETA(a + 1); TOS({t[23:0], data_i}); end
+            4: begin nphase(5); TOS({t[23:0], data_i}); end
+            default: `ZPHASE;
             endcase
         baload:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP; `SETA(t); p_in = p - 1; end
-            1: begin phase_in = 2;
-               `TOS(data_i); code_in = nop; end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); SETA(t); p_in = p - 1; end
+            1: begin phase_in = 2; TOS(data_i); code_in = nop; end
+            default: `ZPHASE;
             endcase
         saload:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `SETA(t); end
-            1: begin phase_in = 2; `NPHASE; `SETA(a + 1); `TOS(data_i); end
-            2: begin phase_in = 3; `NPHASE; `TOS({t[23:0], data_i}); end
-            default: begin phase_in = 0; end
+            0: begin nphase(1); SETA(t); end
+            1: begin nphase(2); SETA(a + 1); TOS(data_i); end
+            2: begin nphase(3); TOS({t[23:0], data_i}); end
+            default: `ZPHASE;
             endcase
-        istore_0: begin r_in = t; rload = 1'b1; `POP; end
+        istore_0: begin r_in = t; rload = 1'b1; POP(); end
         iastore:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `SETA(s); spop = 1'b1;
-               dselload = 1'b1; dsel_in = 0; end
-            1: begin phase_in = 2; `NPHASE; `SETA(a + 1);
-               dselload = 1'b1; dsel_in = 1; write = 1'b1; end
-            2: begin phase_in = 3; `NPHASE; `SETA(a + 1);
-               dselload = 1'b1; dsel_in = 2; write = 1'b1; end
-            3: begin phase_in = 4; `NPHASE; `SETA(a + 1);
-               dselload = 1'b1; dsel_in = 3; write = 1'b1; end
-            4: begin phase_in = 5; `NPHASE;
-               dselload = 1'b1; dsel_in = 3; write = 1'b1;
-               `POP; p_in = p; end
-            default: begin phase_in = 0; end
+            0: begin nphase(1); SETA(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
+            1: begin nphase(2); SETA(a + 1); dwrite(1); end
+            2: begin nphase(3); SETA(a + 1); dwrite(2); end
+            3: begin nphase(4); SETA(a + 1); dwrite(3); end
+            4: begin nphase(5); dwrite(3); POP(); p_in = p; end
+            default: `ZPHASE;
             endcase
         bastore:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP; `SETA(s); spop = 1'b1;
-               p_in = p - 1; end
-            default: begin phase_in = 0; `POP;
-               code_in = nop;
-               dselload = 1'b1; write = 1'b1; asel_in = 1'b0; end
+            0: begin keepop(1); SETA(s); spop = 1'b1; p_in = p - 1; end
+            default: begin `ZPHASE; 
+               POP(); code_in = nop; dwrite(3); asel_in = 1'b0; end
             endcase
         sastore:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `SETA(s); spop = 1'b1; end
-            1: begin phase_in = 2; `NPHASE; `SETA(a + 1);
-               dselload = 1'b1; dsel_in = 2; write = 1'b1; end
-            default: begin phase_in = 0; `NOPHOLD; `POP;
-               dselload = 1'b1; write = 1'b1; asel_in = 1'b1; end
+            0: begin nphase(1); SETA(s); spop = 1'b1; end
+              1: begin nphase(2); SETA(a + 1); dwrite(2); end
+              default: begin phase_in = 0; 
+                 holdnop(); dwrite(3); POP(); asel_in = 1'b1; end
             endcase
-        pop: begin `POP; end
+        pop: begin POP(); end
         pop2:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `POP; end
-            default: begin phase_in = 0; `POP; end
+            0: begin nphase(1); POP(); end
+            default: begin `ZPHASE; POP(); end
             endcase
         dup: begin spush = 1'b1; end
         dup_x1:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-               a_in = s; aload = 1'b1; end
-            default: begin phase_in = 0; `PUSH(a); end
+            0: begin nphase(1); a_in = s; aload = 1'b1; end
+            default: begin `ZPHASE; PUSH(a); end
             endcase
-        dup_x2: begin `PUSH(ss[sp - 1]); end
+        dup_x2: begin PUSH(ss[sp - 1]); end
         dup2:
             case (phase)
-            0: begin phase_in = 1; `NPHASE;
-               a_in = s; aload = 1'b1; end
-            1: begin phase_in = 2; `NPHASE; `PUSH(a); end
-            2: begin phase_in = 3; `NPHASE;
-               a_in = s; aload = 1'b1; end
-            default: begin phase_in = 0; `PUSH(a); end
+            0: begin nphase(1); a_in = s; aload = 1'b1; end
+            1: begin nphase(2); PUSH(a); end
+            2: begin nphase(3); a_in = s; aload = 1'b1; end
+            default: begin `ZPHASE; PUSH(a); end
             endcase
-        swap: begin `TOS(s); sload = 1'b1; end
+        swap: begin TOS(s); sload = 1'b1; end
         //
         // ALU ops
         //
-        iadd: begin `ALU(s + t); end
-        isub: begin `ALU(s - t); end
-        imul: begin `ALU(product[DSZ-1:0]); end
-        idiv: begin `ALU(quotient); end
-        irem: begin `ALU(remain); end
-        ineg: begin `ALU(0 - t); end
-        ishl: begin `ALU(isht_o); end
-        ishr: begin `ALU(isht_o); shr_f = 1'b1; end
-        iushr:begin `ALU(iushr_o); end
-        iand: begin `ALU(s & t); end
-        ior:  begin `ALU(s | t); end
-        ixor: begin `ALU(s ^ t); end
+        iadd: begin ALU(s + t); end
+        isub: begin ALU(s - t); end
+        imul: begin ALU(product[DSZ-1:0]); end
+        idiv: begin ALU(quotient); end
+        irem: begin ALU(remain); end
+        ineg: begin ALU(0 - t); end
+        ishl: begin ALU(isht_o); end
+        ishr: begin ALU(isht_o); shr_f = 1'b1; end
+        iushr:begin ALU(iushr_o); end
+        iand: begin ALU(s & t); end
+        ior:  begin ALU(s | t); end
+        ixor: begin ALU(s ^ t); end
         iinc:
             case (phase)
-            0: begin phase_in = 1; `SETA(s); aselload = 1'b1; end
-            1: begin phase_in = 2; `HOLD;
+            0: begin phase_in = 1; SETA(s); aselload = 1'b1; end
+            1: begin phase_in = 2; hold();
                     t_in = t + data_i; sload = 1'b1; aselload = 1'b1; asel_in = 1'b1;
                     spop = 1'b1; end
-            default: begin phase_in = 0; `HOLD; `TOS(s);
-                    dselload = 1'b1; dsel_in = 0; write = 1'b1;
-                    aselload = 1'b1; end
+            default: begin `ZPHASE; 
+               hold(); TOS(s); dwrite(0); aselload = 1'b1; end
             endcase
         //          
         // Logical ops
@@ -320,77 +296,66 @@ module eJ32 #(
         //
         goto:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP;
-                    a_in = data_i; aload = 1'b1; end
-            1: begin phase_in = 2; `KEEPOP;
-                    p_in = {a[23:0], data_i}; end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); a_in = data_i; aload = 1'b1; end
+            1: begin keepop(2); p_in = {a[23:0], data_i}; end
+            default: `ZPHASE;
             endcase
         jsr:
             case (phase)
-            0: begin phase_in = 1;
-                    `SETA(t); aselload = 1'b1; end
-            1: begin phase_in = 2; `HOLD;
-                    `SETA(a + 1); aselload = 1'b1; 
-                    `TOS(data_i); end
-            default: begin phase_in = 0;
-                    p_in = {t[23:0], data_i}; `PUSH(p + 2); end
+            0: begin phase_in = 1; SETA(t); aselload = 1'b1; end
+            1: begin phase_in = 2; hold(); SETA(a + 1); aselload = 1'b1; TOS(data_i); end
+            default: begin `ZPHASE; 
+               p_in = {t[23:0], data_i}; PUSH(p + 2); end
             endcase
         ret: begin p_in = r; end
         jreturn:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP;
-                    p_in = r; rpop = 1'b1; end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); p_in = r; rpop = 1'b1; end
+            default: `ZPHASE;
             endcase
         invokevirtual:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP;
-                    r_in = p + 2; rpush = 1'b1;
-                    a_in = data_i; aload = 1'b1; end
-            1: begin phase_in = 2; `KEEPOP;
-                    p_in = {a[23:0], data_i}; aload = 1'b1; end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); r_in = p + 2; rpush = 1'b1; a_in = data_i; aload = 1'b1; end
+            1: begin keepop(2); p_in = {a[23:0], data_i}; aload = 1'b1; end
+            default: `ZPHASE;
             endcase
         donext:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP;
-                    a_in = data_i; aload = 1'b1; end
-            1: begin phase_in = 2; `KEEPOP;
+            0: begin keepop(1); a_in = data_i; aload = 1'b1; end
+            1: begin keepop(2);
                     if (r_z) begin
                         rpop = 1'b1; end
                     else begin
                         r_in = r - 1; rload = 1'b1;
                         p_in = {a[23:0], data_i};
                     end
-                    end
-            default: begin phase_in = 0; end
+               end
+            default: `ZPHASE;
             endcase
         ldi:
             case (phase)
-            0: begin phase_in = 1; `KEEPOP; `PUSH(data_i); end
-            1: begin phase_in = 2; `KEEPOP; `TOS({t[23:0], data_i}); end
-            2: begin phase_in = 3; `KEEPOP; `TOS({t[23:0], data_i}); end
-            3: begin phase_in = 4; `KEEPOP; `TOS({t[23:0], data_i}); end
-            default: begin phase_in = 0; end
+            0: begin keepop(1); PUSH(data_i); end
+            1: begin keepop(2); TOS({t[23:0], data_i}); end
+            2: begin keepop(3); TOS({t[23:0], data_i}); end
+            3: begin keepop(4); TOS({t[23:0], data_i}); end
+            default: `ZPHASE;
             endcase
-        popr: begin `PUSH(r); rpop = 1'b1; end
-        pushr:begin `POP; r_in = t; rpush = 1'b1; end
-        dupr: begin `PUSH(r); end
+        popr: begin PUSH(r); rpop = 1'b1; end
+        pushr:begin POP(); r_in = t; rpush = 1'b1; end
+        dupr: begin PUSH(r); end
         get:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `SETA(iptr); spush = 1'b1; end
-            default: begin phase_in = 0; `NOPHOLD; `TOS(data_i); iload = 1'b1; end
+            0: begin nphase(1); SETA(iptr); spush = 1'b1; end
+            default: begin `ZPHASE; 
+               holdnop(); TOS(data_i); iload = 1'b1; end
             endcase
         put:
             case (phase)
-            0: begin phase_in = 1; `NPHASE; `SETA(optr);
-                    dsel_in = 3; dselload = 1'b1; end
-            default: begin phase_in = 0; `NOPHOLD; `POP;
-                    dsel_in = 3; dselload = 1'b1; write = 1'b1;
-                    oload = 1'b1; end
+            0: begin nphase(1); SETA(optr); dselload = 1'b1; end
+            default: begin `ZPHASE; 
+               holdnop(); POP(); dwrite(3); oload = 1'b1; end
             endcase
-        default: begin phase_in = 0; end
+        default: `ZPHASE;
         endcase
     end
 // registers
@@ -424,8 +389,8 @@ module eJ32 #(
             if (spop)      begin sp <= sp - 1; sp1 <= sp1 - 1; end
             if (rpop)      begin rp <= rp - 1; rp1 <= rp1 - 1; end
             if (spush)     begin
-                ss[sp1] <= t;
-//                ss[sp] <= t;
+//                ss[sp1] <= t;
+                ss[sp] <= t;
                 sp <= sp + 1; sp1 <= sp1 + 1; end
             if (rpush)     begin
                 rs[rp1] <= r_in;
