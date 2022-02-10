@@ -12,7 +12,7 @@
 `define NPHASE   cload = 1'b0; pload = 1'b0
 `define SETA(a)  aload = 1'b1; asel_in = 1'b1; a_in = (a)
 `define TOS(v)   tload = 1'b1; t_in = (v)
-`define PUSH     tload = 1'b1; spush = 1'b1
+`define PUSH(v)  tload = 1'b1; spush = 1'b1; t_in = (v)
 `define POP      tload = 1'b1; spop  = 1'b1
 
 module eJ32 #(
@@ -172,33 +172,31 @@ module eJ32 #(
 // instructions
         case (code)
         nop        : begin /* do nothing */ end
-        aconst_null: begin t_in = 0;  `PUSH; end
-        iconst_m1  : begin t_in = -1; `PUSH; end
-        iconst_0   : begin t_in = 0;  `PUSH; end
-        iconst_1   : begin t_in = 1;  `PUSH; end
-        iconst_2   : begin t_in = 2;  `PUSH; end
-        iconst_3   : begin t_in = 3;  `PUSH; end
-        iconst_4   : begin t_in = 4;  `PUSH; end
-        iconst_5   : begin t_in = 5;  `PUSH; end
+        aconst_null: begin `PUSH(0); end
+        iconst_m1  : begin `PUSH(-1); end
+        iconst_0   : begin `PUSH(0); end
+        iconst_1   : begin `PUSH(1); end
+        iconst_2   : begin `PUSH(2); end
+        iconst_3   : begin `PUSH(3); end
+        iconst_4   : begin `PUSH(4); end
+        iconst_5   : begin `PUSH(5); end
         bipush:
             case (phase)
-            0: begin phase_in = 1; `SAMEOP;
-                    t_in = data_i; `PUSH; end
+            0: begin phase_in = 1; `SAMEOP; `PUSH(data_i); end
             default: begin phase_in = 0; end
             endcase
         sipush:
             case (phase)
-                0: begin phase_in = 1; `SAMEOP;
-                    t_in = data_i; `PUSH; end
+                0: begin phase_in = 1; `SAMEOP; `PUSH(data_i); end
                 1: begin phase_in = 2; `SAMEOP;
                     `TOS({t[23:0], data_i}); end
                 default: begin phase_in = 0; end
             endcase
-        iload:   begin t_in = rs[rp - data_i]; `PUSH; p_in = p + 1; end
-        iload_0: begin t_in = rs[rp];          `PUSH; end
-        iload_1: begin t_in = rs[rp - 1];      `PUSH; end
-        iload_2: begin t_in = rs[rp - 2];      `PUSH; end
-        iload_3: begin t_in = rs[rp - 3];      `PUSH; end
+        iload:   begin `PUSH(rs[rp - data_i]); p_in = p + 1; end
+        iload_0: begin `PUSH(rs[rp]); end
+        iload_1: begin `PUSH(rs[rp - 1]); end
+        iload_2: begin `PUSH(rs[rp - 2]); end
+        iload_3: begin `PUSH(rs[rp - 3]); end
         iaload:
             case (phase)
             0: begin phase_in = 1; `NPHASE; 
@@ -276,20 +274,17 @@ module eJ32 #(
             case (phase)
             0: begin phase_in = 1; `NPHASE;
                a_in = s; aload = 1'b1; end
-            default: begin phase_in = 0;
-               t_in = a; `PUSH; end
+            default: begin phase_in = 0; `PUSH(a); end
             endcase
-        dup_x2: begin t_in = ss[sp - 1]; `PUSH; end
+        dup_x2: begin `PUSH(ss[sp - 1]); end
         dup2:
             case (phase)
             0: begin phase_in = 1; `NPHASE;
                a_in = s; aload = 1'b1; end
-            1: begin phase_in = 2; `NPHASE;
-               t_in = a; `PUSH; end
+            1: begin phase_in = 2; `NPHASE; `PUSH(a); end
             2: begin phase_in = 3; `NPHASE;
                a_in = s; aload = 1'b1; end
-            default: begin phase_in = 0;
-               t_in = a; `PUSH; end
+            default: begin phase_in = 0; `PUSH(a); end
             endcase
         swap: begin `TOS(s); sload = 1'b1; end
         //
@@ -349,8 +344,7 @@ module eJ32 #(
                     `SETA(a + 1); aselload = 1'b1; 
                     `TOS(data_i); end
             default: begin phase_in = 0;
-                    p_in = {t[23:0], data_i};
-                    t_in = p + 2; `PUSH; end
+                    p_in = {t[23:0], data_i}; `PUSH(p + 2); end
             endcase
         ret: begin p_in = r; end
         jreturn:
@@ -384,20 +378,17 @@ module eJ32 #(
             endcase
         ldi:
             case (phase)
-            0: begin phase_in =1; `SAMEOP;
-                    t_in = data_i; `PUSH; end
+            0: begin phase_in =1; `SAMEOP; `PUSH(data_i); end
             1: begin phase_in = 2; `SAMEOP; `TOS({t[23:0], data_i}); end
             2: begin phase_in = 3; `SAMEOP; `TOS({t[23:0], data_i}); end
             3: begin phase_in = 4; `SAMEOP; `TOS({t[23:0], data_i}); end
             default: begin phase_in = 0; end
             endcase
-        popr: begin
-            t_in = r; `PUSH; rpop = 1'b1; end
+        popr: begin `PUSH(r); rpop = 1'b1; end
         pushr: begin
             t_in = s; `POP;
             r_in = t; rpush = 1'b1; end
-        dupr: begin
-            t_in = r; `PUSH; end
+        dupr: begin `PUSH(r); end
         get:
             case (phase)
             0: begin phase_in = 1; `NPHASE; `SETA(iptr); spush = 1'b1; end
