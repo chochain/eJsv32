@@ -80,9 +80,9 @@ module eJ32 #(
     task nphase(input logic[2:0] n); cload = 1'b0; phase_in = (n); endtask;
     task nfetch(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
    
-    task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;
-    task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;
-    task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;
+    task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;   /* build addr ptr    */
+    task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory */
+    task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;   /* jmp and clear a   */
    
     task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
     task PUSH(input logic[DSZ-1:0] v); TOS(v); spush = 1'b1;       endtask;
@@ -152,7 +152,9 @@ module eJ32 #(
         write     = 1'b0;
         shr_f     = 1'b0;
        
-        $cast(code_in, data_i);   /// JVM opcodes, some are not avialable yet
+        if (!$cast(code_in, data_i)) begin
+            /// JVM opcodes, some are not avialable yet
+        end
        
         phase_in  = 0;            /// phase and IO controls
         iload     = 1'b0;
@@ -300,12 +302,12 @@ module eJ32 #(
             0: begin phase_in = 1; GET(t); end
             1: begin phase_in = 2; `HOLD; GET(a + 1); TOS(data_i); end
             default: begin `PHASE0; 
-               p_in = t_d; PUSH(p + 2); end
+               JMP(t_d); PUSH(p + 2); end
             endcase
-        ret: p_in = r;
+        ret: JMP(r);
         jreturn:
             case (phase)
-            0: begin nphase(1); p_in = r; rpop = 1'b1; end
+            0: begin nphase(1); rpop = 1'b1; JMP(r); end
             default: `PHASE0;
             endcase
         invokevirtual:
@@ -320,8 +322,8 @@ module eJ32 #(
             1: begin nphase(2);
                if (r == 0) begin rpop = 1'b1; end
                else begin
-                   r_in = r - 1; rload = 1'b1;
-                   p_in = a_d;
+                  r_in = r - 1; rload = 1'b1;
+                  JMP(a_d);
                end
             end
             default: `PHASE0;
@@ -349,7 +351,7 @@ module eJ32 #(
             1: begin nfetch(2); POP(); dwrite(3); oload = 1'b1; end
             default: `PHASE0; 
             endcase
-        default: $display("unknown opcode %02x", data_i);
+        default: `PHASE0;
         endcase
     end
 // registers
@@ -369,6 +371,9 @@ module eJ32 #(
             p     <= {ASZ{1'b0}};
         end
         else if (clk) begin
+            $display(
+                "%6t> p:a=%04x:%04x[%02x] sp=%2x<%8x, %8x> %s.%d", 
+                $time, p, a, data_i, sp, s, t, code.name, phase);
             phase <= phase_in;
             asel  <= asel_in;
             if (cload)     code <= code_in;
@@ -377,7 +382,6 @@ module eJ32 #(
             if (dselload)  dsel <= dsel_in;
             if (iload)     iptr <= iptr + 1;
             if (oload)     optr <= optr + 1;
-           
             if (tload)     t    <= t_in;
             if      (sload) ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; sp1 <= sp1 - 1; end
