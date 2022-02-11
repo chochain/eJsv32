@@ -80,8 +80,8 @@ module eJ32 #(
     task nphase(input logic[2:0] n); cload = 1'b0; phase_in = (n); endtask;
     task nfetch(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
    
-    task TOA(input logic[ASZ-1:0] a);  aload = 1'b1; a_in = (a);   endtask;
-    task GET(input logic[ASZ-1:0] a); TOA(a); asel_in = 1'b1;     endtask;
+    task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;
+    task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;
     task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;
    
     task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
@@ -92,7 +92,7 @@ module eJ32 #(
    
     task JCMP0(input logic f);
         case (phase)
-        0: begin nphase(1); TOA(data_i); end
+        0: begin nphase(1); SETA(data_i); end
         1: begin nphase(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
@@ -100,7 +100,7 @@ module eJ32 #(
 
     task JCMPI(input logic f);
         case (phase)
-        0: begin nphase(1); ALU(s - t); TOA(data_i); end
+        0: begin nphase(1); ALU(s - t); SETA(data_i); end
         1: begin nphase(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
@@ -118,7 +118,7 @@ module eJ32 #(
     assign phase_o  = phase;
     assign sp_o     = sp;
     assign rp_o     = rp;
-    assign data_o   = (dsel == 3)
+    assign data_o   = (dsel == 3)             // Big-Endian
                     ? t[7:0]
                     : (dsel == 2)
                         ? t[15:8]
@@ -240,15 +240,15 @@ module eJ32 #(
         dup: spush = 1'b1;
         dup_x1:
             case (phase)
-            0: begin nfetch(1); TOA(s); end
+            0: begin nfetch(1); SETA(s); end
             default: begin `PHASE0; PUSH(a); end
             endcase
         dup_x2: PUSH(ss[sp - 1]);
         dup2:
             case (phase)
-            0: begin nfetch(1); TOA(s);  end
+            0: begin nfetch(1); SETA(s);  end
             1: begin nfetch(2); PUSH(a); end
-            2: begin nfetch(3); TOA(s);  end
+            2: begin nfetch(3); SETA(s);  end
             default: begin `PHASE0; PUSH(a); end
             endcase
         swap: begin TOS(s); sload = 1'b1; end
@@ -291,7 +291,7 @@ module eJ32 #(
         //
         goto:
             case (phase)
-            0: begin nphase(1); TOA(data_i); end
+            0: begin nphase(1); SETA(data_i); end
             1: begin nphase(2); JMP(a_d); end
             default: `PHASE0;
             endcase
@@ -310,13 +310,13 @@ module eJ32 #(
             endcase
         invokevirtual:
             case (phase)
-            0: begin nphase(1); TOA(data_i); r_in = p + 2; rpush = 1'b1; end
+            0: begin nphase(1); SETA(data_i); r_in = p + 2; rpush = 1'b1; end
             1: begin nphase(2); JMP(a_d); end
             default: `PHASE0;
             endcase
         donext:
             case (phase)
-            0: begin nphase(1); TOA(data_i); end
+            0: begin nphase(1); SETA(data_i); end
             1: begin nphase(2);
                if (r == 0) begin rpop = 1'b1; end
                else begin
