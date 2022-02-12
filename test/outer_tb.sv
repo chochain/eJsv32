@@ -57,7 +57,7 @@ module outer_tb #(
       verify();             // validate memory content
       
       reset();              // activate eJsv32
-      repeat(150) @(posedge clk);
+      repeat(1500) @(posedge clk);
         
       #20 $finish;
    end
