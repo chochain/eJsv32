@@ -79,7 +79,9 @@ module eJ32 #(
     
     task nphase(input logic[2:0] n); cload = 1'b0; phase_in = (n); endtask;
     task nfetch(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
-   
+    //
+    // Note: address is memory offset (instead of Java class file reference)
+    //
     task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;   /* build addr ptr    */
     task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory */
     task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;   /* jmp and clear a   */
@@ -90,21 +92,21 @@ module eJ32 #(
     task ALU(input logic[DSZ-1:0] v);  TOS(v); spop  = 1'b1;       endtask;
     task dwrite(input logic[2:0] n); write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
    
-    task JCMP0(input logic f);
+    task ZBRAN(input logic f);
         case (phase)
         0: begin nphase(1); SETA(data_i); end
         1: begin nphase(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
-    endtask; // JCMP0
+    endtask; // ZBRAN
 
-    task JCMPI(input logic f);
+    task IBRAN(input logic f);
         case (phase)
         0: begin nphase(1); ALU(s - t); SETA(data_i); end
-        1: begin nphase(2); POP(); if (f) JMP(a_d); end
+        1: begin nphase(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
         default: `PHASE0;
         endcase
-    endtask; // JCMPI
+    endtask; // IBRAN
 
 // direct signals
     assign data_i   = data_o_i;
@@ -278,16 +280,16 @@ module eJ32 #(
         //          
         // Logical ops
         //          
-        ifeq:      JCMP0(t == 0);
-        ifne:      JCMP0(t != 0);
-        iflt:      JCMP0(t <  0);
-        ifge:      JCMP0(t >= 0);
-        ifgt:      JCMP0(t >  0);
-        ifle:      JCMP0(t <= 0);
-        if_icmpeq: JCMPI(t == 0);
-        if_icmpne: JCMPI(t != 0);
-        if_icmplt: JCMPI(t <  0);
-        if_icmpgt: JCMPI(t >  0);
+        ifeq:      ZBRAN(t == 0);
+        ifne:      ZBRAN(t != 0);
+        iflt:      ZBRAN(t <  0);
+        ifge:      ZBRAN(t >= 0);
+        ifgt:      ZBRAN(t >  0);
+        ifle:      ZBRAN(t <= 0);
+        if_icmpeq: IBRAN(t == 0);
+        if_icmpne: IBRAN(t != 0);
+        if_icmplt: IBRAN(t <  0);
+        if_icmpgt: IBRAN(t >  0);
         //
         // branching
         //
