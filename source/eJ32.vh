@@ -55,8 +55,6 @@ typedef enum logic [7:0] {
         jreturn       = 'hb1,
         invokevirtual = 'hb6,
         donext        = 'hca,
-        ldi, popr, pushr, dupr,
-        get           = 'hd0,
-        put
+        ldi, popr, pushr, dupr, ext, get, put
 } jvm_opcode;
 `endif // EJ32_EJ32_VH
