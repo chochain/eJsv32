@@ -16,19 +16,22 @@ module eJ32 #(
     parameter SS_DEPTH = 32,
     parameter RS_DEPTH = 32
     ) (
-    input logic        clk, clr,
-    input  logic[7:0]  data_o_i,
-    output logic[31:0] addr_o_o, t_o, p_o, a_o,
-    output logic[7:0]  data_o_o, code_o,
-    output logic[2:0]  phase_o,
-    output logic[4:0]  sp_o,rp_o,
-    output logic       write_o);
+    localparam SSZ = $clog2(SS_DEPTH);
+    localparam RSZ = $clog2(RS_DEPTH);
+    input logic            clk, clr,
+    input logic [7:0]  data_o_i,
+    output logic [MSZ-1:0] data_o_o, code_o,
+    output logic [ASZ-1:0] addr_o_o, t_o, p_o, a_o,
+    output logic [2:0]     phase_o,
+    output logic [SSZ-1:0] sp_o,
+    output logic [RSZ-1:0] rp_o,
+    output logic           write_o);
 
 // registers
     logic[DSZ-1:0] ss[SS_DEPTH-1:0];
     logic[DSZ-1:0] rs[RS_DEPTH-1:0];
-    logic[$clog2(SS_DEPTH)-1:0] sp, sp1;
-    logic[$clog2(RS_DEPTH)-1:0] rp, rp1;
+    logic[SSZ-1:0] sp, sp1;
+    logic[RSZ-1:0] rp, rp1;
     logic[DSZ-1:0] t;
     logic[ASZ-1:0] p, a;
     logic[2:0]     phase;
