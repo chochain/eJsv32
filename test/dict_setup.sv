@@ -4,8 +4,8 @@
 `timescale 1ps / 1ps
 `include "../source/forthsuper_if.sv"
 module dict_setup #(
-    parameter TIB  = 'h0,
-    parameter DICT = 'h0,       /// starting address of dictionary
+    parameter MEM0 = 'h0,       /// starting address of memory block
+    parameter TIB  = 'h1000,    /// terminal input buffer
     parameter DSZ  = 8,         /// 8-bit data path
     parameter ASZ  = 17         /// 128K address space
     ) (
@@ -23,7 +23,7 @@ module dict_setup #(
     endtask: add_u8
     
     task setup_mem;
-        automatic integer c, i = DICT;
+        automatic integer c, i = MEM0;
         automatic integer f = $fopen("../source/eJsv32.hex", "r");
         logic [7:0] v;
         
@@ -35,12 +35,12 @@ module dict_setup #(
         $fclose(f);
         ctx  = i;
         here = i;
-        $display("done memory at x%04x:", i);
+        $display("done memory at x%04x:", --i);
     endtask: setup_mem
     
     task setup_tib;
         $display("tib at x%04x: [%s]", TIB, tib);
-        for (integer i = 0; i < tib.len(); i = i + 1) begin
+        for (integer i = 0; i < tib.len(); i++) begin
             add_u8(TIB + i, tib[i]);
         end
         add_u8(TIB + tib.len(), 'h0);
@@ -55,7 +55,7 @@ module dict_setup #(
 endmodule: dict_setup
 /*
 module dict_setup_tb;
-    localparam DICT = 'h0;      /// starting address of dictionary
+    localparam TIB = 'h1000;      /// starting address of input buffer
     logic clk, rst, en;
     logic [16:0] ctx, here;
     
@@ -72,7 +72,7 @@ module dict_setup_tb;
     task verify; 
         $display("validate memory content");
         // verify - read back
-        for (integer i=DICT; i < DICT + 'h20; i = i + 1) begin
+        for (integer i=TIB; i < TIB + 'h20; i = i + 1) begin
             repeat(1) @(posedge clk) begin
                 b8_if.get_u8(i);
                 $display("%x:%x", i, b8_if.vo);
@@ -91,5 +91,5 @@ module dict_setup_tb;
         
         #20 $finish;
     end
-endmodule: dict_setup_tb
-*/    
+endmodule: dict_setup_tb    
+*/
