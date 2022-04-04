@@ -11,21 +11,25 @@
 `define HOLD   pload = 1'b0
 
 module eJ32 #(
-    parameter DSZ      = 32,
-    parameter ASZ      = 32,
+	parameter TIB      = 'h1000,
+	parameter OBUF     = 'h1400,
+    parameter DSZ      = 32,     /* 32-bit data width  */
+    parameter ASZ      = 17,     /* 128K address space */
     parameter SS_DEPTH = 32,
-    parameter RS_DEPTH = 32
+    parameter RS_DEPTH = 32,
+    parameter SSZ = $clog2(SS_DEPTH),
+    parameter RSZ = $clog2(RS_DEPTH)
     ) (
-    localparam SSZ = $clog2(SS_DEPTH);
-    localparam RSZ = $clog2(RS_DEPTH);
     input logic            clk, clr,
-    input logic [7:0]  data_o_i,
-    output logic [MSZ-1:0] data_o_o, code_o,
-    output logic [ASZ-1:0] addr_o_o, t_o, p_o, a_o,
+    input logic [7:0]      data_o_i,
+	output logic [7:0]     data_o_o, code_o,
+    output logic [DSZ-1:0] t_o,
+    output logic [ASZ-1:0] addr_o_o, p_o, a_o,
     output logic [2:0]     phase_o,
     output logic [SSZ-1:0] sp_o,
     output logic [RSZ-1:0] rp_o,
-    output logic           write_o);
+    output logic           write_o
+	);
 
 // registers
     logic[DSZ-1:0] ss[SS_DEPTH-1:0];
@@ -34,6 +38,7 @@ module eJ32 #(
     logic[RSZ-1:0] rp, rp1;
     logic[DSZ-1:0] t;
     logic[ASZ-1:0] p, a;
+	logic[ASZ-1:0] iptr, optr;                 // input, output buffer pointers
     logic[2:0]     phase;
     logic[1:0]     dsel;
     logic          asel;
@@ -49,10 +54,9 @@ module eJ32 #(
     logic[7:0]     data_i, data_o;
     logic[2:0]     phase_in;
     logic[1:0]     dsel_in;
-    logic          write, asel_in, dselload, cload;
+    logic          asel_in, dselload, cload;
     logic[DSZ-1:0] isht_o, iushr_o;
     logic          shr_f;
-    logic[DSZ-1:0] iptr, optr;
     logic[DSZ-1:0] div_q, div_r;
     logic[(DSZ*2)-1:0] mul_v;
     jvm_opcode     code_in;
@@ -93,7 +97,7 @@ module eJ32 #(
     task PUSH(input logic[DSZ-1:0] v); TOS(v); spush = 1'b1;       endtask;
     task POP();                        TOS(s); spop  = 1'b1;       endtask;
     task ALU(input logic[DSZ-1:0] v);  TOS(v); spop  = 1'b1;       endtask;
-    task dwrite(input logic[2:0] n); write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
+    task dwrite(input logic[2:0] n);   dselload = 1'b1; dsel_in = (n); endtask;
    
     task ZBRAN(input logic f);
         case (phase)
@@ -115,7 +119,7 @@ module eJ32 #(
     assign data_i   = data_o_i;
     assign data_o_o = data_o;
     assign addr_o_o = addr_o;
-    assign write_o  = write;
+    assign write_o  = oload;
     assign code_o   = code;
     assign t_o      = t;
     assign p_o      = p;
@@ -140,7 +144,7 @@ module eJ32 #(
         a_in      = {ASZ{1'b0}};  /// address
         aload     = 1'b0;
         asel_in   = 1'b0;
-        p_in      = p + 1;        /// advance program counter
+        p_in      = p + 'h1;      /// advance program counter
         pload     = 1'b1;
         cload     = 1'b1;
         t_in      = {DSZ{1'b0}};  /// TOS
@@ -154,7 +158,6 @@ module eJ32 #(
         rpop      = 1'b0;
         dselload  = 1'b0;         /// data bus
         dsel_in   = 3;
-        write     = 1'b0;
         shr_f     = 1'b0;
        
         if (!$cast(code_in, data_i)) begin
@@ -369,16 +372,16 @@ module eJ32 #(
             sp1   <= 1;
             rp    <= 0;
             rp1   <= 1;
-            iptr  <= 'h1000;
-            optr  <= 'h1400;
+            iptr  <= TIB;
+            optr  <= OBUF;
             t     <= {DSZ{1'b0}};
             a     <= {ASZ{1'b0}};
             p     <= {ASZ{1'b0}};
         end
         else if (clk) begin
             $display(
-                "%6t> p:a=%04x:%04x[%02x] sp=%2x<%8x, %8x> %s.%d", 
-                $time, p, a, data_i, sp, s, t, code.name, phase);
+                "%6t<%02x> p:a=%04x:%04x[%02x] sp=%2x<%8x, %8x> %s.%d", 
+                $time, code, p, a, iload ? data_i : (oload ? data_o : 'hff), sp, s, t, code.name, phase);
             phase <= phase_in;
             asel  <= asel_in;
             if (cload)     code <= code_in;
