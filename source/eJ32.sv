@@ -208,7 +208,6 @@ module eJ32 #(
             case (phase)
             0: begin nphase(1); GET(t); p_in = p - 1; end
             1: begin nphase(2); TOS(data_i); end
-            2: begin nphase(3); /* wait 1 memory cycle */ end
             default: `PHASE0;
             endcase
         saload:
@@ -380,8 +379,8 @@ module eJ32 #(
         end
         else if (clk) begin
             $display(
-                "%6t<%02x> p:a=%04x:%04x[%02x] sp=%2x<%8x, %8x> %s.%d", 
-                $time, code, p, a, iload ? data_i : (oload ? data_o : 'hff), sp, s, t, code.name, phase);
+                "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%s.%d", 
+                $time, p, a, data_i, data_o, rp, rs[rp], sp, s, t, code, code.name, phase);
             phase <= phase_in;
             asel  <= asel_in;
             if (cload)     code <= code_in;
