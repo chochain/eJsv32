@@ -43,7 +43,8 @@ typedef enum logic [7:0] {
         //
         ifeq    = 'h99,
         ifne, iflt, ifge, ifgt, ifle,
-        if_icmpeq, if_icmpne, if_icmplt, if_icmpgt,
+        if_icmpeq, if_icmpne, if_icmplt, if_icmpge, if_icmpgt,
+        if_acmpeq, if_acmpne,
         //
         // jump opcodes
         //
