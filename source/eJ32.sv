@@ -57,20 +57,33 @@ module eJ32 #(
     logic          write, asel_in, dselload, cload;
     logic[DSZ-1:0] isht_o, iushr_o;
     logic          shr_f;
-    logic[DSZ-1:0] div_q, div_r;
     logic[(DSZ*2)-1:0] mul_v;
+    logic[DSZ-1:0] div_q, div_r;
+    logic          div_busy, div_by_z;
     jvm_opcode     code_in;
-   
+
     mult  mult_inst (
     .dataa (t),
     .datab (s),
     .result (mul_v)
     );
+    /*
     divide    divide_inst (
     .denom (t),
     .numer (s),
     .quotient (div_q),
     .remain (div_r)
+    );
+    */
+    div_int   divide_inst (
+    .clk(clk),
+    .rst(phase==0 && (code==idiv || code==irem)),
+    .x(s),
+    .y(t),
+    .busy(div_busy),
+    .dbz(div_by_z),
+    .q(div_q),
+    .r(div_r)
     );
     shifter   shifter_inst (
     .data (s),
@@ -83,7 +96,7 @@ module eJ32 #(
     .distance (t[4:0]),
     .result (iushr_o)
     );
-    
+
     task nphase(input logic[2:0] n); phase_in = (n); cload = 1'b0; endtask;
     task nphold(input logic[2:0] n); nphase(n); `HOLD;             endtask;
     //
@@ -92,13 +105,21 @@ module eJ32 #(
     task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;   /* build addr ptr    */
     task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory */
     task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;   /* jmp and clear a   */
-   
+
     task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
     task PUSH(input logic[DSZ-1:0] v); TOS(v); spush = 1'b1;       endtask;
     task POP();                        TOS(s); spop  = 1'b1;       endtask;
     task ALU(input logic[DSZ-1:0] v);  TOS(v); spop  = 1'b1;       endtask;
     task dwrite(input logic[2:0] n);   write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
-   
+
+    task DIV(input logic[DSZ-1:0] v);
+        case (phase)
+        0: nphold(1);
+        1: nphold((!div_by_z && div_busy) ? 1 : 2);
+        default: begin `PHASE0; ALU(v); end
+        endcase
+    endtask: DIV
+
     task ZBRAN(input logic f);
         case (phase)
         0: begin nphase(1); SETA(data_i); end
@@ -161,16 +182,16 @@ module eJ32 #(
         dsel_in   = 3;
         write     = 1'b0;         /// data write
         shr_f     = 1'b0;
-       
+
         if (!$cast(code_in, data_i)) begin
             /// JVM opcodes, some are not avialable yet
             code_in = nop;
         end
-       
+
         phase_in  = 0;            /// phase and IO controls
         iload     = 1'b0;
         oload     = 1'b0;
-       
+
 // instructions
         case (code)
         nop        : begin /* do nothing */ end
@@ -270,8 +291,8 @@ module eJ32 #(
         iadd: ALU(s + t);
         isub: ALU(s - t);
         imul: ALU(mul_v[DSZ-1:0]);
-        idiv: ALU(div_q);
-        irem: ALU(div_r);
+        idiv: DIV(div_q);
+        irem: DIV(div_r);
         ineg: ALU(0 - t);
         ishl: ALU(isht_o);
         ishr: begin ALU(isht_o); shr_f = 1'b1; end
@@ -285,9 +306,9 @@ module eJ32 #(
             1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
             default: begin `PHASE0; `HOLD; TOS(s); dwrite(0); end
             endcase
-        //          
+        //
         // Logical ops
-        //          
+        //
         ifeq:      ZBRAN(t_z);
         ifne:      ZBRAN(!t_z);
         iflt:      ZBRAN(t[DSZ-1]);
@@ -311,8 +332,7 @@ module eJ32 #(
             case (phase)
             0: begin phase_in = 1; GET(t); end
             1: begin phase_in = 2; `HOLD; GET(a + 1); TOS(data_i); end
-            default: begin `PHASE0; 
-               JMP(t_d); PUSH(p + 2); end
+            default: begin `PHASE0; JMP(t_d); PUSH(p + 2); end
             endcase
         ret: JMP(r);
         jreturn:
