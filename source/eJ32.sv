@@ -11,8 +11,8 @@
 `define HOLD   pload = 1'b0
 
 module eJ32 #(
-	parameter TIB      = 'h1000,
-	parameter OBUF     = 'h1400,
+    parameter TIB      = 'h1000,
+    parameter OBUF     = 'h1400,
     parameter DSZ      = 32,     /* 32-bit data width  */
     parameter ASZ      = 17,     /* 128K address space */
     parameter SS_DEPTH = 32,
@@ -22,14 +22,14 @@ module eJ32 #(
     ) (
     input logic            clk, clr,
     input logic [7:0]      data_o_i,
-	output logic [7:0]     data_o_o, code_o,
+    output logic [7:0]     data_o_o, code_o,
     output logic [DSZ-1:0] t_o,
     output logic [ASZ-1:0] addr_o_o, p_o, a_o,
     output logic [2:0]     phase_o,
     output logic [SSZ-1:0] sp_o,
     output logic [RSZ-1:0] rp_o,
     output logic           write_o
-	);
+    );
 
 // registers
     logic[DSZ-1:0] ss[SS_DEPTH-1:0];
@@ -38,7 +38,7 @@ module eJ32 #(
     logic[RSZ-1:0] rp, rp1;
     logic[DSZ-1:0] t;
     logic[ASZ-1:0] p, a;
-	logic[ASZ-1:0] iptr, optr;                 // input, output buffer pointers
+    logic[ASZ-1:0] iptr, optr;                 // input, output buffer pointers
     logic[2:0]     phase;
     logic[1:0]     dsel;
     logic          asel;
@@ -47,10 +47,10 @@ module eJ32 #(
     logic[DSZ-1:0] s, r;
     logic[DSZ-1:0] t_in, r_in, t_d;
     logic[ASZ-1:0] a_in, p_in, a_d, addr_o;
-    logic          tload, sload, spush, spop;  // data stack controls
-    logic          rload, rpush, rpop;         // return stack controls
-    logic          aload, pload;               // address controls
-    logic          iload, oload;               // IO controls
+    logic          tload, t_z, sload, spush, spop;  // data stack controls
+    logic          rload, rpush, rpop;              // return stack controls
+    logic          aload, pload;                    // address controls
+    logic          iload, oload;                    // IO controls
     logic[7:0]     data_i, data_o;
     logic[2:0]     phase_in;
     logic[1:0]     dsel_in;
@@ -139,6 +139,7 @@ module eJ32 #(
     assign r      = rs[rp];
     assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
     assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
+    assign t_z    = t == 0;                   // TOS zero flag
 // combinational
     always_comb begin
         a_in      = {ASZ{1'b0}};  /// address
@@ -163,7 +164,7 @@ module eJ32 #(
        
         if (!$cast(code_in, data_i)) begin
             /// JVM opcodes, some are not avialable yet
-			code_in = nop;
+            code_in = nop;
         end
        
         phase_in  = 0;            /// phase and IO controls
@@ -232,7 +233,7 @@ module eJ32 #(
         bastore:
             case (phase)
             0: begin nphold(1); GET(s); spop = 1'b1; end
-			1: begin nphold(2); POP(); dwrite(3); end
+            1: begin nphold(2); POP(); dwrite(3); end
             default: begin `PHASE0; p_in = p + 1; end      // CC: extra cycle
             endcase
         sastore:
@@ -287,16 +288,16 @@ module eJ32 #(
         //          
         // Logical ops
         //          
-        ifeq:      ZBRAN(t == 0);
-        ifne:      ZBRAN(t != 0);
-        iflt:      ZBRAN(t <  0);
-        ifge:      ZBRAN(t >= 0);
-        ifgt:      ZBRAN(t >  0);
-        ifle:      ZBRAN(t <= 0);
-        if_icmpeq: IBRAN(t == 0);
-        if_icmpne: IBRAN(t != 0);
-        if_icmplt: IBRAN(t != 0 && t[DSZ-1]);
-        if_icmpgt: IBRAN(t != 0 && t[DSZ-1]==0);
+        ifeq:      ZBRAN(t_z);
+        ifne:      ZBRAN(!t_z);
+        iflt:      ZBRAN(t[DSZ-1]);
+        ifge:      ZBRAN(!t[DSZ-1]);
+        ifgt:      ZBRAN(!t_z && !t[DSZ-1]);
+        ifle:      ZBRAN(t_z || t[DSZ-1]);
+        if_icmpeq: IBRAN(t_z);
+        if_icmpne: IBRAN(!t_z);
+        if_icmplt: IBRAN(t[DSZ-1]);
+        if_icmpgt: IBRAN(!t_z && !t[DSZ-1]);
         //
         // branching
         //
