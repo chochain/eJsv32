@@ -295,8 +295,8 @@ module eJ32 #(
         ifle:      ZBRAN(t <= 0);
         if_icmpeq: IBRAN(t == 0);
         if_icmpne: IBRAN(t != 0);
-        if_icmplt: IBRAN(t <  0);
-        if_icmpgt: IBRAN(t >  0);
+        if_icmplt: IBRAN(t != 0 && t[DSZ-1]);
+        if_icmpgt: IBRAN(t != 0 && t[DSZ-1]==0);
         //
         // branching
         //
