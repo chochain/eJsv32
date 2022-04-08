@@ -13,13 +13,13 @@ module div_int #(parameter DSZ=32) (
     logic [$clog2(DSZ)-1:0] i;        // iteration counter
 
     always_comb begin
-        if (r < {1'b0, y}) begin
-            {_r, _q} = {r, q} << 1;
+        if (r >= y) begin
+            _r = r - y;               
+            {_r, _q} = ({_r, q} << 1) | 1'b1;  // 65-bit ops
         end
         else begin
-            _r = r - y;
-            {_r, _q} = {_r[DSZ-1:0], q, 1'b1};
-        end
+            {_r, _q} = {1'b0, r, q} << 1;
+        end 
     end
 
     always_ff @(posedge clk) begin
@@ -27,7 +27,7 @@ module div_int #(parameter DSZ=32) (
             i      <= 0;
             busy   <= y != 0;
             dbz    <= y == 0;
-            {r, q} <= {{DSZ{1'b0}}, x, 1'b0};
+            {r, q} <= {{(DSZ-1){1'b0}}, x, 1'b0};
         end
         else if (busy) begin
             if (i != DSZ-1) r <= _r;
@@ -37,7 +37,7 @@ module div_int #(parameter DSZ=32) (
             end
             q <= _q;
             i <= i + 1;                // advance loop counter
-            //$write("%6t> div.%d _q,_r=%8x,%8x ", $time, i, _q, _r);
+            // $write("[%d] _q,_r=%8x,%8x ", i, _q, _r);
         end
     end
 endmodule: div_int
