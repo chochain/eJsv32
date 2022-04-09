@@ -8,7 +8,6 @@
 `include "../source/eJ32.vh"
 
 `define PHASE0 phase_in = 0
-`define HOLD   pload = 1'b0
 
 module eJ32 #(
     parameter TIB      = 'h1000,
@@ -32,8 +31,8 @@ module eJ32 #(
     );
 
 // registers
-    logic[DSZ-1:0] ss[SS_DEPTH-1:0];
-    logic[DSZ-1:0] rs[RS_DEPTH-1:0];
+    logic[DSZ-1:0] ss[SS_DEPTH-1:0];           // 3K LUTs, TODO: use EBR memory
+    logic[DSZ-1:0] rs[RS_DEPTH-1:0];           // 3K LUTs, TODO: use EBR memory
     logic[SSZ-1:0] sp, sp1;
     logic[RSZ-1:0] rp, rp1;
     logic[DSZ-1:0] t;
@@ -59,7 +58,7 @@ module eJ32 #(
     logic          shr_f;
     logic[(DSZ*2)-1:0] mul_v;
     logic[DSZ-1:0] div_q, div_r;
-    logic          div_busy, div_by_z;
+    logic          div_rst, div_busy, div_by_z;
     jvm_opcode     code_in;
 
     mult  mult_inst (
@@ -77,7 +76,7 @@ module eJ32 #(
     */
     div_int   divide_inst (
     .clk(clk),
-    .rst(phase==0 && (code==idiv || code==irem)),
+    .rst(div_rst),
     .x(s),
     .y(t),
     .busy(div_busy),
@@ -98,7 +97,7 @@ module eJ32 #(
     );
 
     task nphase(input logic[2:0] n); phase_in = (n); cload = 1'b0; endtask;
-    task nphold(input logic[2:0] n); nphase(n); `HOLD;             endtask;
+    task nphold(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
     //
     // Note: address is memory offset (instead of Java class file reference)
     //
@@ -114,9 +113,11 @@ module eJ32 #(
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
-        0: nphold(1);
-        1: nphold((!div_by_z && div_busy) ? 1 : 2);
-        default: begin `PHASE0; ALU(v); end
+        0: begin nphold(1); div_rst = 1'b0; end
+        default: begin
+            if (div_busy) begin nphold(1); div_rst = 1'b0; end
+            else begin `PHASE0; ALU(v); end
+        end
         endcase
     endtask: DIV
 
@@ -135,8 +136,9 @@ module eJ32 #(
         default: `PHASE0;
         endcase
     endtask; // IBRAN
-
-// direct signals
+    ///
+    /// direct signals
+    ///
     assign data_i   = data_o_i;
     assign data_o_o = data_o;
     assign addr_o_o = addr_o;
@@ -148,19 +150,20 @@ module eJ32 #(
     assign phase_o  = phase;
     assign sp_o     = sp;
     assign rp_o     = rp;
-    assign data_o   = (dsel == 3)             // Big-Endian
+    assign addr_o = (asel) ? a : p;           // address, data or instruction
+    assign data_o   = (dsel == 3)             // data byte select (Big-Endian)
                     ? t[7:0]
                     : (dsel == 2)
                         ? t[15:8]
                         : (dsel == 1)
                             ? t[23:16]
                             : t[31:24];
-    assign addr_o = (asel) ? a : p;
     assign s      = ss[sp];
     assign r      = rs[rp];
     assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
     assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
     assign t_z    = t == 0;                   // TOS zero flag
+
 // combinational
     always_comb begin
         a_in      = {ASZ{1'b0}};  /// address
@@ -181,7 +184,11 @@ module eJ32 #(
         dselload  = 1'b0;         /// data bus
         dsel_in   = 3;
         write     = 1'b0;         /// data write
-        shr_f     = 1'b0;
+        ///
+        /// external module control flags
+        ///
+        shr_f     = 1'b0;         /// shifter flag
+        div_rst   = 1'b1;         /// divider reset flag
 
         if (!$cast(code_in, data_i)) begin
             /// JVM opcodes, some are not avialable yet
@@ -191,8 +198,9 @@ module eJ32 #(
         phase_in  = 0;            /// phase and IO controls
         iload     = 1'b0;
         oload     = 1'b0;
-
-// instructions
+        ///
+        /// instruction dispatcher
+        ///
         case (code)
         nop        : begin /* do nothing */ end
         aconst_null: PUSH(0);
@@ -248,7 +256,7 @@ module eJ32 #(
             1: begin nphold(2); GET(a + 1); dwrite(1); end
             2: begin nphold(3); GET(a + 1); dwrite(2); end
             3: begin nphold(4); GET(a + 1); dwrite(3); end
-            4: begin nphold(5); dwrite(3); POP(); `HOLD; end
+            4: begin nphold(5); dwrite(3); POP(); end
             default: `PHASE0;
             endcase
         bastore:
@@ -302,9 +310,13 @@ module eJ32 #(
         ixor: ALU(s ^ t);
         iinc:
             case (phase)
-            0: begin phase_in = 1; GET(s); end
-            1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
-            default: begin `PHASE0; `HOLD; TOS(s); dwrite(0); end
+            // 0: begin phase_in = 1; GET(s); end
+            // 1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
+            // default: begin `PHASE0; `HOLD; TOS(s); dwrite(0); end
+            // CC: change Dr. Ting's logic
+            0: begin nphold(1); GET(s); end
+            1: begin nphold(2); ALU(t + data_i); asel_in = 1'b1; end
+            default: begin `PHASE0; TOS(s); dwrite(0); end
             endcase
         //
         // Logical ops
@@ -330,8 +342,11 @@ module eJ32 #(
             endcase
         jsr:
             case (phase)
-            0: begin phase_in = 1; GET(t); end
-            1: begin phase_in = 2; `HOLD; GET(a + 1); TOS(data_i); end
+            // 0: begin phase_in = 1; GET(t); end
+            // 1: begin phase_in = 2; `HOLD; GET(a + 1); TOS(data_i); end
+            // CC: change Dr. Ting's logic
+            0: begin nphold(1); GET(t); end
+            1: begin nphold(2); GET(a + 1); TOS(data_i); end
             default: begin `PHASE0; JMP(t_d); PUSH(p + 2); end
             endcase
         ret: JMP(r);
@@ -379,7 +394,6 @@ module eJ32 #(
             case (phase)
             0: begin nphold(1); GET(optr); dselload = 1'b1; end
             default: begin `PHASE0; POP(); dwrite(3); oload = 1'b1; end
-            //default: `PHASE0;     // CC: extra cycle
             endcase
         default: `PHASE0;
         endcase
@@ -415,8 +429,8 @@ module eJ32 #(
             if (tload)     t    <= t_in;
             if      (sload) ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; sp1 <= sp1 - 1; end
-            else if (spush) begin ss[sp1] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
-//            else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
+            else if (spush) begin ss[sp1] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end   // CC: ERROR -> EBR with multiple writers
+//         else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
             if (rload)      rs[rp] <= r_in;
             else if (rpop)  begin rp <= rp - 1; rp1 <= rp1 - 1; end
             else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; rp1 <= rp1 + 1; end
