@@ -58,7 +58,7 @@ module eJ32 #(
     logic          shr_f;
     logic[(DSZ*2)-1:0] mul_v;
     logic[DSZ-1:0] div_q, div_r;
-    logic          div_rst, div_busy, div_by_z;
+    logic          div_rst, div_by_z, div_bsy;
     jvm_opcode     code_in;
 
     mult  mult_inst (
@@ -79,7 +79,7 @@ module eJ32 #(
     .rst(div_rst),
     .x(s),
     .y(t),
-    .busy(div_busy),
+    .busy(div_bsy),
     .dbz(div_by_z),
     .q(div_q),
     .r(div_r)
@@ -113,10 +113,10 @@ module eJ32 #(
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
-        0: begin nphold(1); div_rst = 1'b1; end
+        0: nphold(1);
         default: begin
-            if (div_busy) begin nphold(1); div_rst = 1'b0; end
-            else begin `PHASE0; ALU(v); div_rst = 1'b1; end
+            if (div_bsy) nphold(1);
+            else begin `PHASE0; ALU(v); end
         end
         endcase
     endtask: DIV
@@ -163,6 +163,7 @@ module eJ32 #(
     assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
     assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
     assign t_z    = t == 0;                   // TOS zero flag
+    assign div_rst= (code!=idiv && code!=irem) ? 1'b1 : phase==0;
 
 // combinational
     always_comb begin
@@ -188,7 +189,6 @@ module eJ32 #(
         /// external module control flags
         ///
         shr_f     = 1'b0;         /// shifter flag
-        div_rst   = 1'b1;         /// divider reset flag
 
         if (!$cast(code_in, data_i)) begin
             /// JVM opcodes, some are not avialable yet
@@ -439,25 +439,35 @@ module eJ32 #(
             else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; rp1 <= rp1 + 1; end
             ///
             /// validate and patch
-            /// CC: not sure why DIV is skipping the conditional branch
+            /// CC: do not know why DIV is skipping the branch
             ///
-            if (code==idiv || code==irem) begin
-                if (phase_in==1) begin
-                    if (!div_busy) begin
-                        $display("%8x / %8x => %8x..%8x", s, t, div_q, div_r);
-                        $write("ERROR: div_busy=%d, phase_in=%d ", div_busy, phase_in);
-                        phase <= 0;
-                        code  <= code_in;
-                        t     <= code==idiv ? div_q : div_r;
-                        p     <= p + 1;
-                    end
+            if (!div_rst) div_patch();
+        end
+    end // always_ff @ (posedge clk, posedge clr)
+
+    task div_patch();
+        automatic logic[7:0] op = code==idiv ? "/" : "%";
+        if (phase_in==1) begin
+            if (!div_bsy) begin
+                $display("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+                assert(phase_in == 0) else begin
+                    $display("ERR: phase_in=%d reset to 0", phase_in) ;
+                    phase <= 0;
                 end
-                else begin // done div_int
-                    $display("%8x / %8x => %8x..%8x", s, t, div_q, div_r);
-                    assert(div_q == (s / t));
-                    assert(div_r == (s % t));
+                assert(cload    == 1) else begin
+                    $display("ERR: cload=%d code_in=%s", cload, code_in.name);
+                    code <= code_in; p <= p + 1;
+                end
+                assert(t_in     == (t_in==(idiv ? div_q : div_r))) else begin
+                    t <= code==idiv ? div_q : div_r;
+                    $display("ERR: tload=%d t_in=%8x", tload, t_in);
                 end
             end
         end
-    end
+        else begin // done div_int
+            $display("OK %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+            assert(div_q == (s / t));
+            assert(div_r == (s % t));
+        end
+    endtask: div_patch
 endmodule
