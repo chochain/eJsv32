@@ -9,33 +9,32 @@ module div_int #(parameter DSZ=32) (
     output logic [DSZ-1:0] r          // remainder
     );
     logic [DSZ-1:0] _q;               // intermediate quotient
-    logic [DSZ:0]   _r, rx;           // accumulator (1 bit wider)
+    logic [DSZ:0]   _r, r1;           // accumulator (1 bit wider)
     logic [$clog2(DSZ)-1:0] i;        // iteration counter
 
     always_comb begin
-        if (rx >= {1'b0, y}) begin
-            _r = rx - y;
-            {_r, _q} = {_r[DSZ-1:0], q, 1'b1};   // 65-bit ops
+        if (r1 >= {1'b0, y}) begin
+            {_r, _q} = {{r1 - y}[DSZ-1:0], q, 1'b1}; // 65-bit ops
         end
-        else {_r, _q} = {rx[DSZ-1:0], q, 1'b0};
+        else {_r, _q} = {r1[DSZ-1:0], q, 1'b0};
     end
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            i      <= 0;
-            busy   <= y != 0;
+            i      <= 1;
+            busy   <= 1'b1;
             dbz    <= y == 0;
-            {rx, q} <= {{DSZ{1'b0}}, x, 1'b0};
+            {r1, q} <= {{(DSZ-1){1'b0}}, x, 1'b0};   // shift left with carry
         end
         else if (busy) begin
-            if (i == (DSZ-1)) begin
-                busy <= 0;             // are we done?
+            if (i) r1 <= _r;           // next digit
+            else begin                 // last bit
+                busy <= 1'b0;          // we are done
                 r    <= _r[DSZ:1];     // undo final shift
             end
-            else rx  <= _r;
             q <= _q;
             i <= i + 1;
-            $write("[%d] y,_q,_r=%8x,%8x,%8x ", i, y, _q, _r);
+            $write("[%d] r1.q _r_q %9x.%8x %9x_%8x ", i, r1, q, _r, _q);
         end
     end
 endmodule: div_int
