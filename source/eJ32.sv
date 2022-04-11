@@ -113,10 +113,10 @@ module eJ32 #(
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
-        0: begin nphold(1); div_rst = 1'b0; end
+        0: begin nphold(1); div_rst = 1'b1; end
         default: begin
             if (div_busy) begin nphold(1); div_rst = 1'b0; end
-            else begin `PHASE0; ALU(v); end
+            else begin `PHASE0; ALU(v); div_rst = 1'b1; end
         end
         endcase
     endtask: DIV
@@ -216,17 +216,17 @@ module eJ32 #(
             0: begin nphase(1); PUSH(data_i); end
             default: `PHASE0;
             endcase
-        sipush:
+        sipush:                          // CC: not tested
             case (phase)
             0: begin nphase(1); PUSH(data_i); end
             1: begin nphase(2); TOS(t_d); end
             default: `PHASE0;
             endcase
-        iload:   PUSH(rs[rp - data_i]);
-        iload_0: PUSH(rs[rp]);
-        iload_1: PUSH(rs[rp - 1]);
-        iload_2: PUSH(rs[rp - 2]);
-        iload_3: PUSH(rs[rp - 3]);
+        iload:   PUSH(rs[rp - data_i]);  // CC: not tested
+        iload_0: PUSH(rs[rp]);           // CC: not tested
+        iload_1: PUSH(rs[rp - 1]);       // CC: not tested
+        iload_2: PUSH(rs[rp - 2]);       // CC: not tested
+        iload_3: PUSH(rs[rp - 3]);       // CC: not tested
         iaload:
             case (phase)
             0: begin nphold(1); GET(t); end
@@ -238,8 +238,8 @@ module eJ32 #(
             endcase
         baload:
             case (phase)
-            0: begin nphase(1); GET(t); p_in = p - 1; end
-            1: begin nphase(2); TOS(data_i); end
+            0: begin nphold(1); GET(t); end
+            1: begin nphold(2); TOS(data_i); end
             default: `PHASE0;
             endcase
         saload:
@@ -249,7 +249,7 @@ module eJ32 #(
             2: begin nphold(3); TOS(t_d); end
             default: `PHASE0;
             endcase
-        istore_0: begin r_in = t; rload = 1'b1; POP(); end
+        istore_0: begin r_in = t; rload = 1'b1; POP(); end  // CC: not tested
         iastore:
             case (phase)
             0: begin nphold(1); GET(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
@@ -263,9 +263,9 @@ module eJ32 #(
             case (phase)
             0: begin nphold(1); GET(s); spop = 1'b1; end
             1: begin nphold(2); POP(); dwrite(3); end
-            default: begin `PHASE0; p_in = p + 1; end      // CC: extra cycle
+            default: `PHASE0;       // CC: extra cycle
             endcase
-        sastore:
+        sastore:                    // CC: not tested
             case (phase)
             0: begin nphold(1); GET(s); spop = 1'b1; end
             1: begin nphold(2); GET(a + 1); dwrite(2); end
@@ -282,15 +282,17 @@ module eJ32 #(
         dup_x1:
             case (phase)
             0: begin nphold(1); SETA(s); end
-            default: begin `PHASE0; PUSH(a); end
+            1: begin nphold(2); PUSH(a); end
+            default: `PHASE0;       // CC: extra cycle
             endcase
         dup_x2: PUSH(ss[sp - 1]);
         dup2:
             case (phase)
-            0: begin nphold(1); SETA(s);  end
+            0: begin nphold(1); SETA(s); end
             1: begin nphold(2); PUSH(a); end
-            2: begin nphold(3); SETA(s);  end
-            default: begin `PHASE0; PUSH(a); end
+            2: begin nphold(3); SETA(s); end
+            3: begin nphold(4); PUSH(a); end
+            default: `PHASE0;       // CC: extra cycle
             endcase
         swap: begin TOS(s); sload = 1'b1; end
         //
@@ -420,6 +422,7 @@ module eJ32 #(
                 $time, p, a, data_i, data_o, rp, rs[rp], sp, s, t, code, code.name, phase);
             phase <= phase_in;
             asel  <= asel_in;
+
             if (cload)     code <= code_in;
             if (pload)     p    <= p_in;
             if (aload)     a    <= a_in;
@@ -434,6 +437,27 @@ module eJ32 #(
             if (rload)      rs[rp] <= r_in;
             else if (rpop)  begin rp <= rp - 1; rp1 <= rp1 - 1; end
             else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; rp1 <= rp1 + 1; end
+            ///
+            /// validate and patch
+            /// CC: not sure why DIV is skipping the conditional branch
+            ///
+            if (code==idiv || code==irem) begin
+                if (phase_in==1) begin
+                    if (!div_busy) begin
+                        $display("%8x / %8x => %8x..%8x", s, t, div_q, div_r);
+                        $write("ERROR: div_busy=%d, phase_in=%d ", div_busy, phase_in);
+                        phase <= 0;
+                        code  <= code_in;
+                        t     <= code==idiv ? div_q : div_r;
+                        p     <= p + 1;
+                    end
+                end
+                else begin // done div_int
+                    $display("%8x / %8x => %8x..%8x", s, t, div_q, div_r);
+                    assert(div_q == (s / t));
+                    assert(div_r == (s % t));
+                end
+            end
         end
     end
 endmodule
