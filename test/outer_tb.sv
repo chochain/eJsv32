@@ -66,12 +66,12 @@ module outer_tb #(
 
     task verify_tib;
         $display("\ndump tib %04x", TIB);
-        dump('h400, 'h100);
+        dump(TIB, 'h100);
     endtask: verify_tib;
 
     task verify_obuf;
         $display("\ndump obuf %04x", OBUF);
-        dump(OBUF, 'h100);
+        dump(OBUF, 'h400);
     endtask: verify_obuf
 
     task activate;
@@ -95,7 +95,7 @@ module outer_tb #(
 
         dict.setup_mem();     // fill dictionary from hex file
         activate();           // activate eJsv32
-        repeat(20000) @(posedge clk);
+        repeat(100000) @(posedge clk);
         rst = 1'b1;           // disable eJsv32
 
         verify_tib();         // validate input buffer content
