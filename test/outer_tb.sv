@@ -27,7 +27,7 @@ module outer_tb #(
 
     logic            clk, rst;
     logic [ASZ-1:0]  ctx, here;
-    logic [ASZ-1:0]  ra2nfa[RSZ-1:0];     /// return address to nfa (for tracing)
+    logic [ASZ-1:0]  ra2nfa[RS_DEPTH-1:0];     /// return address to nfa (for tracing)
 
     mb8_io      b8_if();
     spram8_128k m0(b8_if.slave, ~clk);
@@ -74,7 +74,7 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf %04x", OBUF);
-        dump(OBUF, 'h100);
+        dump(OBUF, 'h1000);
     endtask: verify_obuf
 
     task activate;
@@ -85,20 +85,19 @@ module outer_tb #(
 
     task trace;
         automatic jvm_opcode code;
-        automatic logic[DSZ-1:0] ra = ej32.rs[rp_o];       // return address
         if (!$cast(code, code_o)) begin
             /// JVM opcodes, some are not avialable yet
             code = op_err;
         end
         $write(
             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time, p_o, a_o, data_o_i, data_o_o, rp_o, ra, sp_o, s_o, t_o, code, phase_o, code.name);
+            $time, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code, phase_o, code.name);
         if (code==invokevirtual && phase_o==2) begin
             automatic logic[ASZ-1:0] nfa = dict.to_name(addr_o_o);
             for (int i=0; i<rp_o; i++) $write("  ");
             $write(" :: ");
-            dict.to_s(nfa);
             ra2nfa[rp_o] = nfa;
+            dict.to_s(nfa);
         end
         else if (code==jreturn && phase_o==0) begin
             for (int i=0; i<rp_o; i++) $write("  ");
@@ -124,7 +123,7 @@ module outer_tb #(
         dict.setup();         // read ROM into memory from hex file
 
         activate();           // activate eJsv32
-        repeat(600) @(posedge clk) trace();
+        repeat(12600) @(posedge clk) trace();
         rst = 1'b1;           // disable eJsv32
 
         verify_tib();         // validate input buffer content
