@@ -3,6 +3,7 @@
 ///
 `timescale 1ps / 1ps
 `include "../source/forthsuper_if.sv"
+`include "../source/eJ32.vh"
 module outer_tb #(
     parameter MEM0 = 'h0,       /* memory block addr  */
     parameter TIB  = 'h1000,    /* input buffer ptr   */
@@ -17,7 +18,7 @@ module outer_tb #(
     localparam DOT = 'h2e;
 
     logic [7:0]      data_o_i, data_o_o, code_o;
-    logic [DSZ-1:0]  t_o;
+    logic [DSZ-1:0]  s_o, t_o;
     logic [ASZ-1:0]  addr_o_o, p_o, a_o;
     logic [2:0]      phase_o;
     logic [SSZ-1:0]  sp_o;
@@ -30,8 +31,9 @@ module outer_tb #(
     mb8_io      b8_if();
     spram8_128k m0(b8_if.slave, ~clk);
 
-    dict_setup  #(MEM0, TIB) dict(.*, .b8_if(b8_if.master));
-    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) u(.clk, .clr(rst), .*);
+    dict_setup  #(MEM0, TIB, OBUF) dict(.*, .b8_if(b8_if.master));
+    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) ej32(.clk, .clr(rst), .*);
+
 
     task at([ASZ-1:0] ax, [1:0] opt);
         repeat(1) @(posedge clk) begin
@@ -65,13 +67,13 @@ module outer_tb #(
     endtask: dump
 
     task verify_tib;
-        $display("\ndump tib %04x", TIB);
-        dump(TIB, 'h100);
+        $display("\ndump mem %04x", TIB);
+        dump(TIB, 'h120);
     endtask: verify_tib;
 
     task verify_obuf;
         $display("\ndump obuf %04x", OBUF);
-        dump(OBUF, 'h400);
+        dump(OBUF, 'h100);
     endtask: verify_obuf
 
     task activate;
@@ -93,9 +95,24 @@ module outer_tb #(
         clk = 1'b0;           // start clock
         rst = 1'b1;           // disable eJsv32
 
-        dict.setup_mem();     // fill dictionary from hex file
+        dict.setup();         // read ROM into memory from hex file
+
         activate();           // activate eJsv32
-        repeat(100000) @(posedge clk);
+        repeat(400) @(posedge clk) begin
+            automatic jvm_opcode code;
+            if (!$cast(code, code_o)) begin
+                /// JVM opcodes, some are not avialable yet
+                code = op_err;
+            end
+            $write(
+                "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%s.%d",
+                $time, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code, code.name, phase_o);
+            if (code==invokevirtual && phase_o==2) begin
+                $write(" >> ");
+                dict.to_s(dict.to_name(addr_o_o));
+            end
+            $display("");
+        end
         rst = 1'b1;           // disable eJsv32
 
         verify_tib();         // validate input buffer content
