@@ -22,7 +22,7 @@ module eJ32 #(
     input logic            clk, clr,
     input logic [7:0]      data_o_i,
     output logic [7:0]     data_o_o, code_o,
-    output logic [DSZ-1:0] t_o,
+    output logic [DSZ-1:0] s_o, t_o,
     output logic [ASZ-1:0] addr_o_o, p_o, a_o,
     output logic [2:0]     phase_o,
     output logic [SSZ-1:0] sp_o,
@@ -144,6 +144,7 @@ module eJ32 #(
     assign addr_o_o = addr_o;
     assign write_o  = write;
     assign code_o   = code;
+    assign s_o      = s;
     assign t_o      = t;
     assign p_o      = p;
     assign a_o      = a;
@@ -192,7 +193,7 @@ module eJ32 #(
 
         if (!$cast(code_in, data_i)) begin
             /// JVM opcodes, some are not avialable yet
-            code_in = nop;
+            code_in = op_err;
         end
 
         phase_in  = 0;            /// phase and IO controls
@@ -417,9 +418,6 @@ module eJ32 #(
             p     <= {ASZ{1'b0}};
         end
         else if (clk) begin
-            $display(
-                "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%s.%d", 
-                $time, p, a, data_i, data_o, rp, rs[rp], sp, s, t, code, code.name, phase);
             phase <= phase_in;
             asel  <= asel_in;
 
