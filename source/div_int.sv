@@ -34,7 +34,7 @@ module div_int #(parameter DSZ=32) (
             end
             q <= _q;
             i <= i + 1;
-            $write("[%d] r1.q _r_q %9x.%8x %9x_%8x ", i, r1, q, _r, _q);
+            //$write("[%d] r1.q _r_q %9x.%8x %9x_%8x ", i, r1, q, _r, _q);
         end
     end
 endmodule: div_int
