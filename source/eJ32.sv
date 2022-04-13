@@ -137,7 +137,16 @@ module eJ32 #(
         endcase
     endtask; // IBRAN
     ///
-    /// direct signals
+    /// wires to reduce verbosity
+    ///
+    assign s      = ss[sp];
+    assign r      = rs[rp];
+    assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
+    assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
+    assign t_z    = t == 0;                   // TOS zero flag
+    assign div_rst= (code!=idiv && code!=irem) ? 1'b1 : phase==0;
+    ///
+    /// IO signals wires
     ///
     assign data_i   = data_o_i;
     assign data_o_o = data_o;
@@ -159,14 +168,9 @@ module eJ32 #(
                         : (dsel == 1)
                             ? t[23:16]
                             : t[31:24];
-    assign s      = ss[sp];
-    assign r      = rs[rp];
-    assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
-    assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
-    assign t_z    = t == 0;                   // TOS zero flag
-    assign div_rst= (code!=idiv && code!=irem) ? 1'b1 : phase==0;
-
-// combinational
+    ///
+    /// combinational
+    ///
     always_comb begin
         a_in      = {ASZ{1'b0}};  /// address
         aload     = 1'b0;
@@ -280,20 +284,19 @@ module eJ32 #(
             default: begin `PHASE0; POP(); end
             endcase
         dup: spush = 1'b1;
-        dup_x1:
+        dup_x1:                     // CC: logic changed since a_in is 16-bit only
             case (phase)
-            0: begin nphold(1); SETA(s); end
-            1: begin nphold(2); PUSH(a); end
-            default: `PHASE0;       // CC: extra cycle
+            0: begin nphold(1); PUSH(s); end
+            1: nphold(2);           // wait for stack update??
+            default: `PHASE0;
             endcase
         dup_x2: PUSH(ss[sp - 1]);
-        dup2:
+        dup2:                       // CC: logic changed since a_in is 16-bit only 
             case (phase)
-            0: begin nphold(1); SETA(s); end
-            1: begin nphold(2); PUSH(a); end
-            2: begin nphold(3); SETA(s); end
-            3: begin nphold(4); PUSH(a); end
-            default: `PHASE0;       // CC: extra cycle
+            0: begin nphold(1); PUSH(s); end
+            1: nphold(2);           // CC: wait for stack update??
+            2: begin nphold(3); PUSH(s); end
+            default: `PHASE0;
             endcase
         swap: begin TOS(s); sload = 1'b1; end
         //
@@ -447,19 +450,24 @@ module eJ32 #(
         automatic logic[7:0] op = code==idiv ? "/" : "%";
         if (phase_in==1) begin
             if (!div_bsy) begin
-                $display("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+                $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
                 assert(phase_in == 0) else begin
-                    $display("ERR: phase_in=%d reset to 0", phase_in) ;
+                    $write(", phase_in=%d reset =0", phase_in) ;
                     phase <= 0;
                 end
-                assert(cload    == 1) else begin
-                    $display("ERR: cload=%d code_in=%s", cload, code_in.name);
+                assert(cload == 1) else begin
+                    $write(", cload=%d code_in=%s, p=%4x forced +1", cload, code_in.name, p);
                     code <= code_in; p <= p + 1;
                 end
-                assert(t_in     == (t_in==(idiv ? div_q : div_r))) else begin
-                    t <= code==idiv ? div_q : div_r;
-                    $display("ERR: tload=%d t_in=%8x", tload, t_in);
+                assert(spop == 1) else begin
+                    $write(", sp=%d, sp1=%d forced -1", sp, sp1);
+                    sp <= sp - 1; sp1 <= sp1 - 1;
                 end
+                assert(t_in == (t_in==(idiv ? div_q : div_r))) else begin
+                    $write(", tload=%d t_in=%8x =q/r", tload, t_in);
+                    t <= code==idiv ? div_q : div_r;
+                end
+                $display(" :ERR");
             end
         end
         else begin // done div_int
