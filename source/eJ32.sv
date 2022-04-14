@@ -439,7 +439,7 @@ module eJ32 #(
             if      (sload) ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; sp1 <= sp1 - 1; end
             else if (spush) begin ss[sp1] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end   // CC: ERROR -> EBR with multiple writers
-//         else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end
+//            else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end  // CC: use this to fix synthesizer
             if (rload)      rs[rp] <= r_in;
             else if (rpop)  begin rp <= rp - 1; rp1 <= rp1 - 1; end
             else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; rp1 <= rp1 + 1; end
