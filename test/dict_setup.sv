@@ -51,12 +51,12 @@ module dict_setup #(
     endtask: read_rom
 
     task fill_mem;
-        $display("fill memory at x%04x from ROM", MEM0);
+        $display("fill memory from ROM %4x-%04x", MEM0, MEM0+OBUF);
         for (int i=0; i<here; i++) begin
             add_u8(MEM0+i, i<OBUF ? rom[i] : 'h0);
         end
         ctx = CTX;
-        $display("memory filled to x%04x:", here);
+        $display("memory filled, context=%4x", CTX);
     endtask: fill_mem
 
     task setup_tib;
