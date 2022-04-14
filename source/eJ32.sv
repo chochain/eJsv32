@@ -102,7 +102,7 @@ module eJ32 #(
     // Note: address is memory offset (instead of Java class file reference)
     //
     task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;   /* build addr ptr    */
-    task GET(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory */
+    task MEM(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory, data_i returns next cycle */
     task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;   /* jmp and clear a   */
 
     task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
@@ -234,48 +234,53 @@ module eJ32 #(
         iload_3: PUSH(rs[rp - 3]);       // CC: not tested
         iaload:
             case (phase)
-            0: begin nphold(1); GET(t); end
-            1: begin nphold(2); GET(a + 1); TOS(data_i); end
-            2: begin nphold(3); GET(a + 1); TOS(t_d); end
-            3: begin nphold(4); GET(a + 1); TOS(t_d); end
+            0: begin nphold(1); MEM(t); end
+            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
+            2: begin nphold(3); MEM(a + 1); TOS(t_d); end
+            3: begin nphold(4); MEM(a + 1); TOS(t_d); end
             4: begin nphold(5); TOS(t_d); end
             default: `PHASE0;
             endcase
         baload:
             case (phase)
-            0: begin nphold(1); GET(t); end
+            0: begin nphold(1); MEM(t); end
             1: begin nphold(2); TOS(data_i); end
             default: `PHASE0;
             endcase
         saload:
             case (phase)
-            0: begin nphold(1); GET(t); end
-            1: begin nphold(2); GET(a + 1); TOS(data_i); end
+            0: begin nphold(1); MEM(t); end
+            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
             2: begin nphold(3); TOS(t_d); end
             default: `PHASE0;
             endcase
         istore_0: begin r_in = t; rload = 1'b1; POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin nphold(1); GET(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
-            1: begin nphold(2); GET(a + 1); dwrite(1); end
-            2: begin nphold(3); GET(a + 1); dwrite(2); end
-            3: begin nphold(4); GET(a + 1); dwrite(3); end
+            0: begin nphold(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
+            1: begin nphold(2); MEM(a + 1); dwrite(1); end
+            2: begin nphold(3); MEM(a + 1); dwrite(2); end
+            3: begin nphold(4); MEM(a + 1); dwrite(3); end
             4: begin nphold(5); dwrite(3); POP(); end
             default: `PHASE0;
             endcase
         bastore:
             case (phase)
-            0: begin nphold(1); GET(s); spop = 1'b1; end
+            0: begin nphold(1); MEM(s); spop = 1'b1; end
             1: begin nphold(2); POP(); dwrite(3); end
             default: `PHASE0;       // CC: extra cycle
             endcase
-        sastore:                    // CC: not tested
+        sastore:
             case (phase)
-            0: begin nphold(1); GET(s); spop = 1'b1; end
-            1: begin nphold(2); GET(a + 1); dwrite(2); end
+            /* CC: logic changed
+            0: begin nphold(1); MEM(s); spop = 1'b1; end
+            1: begin nphold(2); MEM(a + 1); dwrite(2); end
             2: begin nphold(3); POP(); dwrite(3); asel_in = 1'b1; end
-            default: `PHASE0;       // CC: extra cycle
+            */
+            0: begin nphold(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 2; end
+            1: begin nphold(2); MEM(a + 1); dwrite(3); end
+            2: begin nphold(3); dwrite(3); POP(); end
+            default: `PHASE0;
             endcase
         pop: POP();
         pop2:
@@ -316,11 +321,11 @@ module eJ32 #(
         ixor: ALU(s ^ t);
         iinc:
             case (phase)
-            // 0: begin phase_in = 1; GET(s); end
+            // 0: begin phase_in = 1; MEM(s); end
             // 1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
             // default: begin `PHASE0; `HOLD; TOS(s); dwrite(0); end
             // CC: change Dr. Ting's logic
-            0: begin nphold(1); GET(s); end
+            0: begin nphold(1); MEM(s); end
             1: begin nphold(2); ALU(t + data_i); asel_in = 1'b1; end
             default: begin `PHASE0; TOS(s); dwrite(0); end
             endcase
@@ -348,11 +353,11 @@ module eJ32 #(
             endcase
         jsr:
             case (phase)
-            // 0: begin phase_in = 1; GET(t); end
-            // 1: begin phase_in = 2; `HOLD; GET(a + 1); TOS(data_i); end
+            // 0: begin phase_in = 1; MEM(t); end
+            // 1: begin phase_in = 2; `HOLD; MEM(a + 1); TOS(data_i); end
             // CC: change Dr. Ting's logic
-            0: begin nphold(1); GET(t); end
-            1: begin nphold(2); GET(a + 1); TOS(data_i); end
+            0: begin nphold(1); MEM(t); end
+            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
             default: begin `PHASE0; JMP(t_d); PUSH(p + 2); end
             endcase
         ret: JMP(r);
@@ -392,13 +397,13 @@ module eJ32 #(
         dupr: PUSH(r);
         get:
             case (phase)
-            0: begin nphold(1); GET(iptr); spush = 1'b1; end
+            0: begin nphold(1); MEM(iptr); spush = 1'b1; end
             1: begin nphold(2); TOS(data_i); iload = 1'b1; end
             default: `PHASE0;     // CC: extra memory cycle
             endcase
         put:
             case (phase)
-            0: begin nphold(1); GET(optr); dselload = 1'b1; end
+            0: begin nphold(1); MEM(optr); dselload = 1'b1; end
             default: begin `PHASE0; POP(); dwrite(3); oload = 1'b1; end
             endcase
         default: `PHASE0;
