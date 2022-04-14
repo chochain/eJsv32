@@ -74,7 +74,7 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf %04x", OBUF);
-        dump(OBUF, 'h1000);
+        dump(OBUF, 'h400);
     endtask: verify_obuf
 
     task activate;
@@ -91,7 +91,7 @@ module outer_tb #(
         end
         $write(
             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code, phase_o, code.name);
+            $time, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code_o, phase_o, code.name);
         if (code==invokevirtual && phase_o==2) begin
             automatic logic[ASZ-1:0] nfa = dict.to_name(addr_o_o);
             for (int i=0; i<rp_o; i++) $write("  ");
@@ -123,7 +123,7 @@ module outer_tb #(
         dict.setup();         // read ROM into memory from hex file
 
         activate();           // activate eJsv32
-        repeat(12600) @(posedge clk) trace();
+        repeat(120000) @(posedge clk) trace();
         rst = 1'b1;           // disable eJsv32
 
         verify_tib();         // validate input buffer content
