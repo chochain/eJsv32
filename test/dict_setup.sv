@@ -1,8 +1,7 @@
 ///
-/// ForthSuper Dictionary Setup Testbench
+/// eJ32 Dictionary Setup Testbench
 ///
-`timescale 1ps / 1ps
-`include "../source/forthsuper_if.sv"
+`include "../source/eJ32_if.sv"
 module dict_setup #(
     parameter MEM0 = 'h0,       /// starting address of memory block
     parameter TIB  = 'h1000,    /// terminal input buffer
@@ -12,11 +11,11 @@ module dict_setup #(
     ) (
     mb8_io b8_if,               /// 8-bit memory bus master
     input  clk,
-    output logic [ASZ-1:0] ctx,
-    output logic [ASZ-1:0] here
+    output logic [ASZ-1:0] ctx, /// context
+    output logic [ASZ-1:0] here /// starting CP
     );
     localparam P2N_SZ = 200;
-    localparam CTX    = 'h0d4d;
+    localparam CTX    = 'h0d4d; /// starting context (hardcoded for now)
 
     typedef struct {
         logic[ASZ-1:0] nfa;
