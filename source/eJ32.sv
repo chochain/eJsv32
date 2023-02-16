@@ -2,20 +2,21 @@
 // eJ32 - Java Forth Machine
 //
 // Chen-hanson Ting, 20220110 eJsv32k.v in Quartus II SystemVerilog-2005
-// Chochain          20220209 to eJ32 for Lattice and future versions
+// Chochain Lee      20220209 to eJ32 for Lattice and future versions
+// Chochain Lee      20230216 consolidate ALU modules, tiddy macro tasks
 //
-`include "../source/forthsuper_if.sv"
+`include "../source/eJ32_if.sv"
 `include "../source/eJ32.vh"
 
 `define PHASE0 phase_in = 0
 
 module eJ32 #(
-    parameter TIB      = 'h1000,
-    parameter OBUF     = 'h1400,
-    parameter DSZ      = 32,     /* 32-bit data width  */
-    parameter ASZ      = 17,     /* 128K address space */
-    parameter SS_DEPTH = 32,
-    parameter RS_DEPTH = 32,
+    parameter TIB      = 'h1000,          ///> input buffer address
+    parameter OBUF     = 'h1400,          ///> output buffer address
+    parameter DSZ      = 32,              ///> 32-bit data width
+    parameter ASZ      = 17,              ///> 128K address space
+    parameter SS_DEPTH = 32,              ///> 32 deep data stack
+    parameter RS_DEPTH = 32,              ///> 32 deep return stack
     parameter SSZ = $clog2(SS_DEPTH),
     parameter RSZ = $clog2(RS_DEPTH)
     ) (
@@ -29,52 +30,52 @@ module eJ32 #(
     output logic [RSZ-1:0] rp_o,
     output logic           write_o
     );
-
-// registers
-    logic[DSZ-1:0] ss[SS_DEPTH-1:0];           // 3K LUTs, TODO: use EBR memory
-    logic[DSZ-1:0] rs[RS_DEPTH-1:0];           // 3K LUTs, TODO: use EBR memory
-    logic[SSZ-1:0] sp, sp1;
-    logic[RSZ-1:0] rp, rp1;
-    logic[DSZ-1:0] t;
-    logic[ASZ-1:0] p, a;
-    logic[ASZ-1:0] iptr, optr;                 // input, output buffer pointers
-    logic[2:0]     phase;
-    logic[1:0]     dsel;
-    logic          asel;
-    jvm_opcode     code;
-// wires
-    logic[DSZ-1:0] s, r;
-    logic[DSZ-1:0] t_in, r_in, t_d;
-    logic[ASZ-1:0] a_in, p_in, a_d, addr_o;
-    logic          tload, t_z, sload, spush, spop;  // data stack controls
-    logic          rload, rpush, rpop;              // return stack controls
-    logic          aload, pload;                    // address controls
-    logic          iload, oload;                    // IO controls
-    logic[7:0]     data_i, data_o;
+    /// @defgroup Registers
+    /// @{
+    jvm_opcode     code;                  ///> JVM opcode
+    logic[2:0]     phase;                 ///> FSM phase (aka state)
+    logic[DSZ-1:0] ss[SS_DEPTH-1:0];      ///> data stack, 3K LUTs, TODO: use EBR memory
+    logic[DSZ-1:0] rs[RS_DEPTH-1:0];      ///> return stack, 3K LUTs, TODO: use EBR memory
+    logic[SSZ-1:0] sp, sp1;               ///> data stack pointers, sp1 = sp + 1
+    logic[RSZ-1:0] rp, rp1;               ///> return stack pointers
+    logic[DSZ-1:0] t;                     ///> TOS
+    logic[DSZ-1:0] s, r;                  ///> NOS, top of RS
+    logic[ASZ-1:0] p, a;                  ///> program counter, instruction pointer
+    logic[ASZ-1:0] iptr, optr;            ///> input, output buffer pointers
+    logic[1:0]     dsel;                  ///> 32-bit, 4-to-1 mux, byte select
+    logic          asel;                  ///> address bus mux (P|A)
+    /// @}
+    /// @defgroup Wires
+    /// @{
+    jvm_opcode     code_in;
+    logic          cload;                           ///> instruction unit control
     logic[2:0]     phase_in;
-    logic[1:0]     dsel_in;
-    logic          write, asel_in, dselload, cload;
+    logic[DSZ-1:0] t_in, r_in, t_d;                 ///> TOS controls
+    logic[ASZ-1:0] a_in, p_in, a_d, addr_o;         ///> address controls
+    logic          tload, t_z, sload, spush, spop;  ///> data stack controls
+    logic          rload, rpush, rpop;              ///> return stack controls
+    logic          aload, pload;                    ///> address controls
+    logic          iload, oload;                    ///> IO controls
+    logic[7:0]     data_i, data_o;                  ///> input output data
+    logic[1:0]     dsel_in;                         ///> data select mux
+    logic          write, asel_in, dselload;        ///> data/addr bus controls
+    /// @}
+    /// @defgroup ALU pre-calc wires
+    /// @{
     logic[DSZ-1:0] isht_o, iushr_o;
     logic          shr_f;
     logic[(DSZ*2)-1:0] mul_v;
     logic[DSZ-1:0] div_q, div_r;
     logic          div_rst, div_by_z, div_bsy;
-    jvm_opcode     code_in;
-
-    mult  mult_inst (
-    .dataa (t),
-    .datab (s),
-    .result (mul_v)
+    ///
+    /// extended ALU units
+    ///
+    mult      mult_inst(
+    .a(t),
+    .b(s),
+    .r(mul_v)
     );
-    /*
-    divide    divide_inst (
-    .denom (t),
-    .numer (s),
-    .quotient (div_q),
-    .remain (div_r)
-    );
-    */
-    div_int   divide_inst (
+    div_int   divide_inst(
     .clk(clk),
     .rst(div_rst),
     .x(s),
@@ -84,38 +85,38 @@ module eJ32 #(
     .q(div_q),
     .r(div_r)
     );
-    shifter   shifter_inst (
-    .data (s),
-    .direction (shr_f),
-    .distance (t[4:0]),
-    .result (isht_o)
+    shifter   shifter_inst(
+    .d(s),
+    .dir(shr_f),
+    .bits(t[4:0]),
+    .r(isht_o)
     );
-    ushifter  ushifter_inst (
-    .data (s),
-    .distance (t[4:0]),
-    .result (iushr_o)
+    ushifter  ushifter_inst(
+    .d(s),
+    .bits(t[4:0]),
+    .r(iushr_o)
     );
 
-    task nphase(input logic[2:0] n); phase_in = (n); cload = 1'b0; endtask;
-    task nphold(input logic[2:0] n); nphase(n); pload = 1'b0;      endtask;
+    task NXPH(input logic[2:0] n); phase_in = n; cload = 1'b0; endtask;
+    task BUSY(input logic[2:0] n); NXPH(n); pload = 1'b0;      endtask;
     //
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input logic[ASZ-1:0] a); aload = 1'b1; a_in = (a);   endtask;   /* build addr ptr    */
-    task MEM(input logic[ASZ-1:0] a);  SETA(a); asel_in = 1'b1;    endtask;   /* fetch from memory, data_i returns next cycle */
-    task JMP(input logic[ASZ-1:0] a);  p_in = (a); aload = 1'b1;   endtask;   /* jmp and clear a   */
+    task SETA(input logic[ASZ-1:0] a); a_in = a; aload   = 1'b1;   endtask;   /* build addr ptr    */
+    task MEM(input logic[ASZ-1:0] a);  SETA(a);  asel_in = 1'b1;   endtask;   /* fetch from memory, data_i returns next cycle */
+    task JMP(input logic[ASZ-1:0] a);  p_in = a; aload   = 1'b1;   endtask;   /* jmp and clear a   */
 
-    task TOS(input logic[DSZ-1:0] v);  tload = 1'b1; t_in = (v);   endtask;
+    task TOS(input logic[DSZ-1:0] v);  t_in = v; tload = 1'b1;     endtask;
     task PUSH(input logic[DSZ-1:0] v); TOS(v); spush = 1'b1;       endtask;
     task POP();                        TOS(s); spop  = 1'b1;       endtask;
     task ALU(input logic[DSZ-1:0] v);  TOS(v); spop  = 1'b1;       endtask;
-    task dwrite(input logic[2:0] n);   write = 1'b1; dselload = 1'b1; dsel_in = (n); endtask;
+    task DW(input logic[2:0] n); dsel_in = n; write = 1'b1; dselload = 1'b1; endtask;
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
-        0: nphold(1);
+        0: BUSY(1);
         default: begin
-            if (div_bsy) nphold(1);
+            if (div_bsy) BUSY(1);
             else begin `PHASE0; ALU(v); end
         end
         endcase
@@ -123,27 +124,27 @@ module eJ32 #(
 
     task ZBRAN(input logic f);
         case (phase)
-        0: begin nphase(1); SETA(data_i); end
-        1: begin nphase(2); POP(); if (f) JMP(a_d); end
+        0: begin NXPH(1); SETA(data_i); end
+        1: begin NXPH(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
     endtask; // ZBRAN
 
     task IBRAN(input logic f);
         case (phase)
-        0: begin nphase(1); ALU(s - t); SETA(data_i); end
-        1: begin nphase(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
+        0: begin NXPH(1); ALU(s - t); SETA(data_i); end
+        1: begin NXPH(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
         default: `PHASE0;
         endcase
     endtask; // IBRAN
     ///
     /// wires to reduce verbosity
     ///
-    assign s      = ss[sp];
-    assign r      = rs[rp];
-    assign a_d    = {a[ASZ-9:0], data_i};     // shift combined address
-    assign t_d    = {t[DSZ-9:0], data_i};     // shift combined t (top of stack)
-    assign t_z    = t == 0;                   // TOS zero flag
+    assign s      = ss[sp];                   ///> data stack, TODO: EBR
+    assign r      = rs[rp];                   ///> return stack, TODO: EBR
+    assign a_d    = {a[ASZ-9:0], data_i};     ///> shift combined address
+    assign t_d    = {t[DSZ-9:0], data_i};     ///> shift combined t (top of stack)
+    assign t_z    = t == 0;                   ///> TOS zero flag
     assign div_rst= (code!=idiv && code!=irem) ? 1'b1 : phase==0;
     ///
     /// IO signals wires
@@ -218,13 +219,13 @@ module eJ32 #(
         iconst_5   : PUSH(5);
         bipush:
             case (phase)
-            0: begin nphase(1); PUSH(data_i); end
+            0: begin NXPH(1); PUSH(data_i); end
             default: `PHASE0;
             endcase
         sipush:                          // CC: not tested
             case (phase)
-            0: begin nphase(1); PUSH(data_i); end
-            1: begin nphase(2); TOS(t_d); end
+            0: begin NXPH(1); PUSH(data_i); end
+            1: begin NXPH(2); TOS(t_d); end
             default: `PHASE0;
             endcase
         iload:   PUSH(rs[rp - data_i]);  // CC: not tested
@@ -234,73 +235,73 @@ module eJ32 #(
         iload_3: PUSH(rs[rp - 3]);       // CC: not tested
         iaload:
             case (phase)
-            0: begin nphold(1); MEM(t); end
-            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
-            2: begin nphold(3); MEM(a + 1); TOS(t_d); end
-            3: begin nphold(4); MEM(a + 1); TOS(t_d); end
-            4: begin nphold(5); TOS(t_d); end
+            0: begin BUSY(1); MEM(t); end
+            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
+            2: begin BUSY(3); MEM(a + 1); TOS(t_d); end
+            3: begin BUSY(4); MEM(a + 1); TOS(t_d); end
+            4: begin BUSY(5); TOS(t_d); end
             default: `PHASE0;
             endcase
         baload:
             case (phase)
-            0: begin nphold(1); MEM(t); end
-            1: begin nphold(2); TOS(data_i); end
+            0: begin BUSY(1); MEM(t); end
+            1: begin BUSY(2); TOS(data_i); end
             default: `PHASE0;
             endcase
         saload:
             case (phase)
-            0: begin nphold(1); MEM(t); end
-            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
-            2: begin nphold(3); TOS(t_d); end
+            0: begin BUSY(1); MEM(t); end
+            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
+            2: begin BUSY(3); TOS(t_d); end
             default: `PHASE0;
             endcase
         istore_0: begin r_in = t; rload = 1'b1; POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin nphold(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
-            1: begin nphold(2); MEM(a + 1); dwrite(1); end
-            2: begin nphold(3); MEM(a + 1); dwrite(2); end
-            3: begin nphold(4); MEM(a + 1); dwrite(3); end
-            4: begin nphold(5); dwrite(3); POP(); end
+            0: begin BUSY(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 0; end
+            1: begin BUSY(2); MEM(a + 1); DW(1); end
+            2: begin BUSY(3); MEM(a + 1); DW(2); end
+            3: begin BUSY(4); MEM(a + 1); DW(3); end
+            4: begin BUSY(5); DW(3); POP(); end
             default: `PHASE0;
             endcase
         bastore:
             case (phase)
-            0: begin nphold(1); MEM(s); spop = 1'b1; end
-            1: begin nphold(2); POP(); dwrite(3); end
+            0: begin BUSY(1); MEM(s); spop = 1'b1; end
+            1: begin BUSY(2); POP(); DW(3); end
             default: `PHASE0;       // CC: extra cycle
             endcase
         sastore:
             case (phase)
             /* CC: logic changed
-            0: begin nphold(1); MEM(s); spop = 1'b1; end
-            1: begin nphold(2); MEM(a + 1); dwrite(2); end
-            2: begin nphold(3); POP(); dwrite(3); asel_in = 1'b1; end
+            0: begin BUSY(1); MEM(s); spop = 1'b1; end
+            1: begin BUSY(2); MEM(a + 1); DW(2); end
+            2: begin BUSY(3); POP(); DW(3); asel_in = 1'b1; end
             */
-            0: begin nphold(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 2; end
-            1: begin nphold(2); MEM(a + 1); dwrite(3); end
-            2: begin nphold(3); dwrite(3); POP(); end
+            0: begin BUSY(1); MEM(s); spop = 1'b1; dselload = 1'b1; dsel_in = 2; end
+            1: begin BUSY(2); MEM(a + 1); DW(3); end
+            2: begin BUSY(3); DW(3); POP(); end
             default: `PHASE0;
             endcase
         pop: POP();
         pop2:
             case (phase)
-            0: begin nphold(1); POP(); end
+            0: begin BUSY(1); POP(); end
             default: begin `PHASE0; POP(); end
             endcase
         dup: spush = 1'b1;
         dup_x1:                     // CC: logic changed since a_in is 16-bit only
             case (phase)
-            0: begin nphold(1); PUSH(s); end
-            1: nphold(2);           // wait for stack update??
+            0: begin BUSY(1); PUSH(s); end
+            1: BUSY(2);           // wait for stack update??
             default: `PHASE0;
             endcase
         dup_x2: PUSH(ss[sp - 1]);
         dup2:                       // CC: logic changed since a_in is 16-bit only 
             case (phase)
-            0: begin nphold(1); PUSH(s); end
-            1: nphold(2);           // CC: wait for stack update??
-            2: begin nphold(3); PUSH(s); end
+            0: begin BUSY(1); PUSH(s); end
+            1: BUSY(2);           // CC: wait for stack update??
+            2: begin BUSY(3); PUSH(s); end
             default: `PHASE0;
             endcase
         swap: begin TOS(s); sload = 1'b1; end
@@ -323,11 +324,11 @@ module eJ32 #(
             case (phase)
             // 0: begin phase_in = 1; MEM(s); end
             // 1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
-            // default: begin `PHASE0; `HOLD; TOS(s); dwrite(0); end
+            // default: begin `PHASE0; `HOLD; TOS(s); DW(0); end
             // CC: change Dr. Ting's logic
-            0: begin nphold(1); MEM(s); end
-            1: begin nphold(2); ALU(t + data_i); asel_in = 1'b1; end
-            default: begin `PHASE0; TOS(s); dwrite(0); end
+            0: begin BUSY(1); MEM(s); end
+            1: begin BUSY(2); ALU(t + data_i); asel_in = 1'b1; end
+            default: begin `PHASE0; TOS(s); DW(0); end
             endcase
         //
         // Logical ops
@@ -347,8 +348,8 @@ module eJ32 #(
         //
         goto:
             case (phase)
-            0: begin nphase(1); SETA(data_i); end
-            1: begin nphase(2); JMP(a_d); end
+            0: begin NXPH(1); SETA(data_i); end
+            1: begin NXPH(2); JMP(a_d); end
             default: `PHASE0;
             endcase
         jsr:
@@ -356,26 +357,26 @@ module eJ32 #(
             // 0: begin phase_in = 1; MEM(t); end
             // 1: begin phase_in = 2; `HOLD; MEM(a + 1); TOS(data_i); end
             // CC: change Dr. Ting's logic
-            0: begin nphold(1); MEM(t); end
-            1: begin nphold(2); MEM(a + 1); TOS(data_i); end
+            0: begin BUSY(1); MEM(t); end
+            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
             default: begin `PHASE0; JMP(t_d); PUSH(p + 2); end
             endcase
         ret: JMP(r);
         jreturn:
             case (phase)
-            0: begin nphase(1); rpop = 1'b1; JMP(r); end
+            0: begin NXPH(1); rpop = 1'b1; JMP(r); end
             default: `PHASE0;
             endcase
         invokevirtual:
             case (phase)
-            0: begin nphase(1); SETA(data_i); r_in = p + 2; rpush = 1'b1; end
-            1: begin nphase(2); JMP(a_d); end
+            0: begin NXPH(1); SETA(data_i); r_in = p + 2; rpush = 1'b1; end
+            1: begin NXPH(2); JMP(a_d); end
             default: `PHASE0;
             endcase
         donext:
             case (phase)
-            0: begin nphase(1); SETA(data_i); end
-            1: begin nphase(2);
+            0: begin NXPH(1); SETA(data_i); end
+            1: begin NXPH(2);
                if (r == 0) begin rpop = 1'b1; end
                else begin
                   r_in = r - 1; rload = 1'b1;
@@ -386,10 +387,10 @@ module eJ32 #(
             endcase
         ldi:
             case (phase)
-            0: begin nphase(1); PUSH(data_i); end
-            1: begin nphase(2); TOS(t_d); end
-            2: begin nphase(3); TOS(t_d); end
-            3: begin nphase(4); TOS(t_d); end
+            0: begin NXPH(1); PUSH(data_i); end
+            1: begin NXPH(2); TOS(t_d); end
+            2: begin NXPH(3); TOS(t_d); end
+            3: begin NXPH(4); TOS(t_d); end
             default: `PHASE0;
             endcase
         popr: begin PUSH(r); rpop = 1'b1; end
@@ -397,14 +398,14 @@ module eJ32 #(
         dupr: PUSH(r);
         get:
             case (phase)
-            0: begin nphold(1); MEM(iptr); spush = 1'b1; end
-            1: begin nphold(2); TOS(data_i); iload = 1'b1; end
+            0: begin BUSY(1); MEM(iptr); spush = 1'b1; end
+            1: begin BUSY(2); TOS(data_i); iload = 1'b1; end
             default: `PHASE0;     // CC: extra memory cycle
             endcase
         put:
             case (phase)
-            0: begin nphold(1); MEM(optr); dselload = 1'b1; end
-            default: begin `PHASE0; POP(); dwrite(3); oload = 1'b1; end
+            0: begin BUSY(1); MEM(optr); dselload = 1'b1; end
+            default: begin `PHASE0; POP(); DW(3); oload = 1'b1; end
             endcase
         default: `PHASE0;
         endcase
