@@ -1,8 +1,8 @@
 ///
-/// ForthSuper common interfaces
+/// eJ32 common interfaces
 ///
-`ifndef FORTHSUPER_FORTHSUPER_IF
-`define FORTHSUPER_FORTHSUPER_IF
+`ifndef EJ32_EJ32_IF
+`define EJ32_EJ32_IF
 
 typedef enum logic [1:0] { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
 
@@ -13,12 +13,12 @@ interface mb32_io(input logic clk);
     logic [31:0] vi;
     logic [31:0] vo;
     
-    clocking ioDrv @(posedge clk);
+    clocking io_clk @(posedge clk);
         default input #1 output #1;
     endclocking // ioMaster
 
-    modport master(clocking ioDrv, output we, bmsk, ai, vi);
-    modport slave(clocking ioDrv, input we, bmsk, ai, vi, output vo);
+    modport master(clocking io_clk, output we, bmsk, ai, vi);
+    modport slave(clocking io_clk, input we, bmsk, ai, vi, output vo);
 endinterface: mb32_io
 
 interface mb8_io;
@@ -62,5 +62,5 @@ interface ss_io();
     endfunction: pop
     
 endinterface: ss_io
-`endif // FORTHSUPER_FORTHSUPER_IF
+`endif // EJ32_EJ32_IF
 
