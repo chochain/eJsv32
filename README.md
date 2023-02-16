@@ -8,6 +8,8 @@ A reincarnation of eP32, a 32-bit CPU by Dr. Ting. However, deviating from the l
 
 Responding to the invitation from Don Golding of CORE-I FPGA project [AI & Robotics Group](https://www.facebook.com/groups/1304548976637542), Dr. Ting dedicated the last few months of his life on developing eJ32. Based on his VHDL eP32, the transcoded SystemVerilog set was completed but never has the chance been fully verified or validated in time before his passing.
 
+> ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_arch.png)
+
 I appreciate that Dr. Ting took me in his last projects and considered me one of his student. Though a trained software engineer, who have never worked on any FPGA before, I felt overwhelmingly obligated to at least carry his last work to a point that future developers can benefit from the work of his life's effort.
 
 My goal is to make eJ32 as an example and learning tool for designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not. Here what I've done.
