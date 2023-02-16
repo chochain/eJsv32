@@ -1,8 +1,8 @@
 ///
-/// eJsv32 Outer Interpreter Testbench
+/// eJ32 Outer Interpreter Testbench
 ///
 `timescale 1ps / 1ps
-`include "../source/forthsuper_if.sv"
+`include "../source/eJ32_if.sv"
 `include "../source/eJ32.vh"
 module outer_tb #(
     parameter MEM0 = 'h0,       /* memory block addr  */
@@ -68,21 +68,22 @@ module outer_tb #(
         for (integer a1=a0; a1 < (a0 + len + 'h10); a1 += 'h10) begin
             dump_row(a1);
         end
+        $display("\n");
     endtask: dump
 
     task verify_tib;
-        $display("\ndump mem %04x", TIB);
+        $display("\ndump tib: 0x%04x", TIB);
         dump(TIB, 'h120);
     endtask: verify_tib;
 
     task verify_dict;
-        $display("\ndump mem %04x", dict.ctx);
-        dump(dict.ctx, 'h120);
+        $display("\ndump dict: 0x%04x", dict.ctx);
+        dump(dict.ctx, 'h80);
     endtask: verify_dict;
 
     task verify_obuf;
-        $display("\ndump obuf %04x", OBUF);
-        dump(OBUF, 'h600);
+        $display("\ndump obuf: 0x%04x", OBUF);
+        dump(OBUF, 'h80);
     endtask: verify_obuf
 
     task activate;
@@ -132,7 +133,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(540000) @(posedge clk) trace();
+        repeat(1000) @(posedge clk) trace();
         rst = 1'b1;           // disable eJsv32
 
         verify_dict();        // validate output dictionary words
