@@ -1,3 +1,42 @@
+///
+/// @file
+/// @brief - ALU extended funtions
+///    shifter    - shifter (both directions)
+///    ushifter   - unsigned shifter
+///    multiplier - 64-bit = 32x32
+///    divider    -
+///
+module shifter #(
+    parameter DSZ = 32
+    )(
+	input	[DSZ-1:0] d,
+	input	          dir,
+	input	[4:0]     bits,
+	output	[DSZ-1:0] r
+    );
+    assign r = dir ? d << bits : d >> bits;
+endmodule
+
+module ushifter #(
+    parameter DSZ = 32
+    )(
+	input	[DSZ-1:0]  d,
+	input	[4:0]      bits,
+	output	[DSZ-1:0]  r
+    );
+    assign r = $unsigned(d) >> bits;
+endmodule
+
+module mult #(
+    parameter DSZ = 32,
+    parameter QSZ = DSZ*2
+    )(
+	input  [DSZ-1:0] a, b,
+	output [QSZ-1:0] r
+	);
+    assign r = a * b;
+endmodule
+
 module div_int #(parameter DSZ=32) (
     input  logic clk,
     input  logic rst,                 // start signal
