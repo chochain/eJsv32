@@ -34,3 +34,22 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * clone this [repository](git@github.com:chochain/eJsv32.git) to your local drive
 * Open eJsv32.rdf project from within Radiant
 * Synthesis and simulate (with vsim)
+
+### Memory Map
+<code>
+* Dictionary         0x0000
+* Input (TIB)        0x1000
+* Output buffer      0x1400
+* Total              128K bytes
+</code>
+
+### Limitations
+* targeting only Lattice iCE40 FPGA for now
+* Data and return stacks
+  * 32-deep only
+  * using LUTs instead of EBR memory (i.e. expensive, 7K LUTS)
+* Estimated total 10K LUTs (with data and return stacks)
+* No Map or Route provided
+* No serial interface (i.e. UART, SPI, ..)
+  * fixed validation cases hardcoded in TIB
+  * output sent to output buffer
