@@ -47,9 +47,19 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * targeting only Lattice iCE40 FPGA for now
 * Data and return stacks
   * 32-deep only
-  * using LUTs instead of EBR memory (i.e. expensive, 7K LUTS)
+  * using LUTs instead of EBR memory (i.e. expensive 7K)
 * Estimated total 10K LUTs (with data and return stacks)
 * No Map or Route provided
 * No serial interface (i.e. UART, SPI, ..)
   * fixed validation cases hardcoded in TIB
   * output sent to output buffer
+
+### Results - Staging for future development
+* The 10K LUTs image does not fit in iCE40 (5K), but vsim works OK.
+  + can be reduced to 3K LUTs with EBR memory,
+  + can be further reduced to 2K LUTs with hardware divider.
+* vsim COLD start - completed
+  + 97K cycles, ~/docs/eJ32_trace.txt
+* vsim Dr. Ting's 6 embeded test cases - completed
+  + 600K+ cycles sucessfully, ~/docs/eJ32_trace_full_20220414.txt
+
