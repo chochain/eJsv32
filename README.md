@@ -63,3 +63,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * vsim Dr. Ting's 6 embeded test cases - completed
   + 600K+ cycles sucessfully, ~/docs/eJ32_trace_full_20220414.txt
 
+### TODO
+* read Project-F, https://github.com/projf/projf-explore
+  + Verilator + SDL2, https://projectf.io/posts/verilog-sim-verilator-sdl/
+
