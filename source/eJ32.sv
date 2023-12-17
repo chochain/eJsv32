@@ -11,6 +11,10 @@
 `define PHASE0 phase_in = 0
 `define SET(v) v = 1'b1
 `define CLR(v) v = 1'b0
+`define X8A(b) {9'b0,b}
+`define X8D(b) {24'b0,b}
+`define XAD(a) {15'b0,a}
+`define XDA(d) d[ASZ-1:0]
 
 module eJ32 #(
     parameter TIB      = 'h1000,          ///> input buffer address
@@ -144,7 +148,7 @@ module eJ32 #(
 
     task ZBRAN(input logic f);
         case (phase)
-        0: begin NXPH(1); SETA(data_i); end
+        0: begin NXPH(1); SETA(`X8A(data_i)); end
         1: begin NXPH(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
@@ -152,7 +156,7 @@ module eJ32 #(
 
     task IBRAN(input logic f);
         case (phase)
-        0: begin NXPH(1); ALU(s - t); SETA(data_i); end
+        0: begin NXPH(1); ALU(s - t); SETA(`X8A(data_i)); end
         1: begin NXPH(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
         default: `PHASE0;
         endcase
@@ -178,9 +182,7 @@ module eJ32 #(
     assign r        = rs[rp];                 ///> return stack, TODO: EBR
     assign rp_o     = rp;
     assign rp1      = rp + 1;
-    ///
     /// IO
-    ///
     assign addr_o_o = addr_o;
     assign addr_o   = (asel) ? a : p;         /// address, data or instruction
     assign data_i   = data_o_i;
@@ -249,24 +251,24 @@ module eJ32 #(
         iconst_5   : PUSH(5);
         bipush:
             case (phase)
-            0: begin NXPH(1); PUSH(data_i); end
+            0: begin NXPH(1); PUSH(`X8D(data_i)); end
             default: `PHASE0;
             endcase
         sipush:                          // CC: not tested
             case (phase)
-            0: begin NXPH(1); PUSH(data_i); end
+            0: begin NXPH(1); PUSH(`X8D(data_i)); end
             1: begin NXPH(2); TOS(t_d); end
             default: `PHASE0;
             endcase
-        iload:   PUSH(rs[rp - data_i]);  // CC: not tested
+        iload:   PUSH(rs[rp - data_i[RSZ-1:0]]);  // CC: not tested
         iload_0: PUSH(rs[rp]);           // CC: not tested
         iload_1: PUSH(rs[rp - 1]);       // CC: not tested
         iload_2: PUSH(rs[rp - 2]);       // CC: not tested
         iload_3: PUSH(rs[rp - 3]);       // CC: not tested
         iaload:
             case (phase)
-            0: begin BUSY(1); MEM(t); end
-            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
+            0: begin BUSY(1); MEM(`XDA(t)); end
+            1: begin BUSY(2); MEM(a + 1); TOS(`X8D(data_i)); end
             2: begin BUSY(3); MEM(a + 1); TOS(t_d); end
             3: begin BUSY(4); MEM(a + 1); TOS(t_d); end
             4: begin BUSY(5); TOS(t_d); end
@@ -274,21 +276,21 @@ module eJ32 #(
             endcase
         baload:
             case (phase)
-            0: begin BUSY(1); MEM(t); end
-            1: begin BUSY(2); TOS(data_i); end
+            0: begin BUSY(1); MEM(`XDA(t)); end
+            1: begin BUSY(2); TOS(`X8D(data_i)); end
             default: `PHASE0;
             endcase
         saload:
             case (phase)
-            0: begin BUSY(1); MEM(t); end
-            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
+            0: begin BUSY(1); MEM(`XDA(t)); end
+            1: begin BUSY(2); MEM(a + 1); TOS(`X8D(data_i)); end
             2: begin BUSY(3); TOS(t_d); end
             default: `PHASE0;
             endcase
         istore_0: begin r_in = t; `SET(rload); POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin BUSY(1); MEM(s); `SET(spop); `SET(dselload); dsel_in = 0; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dselload); dsel_in = 0; end
             1: begin BUSY(2); MEM(a + 1); DW(1); end
             2: begin BUSY(3); MEM(a + 1); DW(2); end
             3: begin BUSY(4); MEM(a + 1); DW(3); end
@@ -297,7 +299,7 @@ module eJ32 #(
             endcase
         bastore:
             case (phase)
-            0: begin BUSY(1); MEM(s); `SET(spop); end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); end
             1: begin BUSY(2); POP(); DW(3); end
             default: `PHASE0;       // CC: extra cycle
             endcase
@@ -308,7 +310,7 @@ module eJ32 #(
             1: begin BUSY(2); MEM(a + 1); DW(2); end
             2: begin BUSY(3); POP(); DW(3); asel_in = 1'b1; end
             */
-            0: begin BUSY(1); MEM(s); `SET(spop); `SET(dselload); dsel_in = 2; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dselload); dsel_in = 2; end
             1: begin BUSY(2); MEM(a + 1); DW(3); end
             2: begin BUSY(3); DW(3); POP(); end
             default: `PHASE0;
@@ -356,8 +358,8 @@ module eJ32 #(
             // 1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
             // default: begin `PHASE0; `HOLD; TOS(s); DW(0); end
             // CC: change Dr. Ting's logic
-            0: begin BUSY(1); MEM(s); end
-            1: begin BUSY(2); ALU(t + data_i); `SET(asel_in); end
+            0: begin BUSY(1); MEM(`XDA(s)); end
+            1: begin BUSY(2); ALU(t + `X8D(data_i)); `SET(asel_in); end
             default: begin `PHASE0; TOS(s); DW(0); end
             endcase
         //
@@ -378,7 +380,7 @@ module eJ32 #(
         //
         goto:
             case (phase)
-            0: begin NXPH(1); SETA(data_i); end
+            0: begin NXPH(1); SETA(`X8A(data_i)); end
             1: begin NXPH(2); JMP(a_d); end
             default: `PHASE0;
             endcase
@@ -387,25 +389,25 @@ module eJ32 #(
             // 0: begin phase_in = 1; MEM(t); end
             // 1: begin phase_in = 2; `HOLD; MEM(a + 1); TOS(data_i); end
             // CC: change Dr. Ting's logic
-            0: begin BUSY(1); MEM(t); end
-            1: begin BUSY(2); MEM(a + 1); TOS(data_i); end
-            default: begin `PHASE0; JMP(t_d); PUSH(p + 2); end
+            0: begin BUSY(1); MEM(`XDA(t)); end
+            1: begin BUSY(2); MEM(a + 1); TOS(`X8D(data_i)); end
+            default: begin `PHASE0; JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
             endcase
-        ret: JMP(r);
+        ret: JMP(`XDA(r));
         jreturn:
             case (phase)
-            0: begin NXPH(1); `SET(rpop); JMP(r); end
+            0: begin NXPH(1); `SET(rpop); JMP(`XDA(r)); end
             default: `PHASE0;
             endcase
         invokevirtual:
             case (phase)
-            0: begin NXPH(1); SETA(data_i); r_in = p + 2; `SET(rpush); end
+            0: begin NXPH(1); SETA(`X8A(data_i)); r_in = `XAD(p) + 2; `SET(rpush); end
             1: begin NXPH(2); JMP(a_d); end
             default: `PHASE0;
             endcase
         donext:
             case (phase)
-            0: begin NXPH(1); SETA(data_i); end
+            0: begin NXPH(1); SETA(`X8A(data_i)); end
             1: begin NXPH(2);
                if (r == 0) begin `SET(rpop); end
                else begin
@@ -418,7 +420,7 @@ module eJ32 #(
         // stack ops
         ldi:
             case (phase)
-            0: begin NXPH(1); PUSH(data_i); end
+            0: begin NXPH(1); PUSH(`X8D(data_i)); end
             1: begin NXPH(2); TOS(t_d); end
             2: begin NXPH(3); TOS(t_d); end
             3: begin NXPH(4); TOS(t_d); end
@@ -431,7 +433,7 @@ module eJ32 #(
         get:
             case (phase)
             0: begin BUSY(1); MEM(ibuf); `SET(spush); end
-            1: begin BUSY(2); TOS(data_i); `SET(ibufload); end
+            1: begin BUSY(2); TOS(`X8D(data_i)); `SET(ibufload); end
             default: `PHASE0;     // CC: extra memory cycle
             endcase
         put:
@@ -481,10 +483,10 @@ module eJ32 #(
             /// validate and patch
             /// CC: do not know why DIV is skipping the branch
             ///
-            if (!div_rst) div_patch();
+//            if (!div_rst) div_patch();
         end
     end // always_ff @ (posedge clk, posedge rst)
-
+/*
     task div_patch();
         automatic logic[7:0] op = code==idiv ? "/" : "%";
         if (phase_in==1) begin
@@ -515,4 +517,5 @@ module eJ32 #(
             assert(div_r == (s % t));
         end
     endtask: div_patch
+ */
 endmodule
