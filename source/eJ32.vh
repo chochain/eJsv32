@@ -1,7 +1,9 @@
 `ifndef EJ32_EJ32_VH
 `define EJ32_EJ32_VH
-
-typedef enum logic [7:0] {
+//
+// Note: https://www.infoworld.com/article/2077625/control-flow.html
+//
+typedef enum logic [7:0] {  ///> JVM opcodes
         //
         // constants
         //
@@ -69,14 +71,17 @@ typedef enum logic [7:0] {
         d2i, d2l, d2f,
         i2b, i2c, i2s,
         //
-        // comparision
-        //
+        // comparison
+        //                      
         lcmp    = 'h94,    fcmpl, fcmpg, dcmpl, dcmpg,
+        //
+        // conditional branching
+        //
         ifeq    = 'h99, ifne, iflt, ifge, ifgt, ifle,
         if_icmpeq, if_icmpne, if_icmplt, if_icmpge, if_icmpgt,
         if_acmpeq, if_acmpne,
         //
-        // control
+        // unconditional branching
         //
         goto    = 'ha7, jsr, ret,
         tableswitch, lookupswitch,
@@ -94,7 +99,10 @@ typedef enum logic [7:0] {
         // extended
         //
         wide    = 'hc4,
-        multianewarray, ifnull, ifnotnull, goto_w, jsr_w,
+        multianewarray,
+        // conditional branching (with null)
+        //
+        ifnull, ifnotnull, goto_w, jsr_w,
         //
         // reserved (overlapped with FVM extended)
         // breakpoint = 'hca,
@@ -109,5 +117,5 @@ typedef enum logic [7:0] {
         // Error handler
         //
         op_err = 'hff
-} jvm_opcode;
+} opcode;
 `endif // EJ32_EJ32_VH
