@@ -11,9 +11,9 @@
 `define PHASE0 phase_in = 0
 `define SET(v) v = 1'b1
 `define CLR(v) v = 1'b0
-`define X8A(b) {9'b0,b}
-`define X8D(b) {24'b0,b}
-`define XAD(a) {15'b0,a}
+`define X8A(b) {{ASZ-8{1'b0}}, b}
+`define X8D(b) {{DSZ-8{1'b0}}, b}
+`define XAD(a) {{DSZ-ASZ{1'b0}}, a}
 `define XDA(d) d[ASZ-1:0]
 
 module eJ32 #(
