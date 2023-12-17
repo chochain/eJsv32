@@ -66,4 +66,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 ### TODO
 * read Project-F, https://github.com/projf/projf-explore
   + Verilator + SDL2, https://projectf.io/posts/verilog-sim-verilator-sdl/
+* learn Verilator
+  + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
+* study SpinalHDL
 
