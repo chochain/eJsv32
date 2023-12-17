@@ -67,21 +67,21 @@ module eJ32 #(
     /// @{
     // instruction
     opcode         code_in;
-    logic          cload;                           ///> instruction unit control
+    logic          code_x;                          ///> instruction unit control
     logic[2:0]     phase_in;
     logic[ASZ-1:0] p_in, a_in, a_d;                 ///> program counter, instruction ptr
-    logic          pload, aload;                    ///> address controls
+    logic          p_x, a_x;                        ///> address controls
     // data stack
-    logic          tload, t_z, sload, spush, spop;  ///> data stack controls
+    logic          t_x, t_z, s_x, spush, spop;      ///> data stack controls
     logic[DSZ-1:0] t_in, r_in, t_d;                 ///> TOS controls
     // return stack
-    logic          rload, rpush, rpop;              ///> return stack controls
+    logic          r_x, rpush, rpop;                ///> return stack controls
     // IO
-    logic          ibufload, obufload;              ///> input/output buffer controls
+    logic          ibuf_x, obuf_x;                  ///> input/output buffer controls
     logic          asel_in;                         ///> addr select
     logic[7:0]     data_i;                          ///> input/output data
     logic[1:0]     dsel_in;                         ///> data select mux
-    logic          dwe, dselload;                   ///> data/addr bus controls
+    logic          dwe, dsel_x;                     ///> data/addr bus controls
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -121,20 +121,20 @@ module eJ32 #(
     .r(iushr_o)
     );
     */
-    task NXPH(input logic[2:0] n); phase_in = n; `CLR(cload); endtask;
-    task BUSY(input logic[2:0] n); NXPH(n); `CLR(pload);      endtask;
+    task NXPH(input logic[2:0] n); phase_in = n; `CLR(code_x); endtask;
+    task BUSY(input logic[2:0] n); NXPH(n); `CLR(p_x);         endtask;
     //
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input logic[ASZ-1:0] a); a_in = a; `SET(aload);   endtask;   /* build addr ptr    */
+    task SETA(input logic[ASZ-1:0] a); a_in = a; `SET(a_x);     endtask;   /* build addr ptr    */
     task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_in); endtask;   /* fetch from memory, data_i returns next cycle */
-    task JMP(input logic[ASZ-1:0] a);  p_in = a; `SET(aload);   endtask;   /* jmp and clear a   */
+    task JMP(input logic[ASZ-1:0] a);  p_in = a; `SET(p_x);     endtask;   /* jmp and clear a   */
 
-    task TOS(input logic[DSZ-1:0] v);  t_in = v; `SET(tload);   endtask;
+    task TOS(input logic[DSZ-1:0] v);  t_in = v; `SET(t_x);     endtask;
     task PUSH(input logic[DSZ-1:0] v); TOS(v); `SET(spush);     endtask;
     task POP();                        TOS(s); `SET(spop);      endtask;
-    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);       endtask;
-    task DW(input logic[1:0] n); dsel_in = n; `SET(dwe); `SET(dselload); endtask;
+    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);      endtask;
+    task DW(input logic[1:0] n); dsel_in = n; `SET(dwe); `SET(dsel_x); endtask;
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
@@ -203,28 +203,28 @@ module eJ32 #(
     always_comb begin
         // instruction
         phase_in  = 0;            /// phase and IO controls
-        cload     = 1'b1;
-        pload     = 1'b1;
+        code_x    = 1'b1;
+        p_x       = 1'b1;
         p_in      = p + 'h1;      /// advance program counter
         // data stack
-        tload     = 1'b0;
+        t_x       = 1'b0;
         t_in      = {DSZ{1'b0}};  /// TOS
-        sload     = 1'b0;         /// data stack
+        s_x       = 1'b0;         /// data stack
         spush     = 1'b0;
         spop      = 1'b0;
         // return stack
-        rload     = 1'b0;
+        r_x       = 1'b0;
         r_in      = {DSZ{1'b0}};  /// return stack
         rpush     = 1'b0;
         rpop      = 1'b0;
         // IO
-        aload     = 1'b0;
+        a_x       = 1'b0;
         a_in      = {ASZ{1'b0}};  /// address
         asel_in   = 1'b0;
-        ibufload  = 1'b0;
-        obufload  = 1'b0;
+        ibuf_x    = 1'b0;
+        obuf_x    = 1'b0;
         dwe       = 1'b0;         /// data write enable
-        dselload  = 1'b0;         /// data bus
+        dsel_x    = 1'b0;         /// data bus
         dsel_in   = 3;            /// data byte select
         ///
         /// external module control flags
@@ -287,10 +287,10 @@ module eJ32 #(
             2: begin BUSY(3); TOS(t_d); end
             default: `PHASE0;
             endcase
-        istore_0: begin r_in = t; `SET(rload); POP(); end  // CC: not tested
+        istore_0: begin r_in = t; `SET(r_x); POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dselload); dsel_in = 0; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_in = 0; end
             1: begin BUSY(2); MEM(a + 1); DW(1); end
             2: begin BUSY(3); MEM(a + 1); DW(2); end
             3: begin BUSY(4); MEM(a + 1); DW(3); end
@@ -310,7 +310,7 @@ module eJ32 #(
             1: begin BUSY(2); MEM(a + 1); DW(2); end
             2: begin BUSY(3); POP(); DW(3); asel_in = 1'b1; end
             */
-            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dselload); dsel_in = 2; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_in = 2; end
             1: begin BUSY(2); MEM(a + 1); DW(3); end
             2: begin BUSY(3); DW(3); POP(); end
             default: `PHASE0;
@@ -336,7 +336,7 @@ module eJ32 #(
             2: begin BUSY(3); PUSH(s); end
             default: `PHASE0;
             endcase
-        swap: begin TOS(s); `SET(sload); end
+        swap: begin TOS(s); `SET(s_x); end
         //
         // ALU ops
         //
@@ -411,7 +411,7 @@ module eJ32 #(
             1: begin NXPH(2);
                if (r == 0) begin `SET(rpop); end
                else begin
-                  r_in = r - 1; `SET(rload);
+                  r_in = r - 1; `SET(r_x);
                   JMP(a_d);
                end
             end
@@ -433,13 +433,13 @@ module eJ32 #(
         get:
             case (phase)
             0: begin BUSY(1); MEM(ibuf); `SET(spush); end
-            1: begin BUSY(2); TOS(`X8D(data_i)); `SET(ibufload); end
+            1: begin BUSY(2); TOS(`X8D(data_i)); `SET(ibuf_x); end
             default: `PHASE0;     // CC: extra memory cycle
             endcase
         put:
             case (phase)
-            0: begin BUSY(1); MEM(obuf); `SET(dselload); end
-            default: begin `PHASE0; POP(); DW(3); `SET(obufload); end
+            0: begin BUSY(1); MEM(obuf); `SET(dsel_x); end
+            default: begin `PHASE0; POP(); DW(3); `SET(obuf_x); end
             endcase
         default: `PHASE0;
         endcase
@@ -462,23 +462,23 @@ module eJ32 #(
             phase <= phase_in;
             asel  <= asel_in;
             // instruction ptr
-            if (cload)     code <= code_in;
-            if (pload)     p    <= p_in;
-            if (aload)     a    <= a_in;
+            if (code_x)    code <= code_in;
+            if (p_x)       p    <= p_in;
+            if (a_x)       a    <= a_in;
             // data stack
-            if (tload)     t    <= t_in;
-            if      (sload) ss[sp] <= t;
+            if (t_x)       t    <= t_in;
+            if      (s_x)  ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; end
             else if (spush) begin ss[sp1] <= t; sp <= sp + 1; end   // CC: ERROR -> EBR with multiple writers
 //            else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end  // CC: use this to fix synthesizer
             // return stack
-            if (rload)      rs[rp] <= r_in;
+            if (r_x)       rs[rp] <= r_in;
             else if (rpop)  begin rp <= rp - 1; end
             else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; end
             // input/output buffer
-            if (ibufload)  ibuf <= ibuf + 1;
-            if (obufload)  obuf <= obuf + 1;
-            if (dselload)  dsel <= dsel_in;
+            if (ibuf_x)    ibuf <= ibuf + 1;
+            if (obuf_x)    obuf <= obuf + 1;
+            if (dsel_x)    dsel <= dsel_in;
             ///
             /// validate and patch
             /// CC: do not know why DIV is skipping the branch
