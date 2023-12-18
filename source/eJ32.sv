@@ -19,7 +19,7 @@ module eJ32 #(
     parameter RSZ = $clog2(RS_DEPTH)
     ) (
     input logic            clk, rst,
-    input logic [7:0]      data_o_i,
+    input logic [7:0]      data_i,
     // instruction
     output logic [7:0]     code_o,
     output logic [2:0]     phase_o,
@@ -38,7 +38,7 @@ module eJ32 #(
     /// @defgroup Registers
     /// @{
     // instruction
-    opcode         code;                  ///> JVM opcode
+    opcode_t       code;                  ///> JVM opcode
     logic[2:0]     phase;                 ///> FSM phase (aka state)
     logic[ASZ-1:0] p, a;                  ///> program counter, instruction pointer
     logic          asel;                  ///> address bus mux (P|A)
@@ -59,23 +59,22 @@ module eJ32 #(
     /// @defgroup Wires
     /// @{
     // instruction
-    opcode         code_in;
+    opcode_t       code_r;
     logic          code_x;                          ///> instruction unit control
-    logic[2:0]     phase_in;
-    logic[ASZ-1:0] p_in, a_in, a_d;                 ///> program counter, instruction ptr
+    logic[2:0]     phase_r;
+    logic[ASZ-1:0] p_r, a_r, a_d;                   ///> program counter, instruction ptr
     logic          p_x, a_x;                        ///> address controls
     // data stack
-    logic[DSZ-1:0] t_in, t_d;                       ///> TOS 
+    logic[DSZ-1:0] t_r, t_d;                        ///> TOS 
     logic          t_x, t_z, t_neg;                 ///> TOS controls
     logic          s_x, spush, spop;                ///> data stack controls
     // return stack
-    logic[DSZ-1:0] r_in;                            ///> return stack
+    logic[DSZ-1:0] r_r;                             ///> return stack
     logic          r_x, rpush, rpop;                ///> return stack controls
     // IO
     logic          ibuf_x, obuf_x;                  ///> input/output buffer controls
-    logic          asel_in;                         ///> addr select
-    logic[7:0]     data_i;                          ///> input/output data
-    logic[1:0]     dsel_in;                         ///> data select mux
+    logic          asel_r;                          ///> addr select
+    logic[1:0]     dsel_r;                          ///> data select mux
     logic          dwe, dsel_x;                     ///> data/addr bus controls
     /// @}
     /// @defgroup ALU pre-calc wires
@@ -116,20 +115,20 @@ module eJ32 #(
     .r(iushr_o)
     );
     */
-    task NXPH(input logic[2:0] n); phase_in = n; `CLR(code_x); endtask;
+    task NXPH(input logic[2:0] n); phase_r = n; `CLR(code_x); endtask;
     task BUSY(input logic[2:0] n); NXPH(n); `CLR(p_x);         endtask;
     //
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input logic[ASZ-1:0] a); a_in = a; `SET(a_x);     endtask;   /* build addr ptr    */
-    task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_in); endtask;   /* fetch from memory, data_i returns next cycle */
-    task JMP(input logic[ASZ-1:0] a);  p_in = a; `SET(p_x);     endtask;   /* jmp and clear a   */
+    task SETA(input logic[ASZ-1:0] a); a_r = a; `SET(a_x);     endtask;   /* build addr ptr    */
+    task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_r); endtask;   /* fetch from memory, data_i returns next cycle */
+    task JMP(input logic[ASZ-1:0] a);  p_r = a; `SET(p_x);     endtask;   /* jmp and clear a   */
 
-    task TOS(input logic[DSZ-1:0] v);  t_in = v; `SET(t_x);     endtask;
-    task PUSH(input logic[DSZ-1:0] v); TOS(v); `SET(spush);     endtask;
-    task POP();                        TOS(s); `SET(spop);      endtask;
-    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);      endtask;
-    task DW(input logic[1:0] n); dsel_in = n; `SET(dwe); `SET(dsel_x); endtask;
+    task TOS(input logic[DSZ-1:0] v);  t_r = v; `SET(t_x);     endtask;
+    task PUSH(input logic[DSZ-1:0] v); TOS(v); `SET(spush);    endtask;
+    task POP();                        TOS(s); `SET(spop);     endtask;
+    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);     endtask;
+    task DW(input logic[1:0] n); dsel_r = n; `SET(dwe); `SET(dsel_x); endtask;
 
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
@@ -182,7 +181,6 @@ module eJ32 #(
     /// IO
     assign addr_o_o = addr_o;
     assign addr_o   = (asel) ? a : p;         /// address, data or instruction
-    assign data_i   = data_o_i;
     assign data_o_o = data_o;
     assign dwe_o    = dwe;
     assign data_o   = (dsel == 3)             // data byte select (Big-Endian)
@@ -199,38 +197,38 @@ module eJ32 #(
     ///
     always_comb begin
         // instruction
-        phase_in  = 0;            /// phase and IO controls
+        phase_r   = 0;            /// phase and IO controls
         code_x    = 1'b1;
         p_x       = 1'b1;
-        p_in      = p + 'h1;      /// advance program counter
+        p_r       = p + 'h1;      /// advance program counter
         // data stack
         t_x       = 1'b0;
-        t_in      = {DSZ{1'b0}};  /// TOS
+        t_r       = {DSZ{1'b0}};  /// TOS
         s_x       = 1'b0;         /// data stack
         spush     = 1'b0;
         spop      = 1'b0;
         // return stack
         r_x       = 1'b0;
-        r_in      = {DSZ{1'b0}};  /// return stack
+        r_r       = {DSZ{1'b0}};  /// return stack
         rpush     = 1'b0;
         rpop      = 1'b0;
         // IO
         a_x       = 1'b0;
-        a_in      = {ASZ{1'b0}};  /// address
-        asel_in   = 1'b0;
+        a_r       = {ASZ{1'b0}};  /// address
+        asel_r    = 1'b0;
         ibuf_x    = 1'b0;
         obuf_x    = 1'b0;
         dwe       = 1'b0;         /// data write enable
         dsel_x    = 1'b0;         /// data bus
-        dsel_in   = 3;            /// data byte select
+        dsel_r    = 3;            /// data byte select
         ///
         /// external module control flags
         ///
         shr_f     = 1'b0;         /// shifter flag
 /*
-        if (!$cast(code_in, data_i)) begin
+        if (!$cast(code_r, data_i)) begin
             /// JVM opcodes, some are not avialable yet
-            code_in = op_err;
+            code_r = op_err;
         end
 */
         ///
@@ -284,10 +282,10 @@ module eJ32 #(
             2: begin BUSY(3); TOS(t_d); end
             default: `PHASE0;
             endcase
-        istore_0: begin r_in = t; `SET(r_x); POP(); end  // CC: not tested
+        istore_0: begin r_r = t; `SET(r_x); POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_in = 0; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_r = 0; end
             1: begin BUSY(2); MEM(a + 1); DW(1); end
             2: begin BUSY(3); MEM(a + 1); DW(2); end
             3: begin BUSY(4); MEM(a + 1); DW(3); end
@@ -305,9 +303,9 @@ module eJ32 #(
             /* CC: logic changed
             0: begin BUSY(1); MEM(s); spop = 1'b1; end
             1: begin BUSY(2); MEM(a + 1); DW(2); end
-            2: begin BUSY(3); POP(); DW(3); asel_in = 1'b1; end
+            2: begin BUSY(3); POP(); DW(3); asel_r = 1'b1; end
             */
-            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_in = 2; end
+            0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_r = 2; end
             1: begin BUSY(2); MEM(a + 1); DW(3); end
             2: begin BUSY(3); DW(3); POP(); end
             default: `PHASE0;
@@ -319,14 +317,14 @@ module eJ32 #(
             default: begin `PHASE0; POP(); end
             endcase
         dup: `SET(spush);
-        dup_x1:                     // CC: logic changed since a_in is 16-bit only
+        dup_x1:                     // CC: logic changed since a_r is 16-bit only
             case (phase)
             0: begin BUSY(1); PUSH(s); end
             1: BUSY(2);             // wait for stack update??
             default: `PHASE0;
             endcase
         dup_x2: PUSH(ss[sp - 1]);
-        dup2:                       // CC: logic changed since a_in is 16-bit only 
+        dup2:                       // CC: logic changed since a_r is 16-bit only 
             case (phase)
             0: begin BUSY(1); PUSH(s); end
             1: BUSY(2);             // CC: wait for stack update??
@@ -351,12 +349,12 @@ module eJ32 #(
         ixor: ALU(s ^ t);
         iinc:
             case (phase)
-            // 0: begin phase_in = 1; MEM(s); end
-            // 1: begin phase_in = 2; `HOLD; ALU(t + data_i); asel_in = 1'b1; end
+            // 0: begin phase_r = 1; MEM(s); end
+            // 1: begin phase_r = 2; `HOLD; ALU(t + data_i); asel_r = 1'b1; end
             // default: begin `PHASE0; `HOLD; TOS(s); DW(0); end
             // CC: change Dr. Ting's logic
             0: begin BUSY(1); MEM(`XDA(s)); end
-            1: begin BUSY(2); ALU(t + `X8D(data_i)); `SET(asel_in); end
+            1: begin BUSY(2); ALU(t + `X8D(data_i)); `SET(asel_r); end
             default: begin `PHASE0; TOS(s); DW(0); end
             endcase
         //
@@ -383,8 +381,8 @@ module eJ32 #(
             endcase
         jsr:
             case (phase)
-            // 0: begin phase_in = 1; MEM(t); end
-            // 1: begin phase_in = 2; `HOLD; MEM(a + 1); TOS(data_i); end
+            // 0: begin phase_r = 1; MEM(t); end
+            // 1: begin phase_r = 2; `HOLD; MEM(a + 1); TOS(data_i); end
             // CC: change Dr. Ting's logic
             0: begin BUSY(1); MEM(`XDA(t)); end
             1: begin BUSY(2); MEM(a + 1); TOS(`X8D(data_i)); end
@@ -398,7 +396,7 @@ module eJ32 #(
             endcase
         invokevirtual:
             case (phase)
-            0: begin NXPH(1); SETA(`X8A(data_i)); r_in = `XAD(p) + 2; `SET(rpush); end
+            0: begin NXPH(1); SETA(`X8A(data_i)); r_r = `XAD(p) + 2; `SET(rpush); end
             1: begin NXPH(2); JMP(a_d); end
             default: `PHASE0;
             endcase
@@ -408,7 +406,7 @@ module eJ32 #(
             1: begin NXPH(2);
                if (r == 0) begin `SET(rpop); end
                else begin
-                  r_in = r - 1; `SET(r_x);
+                  r_r = r - 1; `SET(r_x);
                   JMP(a_d);
                end
             end
@@ -424,7 +422,7 @@ module eJ32 #(
             default: `PHASE0;
             endcase
         popr: begin PUSH(r); `SET(rpop); end
-        pushr:begin POP(); r_in = t; `SET(rpush); end
+        pushr:begin POP(); r_r = t; `SET(rpush); end
         dupr: PUSH(r);
         // memory access ops
         get:
@@ -456,26 +454,26 @@ module eJ32 #(
             p     <= {ASZ{1'b0}};
         end
         else if (clk) begin
-            phase <= phase_in;
-            asel  <= asel_in;
+            phase <= phase_r;
+            asel  <= asel_r;
             // instruction ptr
-            if (code_x)    code <= code_in;
-            if (p_x)       p    <= p_in;
-            if (a_x)       a    <= a_in;
+            if (code_x)    code <= code_r;
+            if (p_x)       p    <= p_r;
+            if (a_x)       a    <= a_r;
             // data stack
-            if (t_x)       t    <= t_in;
+            if (t_x)       t    <= t_r;
             if      (s_x)  ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; end
             else if (spush) begin ss[sp1] <= t; sp <= sp + 1; end   // CC: ERROR -> EBR with multiple writers
 //            else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end  // CC: use this to fix synthesizer
             // return stack
-            if (r_x)       rs[rp] <= r_in;
+            if (r_x)       rs[rp] <= r_r;
             else if (rpop)  begin rp <= rp - 1; end
-            else if (rpush) begin rs[rp1] <= r_in; rp <= rp + 1; end
+            else if (rpush) begin rs[rp1] <= r_r; rp <= rp + 1; end
             // input/output buffer
             if (ibuf_x)    ibuf <= ibuf + 1;
             if (obuf_x)    obuf <= obuf + 1;
-            if (dsel_x)    dsel <= dsel_in;
+            if (dsel_x)    dsel <= dsel_r;
             ///
             /// validate and patch
             /// CC: do not know why DIV is skipping the branch
@@ -486,23 +484,23 @@ module eJ32 #(
 /*
     task div_patch();
         automatic logic[7:0] op = code==idiv ? "/" : "%";
-        if (phase_in==1) begin
+        if (phase_r==1) begin
             if (!div_bsy) begin
                 $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-                assert(phase_in == 0) else begin
-                    $write(", phase_in=%d reset =0", phase_in) ;
+                assert(phase_r == 0) else begin
+                    $write(", phase_r=%d reset =0", phase_r) ;
                     phase <= 0;
                 end
                 assert(cload == 1) else begin
-                    $write(", cload=%d code_in=%s, p=%4x forced +1", cload, code_in.name, p);
-                    code <= code_in; p <= p + 1;
+                    $write(", cload=%d code_r=%s, p=%4x forced +1", cload, code_r.name, p);
+                    code <= code_r; p <= p + 1;
                 end
                 assert(spop == 1) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
                     sp <= sp - 1; sp1 <= sp1 - 1;
                 end
-                assert(t_in == (t_in==(idiv ? div_q : div_r))) else begin
-                    $write(", tload=%d t_in=%8x =q/r", tload, t_in);
+                assert(t_r == (t_r==(idiv ? div_q : div_r))) else begin
+                    $write(", tload=%d t_r=%8x =q/r", tload, t_r);
                     t <= code==idiv ? div_q : div_r;
                 end
                 $display(" :ERR");

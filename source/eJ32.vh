@@ -117,9 +117,9 @@ typedef enum logic [7:0] {  ///> JVM opcodes
         // Error handler
         //
         op_err = 'hff
-} opcode;
+} opcode_t /*verilator public*/;
 
-`define PHASE0 phase_in = 0
+`define PHASE0 phase_r = 0
 `define SET(v) v = 1'b1
 `define CLR(v) v = 1'b0
 `define X8A(b) {{ASZ-8{1'b0}}, b}
