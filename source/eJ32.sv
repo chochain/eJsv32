@@ -65,11 +65,11 @@ module eJ32 #(
     logic[ASZ-1:0] p_in, a_in, a_d;                 ///> program counter, instruction ptr
     logic          p_x, a_x;                        ///> address controls
     // data stack
-    logic          t_x, t_z, t_neg,                 ///> data stack controls
-    logic          s_x, spush, spop;
-    logic          t_z, t_neg,
-    logic[DSZ-1:0] t_in, r_in, t_d;                 ///> TOS controls
+    logic[DSZ-1:0] t_in, t_d;                       ///> TOS 
+    logic          t_x, t_z, t_neg;                 ///> TOS controls
+    logic          s_x, spush, spop;                ///> data stack controls
     // return stack
+    logic[DSZ-1:0] r_in;                            ///> return stack
     logic          r_x, rpush, rpop;                ///> return stack controls
     // IO
     logic          ibuf_x, obuf_x;                  ///> input/output buffer controls
