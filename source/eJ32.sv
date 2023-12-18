@@ -8,14 +8,6 @@
 `include "../source/eJ32_if.sv"
 `include "../source/eJ32.vh"
 
-`define PHASE0 phase_in = 0
-`define SET(v) v = 1'b1
-`define CLR(v) v = 1'b0
-`define X8A(b) {{ASZ-8{1'b0}}, b}
-`define X8D(b) {{DSZ-8{1'b0}}, b}
-`define XAD(a) {{DSZ-ASZ{1'b0}}, a}
-`define XDA(d) d[ASZ-1:0]
-
 module eJ32 #(
     parameter TIB      = 'h1000,          ///> input buffer address
     parameter OBUF     = 'h1400,          ///> output buffer address
@@ -36,6 +28,7 @@ module eJ32 #(
     output logic [DSZ-1:0] t_o, s_o,
     output logic [SSZ-1:0] sp_o,
     // return stack
+    output logic [DSZ-1:0] r_o,
     output logic [RSZ-1:0] rp_o,
     // IO
     output logic [ASZ-1:0] addr_o_o,
@@ -72,7 +65,9 @@ module eJ32 #(
     logic[ASZ-1:0] p_in, a_in, a_d;                 ///> program counter, instruction ptr
     logic          p_x, a_x;                        ///> address controls
     // data stack
-    logic          t_x, t_z, s_x, spush, spop;      ///> data stack controls
+    logic          t_x, t_z, t_neg,                 ///> data stack controls
+    logic          s_x, spush, spop;
+    logic          t_z, t_neg,
     logic[DSZ-1:0] t_in, r_in, t_d;                 ///> TOS controls
     // return stack
     logic          r_x, rpush, rpop;                ///> return stack controls
@@ -174,12 +169,14 @@ module eJ32 #(
     assign t_o      = t;
     assign t_d      = {t[DSZ-9:0], data_i};   ///> shift combined t (top of stack)
     assign t_z      = t == 0;                 ///> TOS zero flag
+    assign t_neg    = t[DSZ-1];               ///> TOS negative flag
     assign s        = ss[sp];                 ///> data stack, TODO: EBR
     assign s_o      = s;
     assign sp_o     = sp;
     assign sp1      = sp + 1;
     // return stack
     assign r        = rs[rp];                 ///> return stack, TODO: EBR
+    assign r_o      = r;
     assign rp_o     = rp;
     assign rp1      = rp + 1;
     /// IO
@@ -367,14 +364,14 @@ module eJ32 #(
         //
         ifeq:      ZBRAN(t_z);
         ifne:      ZBRAN(!t_z);
-        iflt:      ZBRAN(t[DSZ-1]);
-        ifge:      ZBRAN(!t[DSZ-1]);
-        ifgt:      ZBRAN(!t_z && !t[DSZ-1]);
-        ifle:      ZBRAN(t_z || t[DSZ-1]);
+        iflt:      ZBRAN(t_neg);
+        ifge:      ZBRAN(!t_neg);
+        ifgt:      ZBRAN(!t_z && !t_neg);
+        ifle:      ZBRAN(t_z || t_neg);
         if_icmpeq: IBRAN(t_z);
         if_icmpne: IBRAN(!t_z);
-        if_icmplt: IBRAN(t[DSZ-1]);
-        if_icmpgt: IBRAN(!t_z && !t[DSZ-1]);
+        if_icmplt: IBRAN(t_neg);
+        if_icmpgt: IBRAN(!t_z && !t_neg);
         //
         // unconditional branching ops
         //
