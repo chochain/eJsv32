@@ -31,51 +31,48 @@ module eJ32 #(
     output logic [DSZ-1:0] r_o,
     output logic [RSZ-1:0] rp_o,
     // IO
-    output logic [ASZ-1:0] addr_o_o,
-    output logic [7:0]     data_o_o,
+    output logic [ASZ-1:0] addr_o,
+    output logic [7:0]     data_o,
     output logic           dwe_o
     );
     /// @defgroup Registers
     /// @{
     // instruction
-    opcode_t       code;                  ///> JVM opcode
-    logic[2:0]     phase;                 ///> FSM phase (aka state)
-    logic[ASZ-1:0] p, a;                  ///> program counter, instruction pointer
-    logic          asel;                  ///> address bus mux (P|A)
+    opcode_t       code, code_r;          ///> JVM opcode
+    logic[2:0]     phase, phase_r;        ///> FSM phase (aka state)
+    logic[ASZ-1:0] p, a, p_r, a_r;        ///> program counter, instruction pointer
     // data stack
+    logic[DSZ-1:0] t, s, t_r;             ///> TOS, NOS
     logic[DSZ-1:0] ss[SS_DEPTH-1:0];      ///> data stack, 3K LUTs, TODO: use EBR memory
-    logic[SSZ-1:0] sp, sp1;               ///> data stack pointers, sp1 = sp + 1
-    logic[DSZ-1:0] t, s;                  ///> TOS, NOS
+    logic[SSZ-1:0] sp;                    ///> data stack pointers, sp1 = sp + 1
     // return stack
     logic[DSZ-1:0] rs[RS_DEPTH-1:0];      ///> return stack, 3K LUTs, TODO: use EBR memory
-    logic[RSZ-1:0] rp, rp1;               ///> return stack pointers
-    logic[DSZ-1:0] r;                     ///> top of return stack
+    logic[DSZ-1:0] r, r_r;                ///> top of return stack
+    logic[RSZ-1:0] rp;                    ///> return stack pointers
     // IO
-    logic[ASZ-1:0] addr_o;                ///> address
-    logic[7:0]     data_o;                ///> data
+    logic[ASZ-1:0] addr;                  ///> address
+    logic[7:0]     data;                  ///> data
     logic[ASZ-1:0] ibuf, obuf;            ///> input, output buffer pointers
-    logic[1:0]     dsel;                  ///> 32-bit, 4-to-1 mux, byte select
+    logic          asel, asel_r;          ///> address bus mux (P|A)
+    logic[1:0]     dsel, dsel_r;          ///> 32-bit, 4-to-1 mux, byte select
     /// @}
     /// @defgroup Wires
     /// @{
     // instruction
-    opcode_t       code_r;
-    logic          code_x;                          ///> instruction unit control
-    logic[2:0]     phase_r;
-    logic[ASZ-1:0] p_r, a_r, a_d;                   ///> program counter, instruction ptr
-    logic          p_x, a_x;                        ///> address controls
+    logic          code_x;                ///> instruction unit control
+    logic[ASZ-1:0] a_d;                   ///> combine address + data
+    logic          p_x, a_x;              ///> address controls
     // data stack
-    logic[DSZ-1:0] t_r, t_d;                        ///> TOS 
-    logic          t_x, t_z, t_neg;                 ///> TOS controls
-    logic          s_x, spush, spop;                ///> data stack controls
+    logic          t_x, t_z, t_neg;       ///> TOS controls
+    logic[SSZ-1:0] sp1;                   ///> data stack pointers, sp1 = sp + 1
+    logic[DSZ-1:0] t_d;                   ///> combined t & data
+    logic          s_x, spush, spop;      ///> data stack controls
     // return stack
-    logic[DSZ-1:0] r_r;                             ///> return stack
-    logic          r_x, rpush, rpop;                ///> return stack controls
+    logic[RSZ-1:0] rp1;                   ///> return stack pointers
+    logic          r_x, rpush, rpop;      ///> return stack controls
     // IO
-    logic          ibuf_x, obuf_x;                  ///> input/output buffer controls
-    logic          asel_r;                          ///> addr select
-    logic[1:0]     dsel_r;                          ///> data select mux
-    logic          dwe, dsel_x;                     ///> data/addr bus controls
+    logic          ibuf_x, obuf_x;        ///> input/output buffer controls
+    logic          dwe, dsel_x;           ///> data/addr bus controls
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -132,14 +129,14 @@ module eJ32 #(
         1: begin NXPH(2); POP(); if (f) JMP(a_d); end
         default: `PHASE0;
         endcase
-    endtask; // ZBRAN
+    endtask: ZBRAN
     task IBRAN(input logic f);
         case (phase)
         0: begin NXPH(1); ALU(s - t); SETA(`X8A(data_i)); end
         1: begin NXPH(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
         default: `PHASE0;
         endcase
-    endtask; // IBRAN
+    endtask: IBRAN
     // memory unit
     task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_r); endtask;   /* fetch from memory, data_i returns next cycle */
     task DW(input logic[1:0] n); dsel_r = n; `SET(dwe); `SET(dsel_x); endtask;
@@ -153,48 +150,10 @@ module eJ32 #(
         end
         endcase
     endtask: DIV
-
     ///
-    /// wires to reduce verbosity
+    ///> wire initial values
     ///
-    // instruction
-    assign code_o   = code;                   ///> JVM opcode
-    assign phase_o  = phase;                  ///> multi-step instruction
-    assign p_o      = p;                      ///> program counter
-    assign a_o      = a;                      ///> instruction pointer
-    assign a_d      = {a[ASZ-9:0], data_i};   ///> shift combined address
-    // data stack   
-    assign t_o      = t;
-    assign t_d      = {t[DSZ-9:0], data_i};   ///> shift combined t (top of stack)
-    assign t_z      = t == 0;                 ///> TOS zero flag
-    assign t_neg    = t[DSZ-1];               ///> TOS negative flag
-    assign s        = ss[sp];                 ///> data stack, TODO: EBR
-    assign s_o      = s;
-    assign sp_o     = sp;
-    assign sp1      = sp + 1;
-    // return stack
-    assign r        = rs[rp];                 ///> return stack, TODO: EBR
-    assign r_o      = r;
-    assign rp_o     = rp;
-    assign rp1      = rp + 1;
-    /// IO
-    assign addr_o_o = addr_o;
-    assign addr_o   = (asel) ? a : p;         /// address, data or instruction
-    assign data_o_o = data_o;
-    assign dwe_o    = dwe;
-    assign data_o   = (dsel == 3)             // data byte select (Big-Endian)
-                    ? t[7:0]
-                    : (dsel == 2)
-                        ? t[15:8]
-                        : (dsel == 1)
-                            ? t[23:16]
-                            : t[31:24];
-    // external module
-    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
-    ///
-    /// combinational
-    ///
-    always_comb begin
+    task SET_INIT();
         // instruction
         phase_r   = '0;           /// phase and IO controls
         code_x    = '1;
@@ -230,6 +189,50 @@ module eJ32 #(
             code_r = op_err;
         end
 */
+    endtask: SET_INIT
+    ///
+    /// combinational
+    ///
+    ///
+    /// wires to reduce verbosity
+    ///
+    // instruction
+    assign code_o   = code;                   ///> JVM opcode
+    assign phase_o  = phase;                  ///> multi-step instruction
+    assign p_o      = p;                      ///> program counter
+    assign a_o      = a;                      ///> instruction pointer
+    assign a_d      = {a[ASZ-9:0], data_i};   ///> shift combined address
+    // data stack   
+    assign t_o      = t;
+    assign t_d      = {t[DSZ-9:0], data_i};   ///> shift combined t (top of stack)
+    assign t_z      = t == 0;                 ///> TOS zero flag
+    assign t_neg    = t[DSZ-1];               ///> TOS negative flag
+    assign s        = ss[sp];                 ///> data stack, TODO: EBR
+    assign s_o      = s;
+    assign sp_o     = sp;
+    assign sp1      = sp + 1;
+    // return stack
+    assign r        = rs[rp];                 ///> return stack, TODO: EBR
+    assign r_o      = r;
+    assign rp_o     = rp;
+    assign rp1      = rp + 1;
+    /// IO
+    assign addr_o   = addr;
+    assign addr     = (asel) ? a : p;        ///> address, data or instruction
+    assign dwe_o    = dwe;
+    assign data_o   = data;
+    assign data     = (dsel == 3)            ///> data byte select (Big-Endian)
+                    ? t[7:0]
+                    : (dsel == 2)
+                        ? t[15:8]
+                        : (dsel == 1)
+                            ? t[23:16]
+                            : t[31:24];
+    // external module
+    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
+   
+    always_comb begin
+        SET_INIT();
         ///
         /// instruction dispatcher
         ///
@@ -464,7 +467,7 @@ module eJ32 #(
             if      (s_x)  ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; end
             else if (spush) begin ss[sp1] <= t; sp <= sp + 1; end   // CC: ERROR -> EBR with multiple writers
-//            else if (spush) begin ss[sp] <= t; sp <= sp + 1; sp1 <= sp1 + 1; end  // CC: use this to fix synthesizer
+//            else if (spush) begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
             // return stack
             if (r_x)       rs[rp] <= r_r;
             else if (rpop)  begin rp <= rp - 1; end
