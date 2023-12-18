@@ -190,37 +190,10 @@ module eJ32 #(
         end
 */
     endtask: SET_INIT
-    ///
-    /// combinational
-    ///
-    ///
-    /// wires to reduce verbosity
-    ///
-    // instruction
-    assign code_o   = code;                   ///> JVM opcode
-    assign phase_o  = phase;                  ///> multi-step instruction
-    assign p_o      = p;                      ///> program counter
-    assign a_o      = a;                      ///> instruction pointer
-    assign a_d      = {a[ASZ-9:0], data_i};   ///> shift combined address
-    // data stack   
-    assign t_o      = t;
-    assign t_d      = {t[DSZ-9:0], data_i};   ///> shift combined t (top of stack)
-    assign t_z      = t == 0;                 ///> TOS zero flag
-    assign t_neg    = t[DSZ-1];               ///> TOS negative flag
-    assign s        = ss[sp];                 ///> data stack, TODO: EBR
-    assign s_o      = s;
-    assign sp_o     = sp;
-    assign sp1      = sp + 1;
-    // return stack
-    assign r        = rs[rp];                 ///> return stack, TODO: EBR
-    assign r_o      = r;
-    assign rp_o     = rp;
-    assign rp1      = rp + 1;
     /// IO
-    assign addr_o   = addr;
+    assign s        = ss[sp];                 ///> data stack, TODO: EBR
+    assign r        = rs[rp];                 ///> return stack, TODO: EBR
     assign addr     = (asel) ? a : p;        ///> address, data or instruction
-    assign dwe_o    = dwe;
-    assign data_o   = data;
     assign data     = (dsel == 3)            ///> data byte select (Big-Endian)
                     ? t[7:0]
                     : (dsel == 2)
@@ -230,7 +203,41 @@ module eJ32 #(
                             : t[31:24];
     // external module
     assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
-   
+    ///
+    /// output drivers
+    ///
+    always_comb begin
+       // instruction
+       code_o   = code;                   ///> JVM opcode
+       phase_o  = phase;                  ///> multi-step instruction
+       p_o      = p;                      ///> program counter
+       a_o      = a;                      ///> instruction pointer
+       a_d      = {a[ASZ-9:0], data_i};   ///> shift combined address
+       // data stack   
+       t_o      = t;
+       s_o      = s;
+       sp_o     = sp;
+       // return stack
+       r_o      = r;
+       rp_o     = rp;
+       // IO
+       addr_o   = addr;
+       data_o   = data;
+       dwe_o    = dwe;
+    end // always_comb
+    ///
+    /// wires to reduce verbosity
+    ///
+    always_comb begin
+       t_d      = {t[DSZ-9:0], data_i};   ///> shift combined t (top of stack)
+       t_z      = t == 0;                 ///> TOS zero flag
+       t_neg    = t[DSZ-1];               ///> TOS negative flag
+       sp1      = sp + 1;
+       rp1      = rp + 1;
+    end // always_comb
+    ///
+    /// combinational logic
+    ///
     always_comb begin
         SET_INIT();
         ///
@@ -439,7 +446,7 @@ module eJ32 #(
             default: begin `PHASE0; POP(); DW(3); `SET(obuf_x); end
             endcase
         default: `PHASE0;
-        endcase
+        endcase // case (code)
     end
 // registers
     always_ff @(posedge clk, posedge rst) begin
@@ -447,8 +454,8 @@ module eJ32 #(
             phase <= '0;
             asel  <= '0;
             dsel  <= 3;
-            sp    <= 0;
-            rp    <= 0;
+            sp    <= '0;
+            rp    <= '0;
             ibuf  <= TIB;
             obuf  <= OBUF;
             t     <= {DSZ{'0}};
