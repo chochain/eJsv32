@@ -115,21 +115,35 @@ module eJ32 #(
     .r(iushr_o)
     );
     */
-    task NXPH(input logic[2:0] n); phase_r = n; `CLR(code_x); endtask;
+    task NXPH(input logic[2:0] n); phase_r = n; `CLR(code_x);  endtask;
     task BUSY(input logic[2:0] n); NXPH(n); `CLR(p_x);         endtask;
-    //
-    // Note: address is memory offset (instead of Java class file reference)
-    //
-    task SETA(input logic[ASZ-1:0] a); a_r = a; `SET(a_x);     endtask;   /* build addr ptr    */
-    task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_r); endtask;   /* fetch from memory, data_i returns next cycle */
-    task JMP(input logic[ASZ-1:0] a);  p_r = a; `SET(p_x);     endtask;   /* jmp and clear a   */
-
+    // data stack
     task TOS(input logic[DSZ-1:0] v);  t_r = v; `SET(t_x);     endtask;
+    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);     endtask;
     task PUSH(input logic[DSZ-1:0] v); TOS(v); `SET(spush);    endtask;
     task POP();                        TOS(s); `SET(spop);     endtask;
-    task ALU(input logic[DSZ-1:0] v);  TOS(v); `SET(spop);     endtask;
+    // branching
+    // Note: address is memory offset (instead of Java class file reference)
+    task SETA(input logic[ASZ-1:0] a); a_r = a; `SET(a_x);     endtask;   /* build addr ptr    */
+    task JMP(input logic[ASZ-1:0] a);  p_r = a; `SET(p_x);     endtask;   /* jmp and clear a   */
+    task ZBRAN(input logic f);
+        case (phase)
+        0: begin NXPH(1); SETA(`X8A(data_i)); end
+        1: begin NXPH(2); POP(); if (f) JMP(a_d); end
+        default: `PHASE0;
+        endcase
+    endtask; // ZBRAN
+    task IBRAN(input logic f);
+        case (phase)
+        0: begin NXPH(1); ALU(s - t); SETA(`X8A(data_i)); end
+        1: begin NXPH(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
+        default: `PHASE0;
+        endcase
+    endtask; // IBRAN
+    // memory unit
+    task MEM(input logic[ASZ-1:0] a);  SETA(a);  `SET(asel_r); endtask;   /* fetch from memory, data_i returns next cycle */
     task DW(input logic[1:0] n); dsel_r = n; `SET(dwe); `SET(dsel_x); endtask;
-
+    // external
     task DIV(input logic[DSZ-1:0] v);
         case (phase)
         0: BUSY(1);
@@ -140,21 +154,6 @@ module eJ32 #(
         endcase
     endtask: DIV
 
-    task ZBRAN(input logic f);
-        case (phase)
-        0: begin NXPH(1); SETA(`X8A(data_i)); end
-        1: begin NXPH(2); POP(); if (f) JMP(a_d); end
-        default: `PHASE0;
-        endcase
-    endtask; // ZBRAN
-
-    task IBRAN(input logic f);
-        case (phase)
-        0: begin NXPH(1); ALU(s - t); SETA(`X8A(data_i)); end
-        1: begin NXPH(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
-        default: `PHASE0;
-        endcase
-    endtask; // IBRAN
     ///
     /// wires to reduce verbosity
     ///
