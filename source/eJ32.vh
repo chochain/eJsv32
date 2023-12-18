@@ -120,11 +120,11 @@ typedef enum logic [7:0] {  ///> JVM opcodes
 } opcode_t /*verilator public*/;
 
 `define PHASE0 phase_r = 0
-`define SET(v) v = 1'b1
-`define CLR(v) v = 1'b0
-`define X8A(b) {{ASZ-8{1'b0}}, b}
-`define X8D(b) {{DSZ-8{1'b0}}, b}
-`define XAD(a) {{DSZ-ASZ{1'b0}}, a}
+`define SET(v) v = '1
+`define CLR(v) v = '0
+`define X8A(b) {{ASZ-8{'0}}, b}
+`define X8D(b) {{DSZ-8{'0}}, b}
+`define XAD(a) {{DSZ-ASZ{'0}}, a}
 `define XDA(d) d[ASZ-1:0]
 
 `endif // EJ32_EJ32_VH

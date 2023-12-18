@@ -190,40 +190,40 @@ module eJ32 #(
                             ? t[23:16]
                             : t[31:24];
     // external module
-    assign div_rst= (code!=idiv && code!=irem) ? 1'b1 : phase==0;
+    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
     ///
     /// combinational
     ///
     always_comb begin
         // instruction
-        phase_r   = 0;            /// phase and IO controls
-        code_x    = 1'b1;
-        p_x       = 1'b1;
-        p_r       = p + 'h1;      /// advance program counter
+        phase_r   = '0;           /// phase and IO controls
+        code_x    = '1;
+        p_x       = '1;
+        p_r       = p + '1;       /// advance program counter
         // data stack
-        t_x       = 1'b0;
-        t_r       = {DSZ{1'b0}};  /// TOS
-        s_x       = 1'b0;         /// data stack
-        spush     = 1'b0;
-        spop      = 1'b0;
+        t_x       = '0;
+        t_r       = {DSZ{'0}};    /// TOS
+        s_x       = '0;           /// data stack
+        spush     = '0;
+        spop      = '0;
         // return stack
-        r_x       = 1'b0;
-        r_r       = {DSZ{1'b0}};  /// return stack
-        rpush     = 1'b0;
-        rpop      = 1'b0;
+        r_x       = '0;
+        r_r       = {DSZ{'0}};    /// return stack
+        rpush     = '0;
+        rpop      = '0;
         // IO
-        a_x       = 1'b0;
-        a_r       = {ASZ{1'b0}};  /// address
-        asel_r    = 1'b0;
-        ibuf_x    = 1'b0;
-        obuf_x    = 1'b0;
-        dwe       = 1'b0;         /// data write enable
-        dsel_x    = 1'b0;         /// data bus
+        a_x       = '0;
+        a_r       = {ASZ{'0}};    /// address
+        asel_r    = '0;
+        ibuf_x    = '0;
+        obuf_x    = '0;
+        dwe       = '0;           /// data write enable
+        dsel_x    = '0;           /// data bus
         dsel_r    = 3;            /// data byte select
         ///
         /// external module control flags
         ///
-        shr_f     = 1'b0;         /// shifter flag
+        shr_f     = '0;           /// shifter flag
 /*
         if (!$cast(code_r, data_i)) begin
             /// JVM opcodes, some are not avialable yet
@@ -300,9 +300,9 @@ module eJ32 #(
         sastore:
             case (phase)
             /* CC: logic changed
-            0: begin BUSY(1); MEM(s); spop = 1'b1; end
+            0: begin BUSY(1); MEM(s); spop = '1; end
             1: begin BUSY(2); MEM(a + 1); DW(2); end
-            2: begin BUSY(3); POP(); DW(3); asel_r = 1'b1; end
+            2: begin BUSY(3); POP(); DW(3); asel_r = '1; end
             */
             0: begin BUSY(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_r = 2; end
             1: begin BUSY(2); MEM(a + 1); DW(3); end
@@ -441,16 +441,16 @@ module eJ32 #(
 // registers
     always_ff @(posedge clk, posedge rst) begin
         if (rst) begin
-            phase <= 3'b0;
-            asel  <= 1'b0;
+            phase <= '0;
+            asel  <= '0;
             dsel  <= 3;
             sp    <= 0;
             rp    <= 0;
             ibuf  <= TIB;
             obuf  <= OBUF;
-            t     <= {DSZ{1'b0}};
-            a     <= {ASZ{1'b0}};
-            p     <= {ASZ{1'b0}};
+            t     <= {DSZ{'0}};
+            a     <= {ASZ{'0}};
+            p     <= {ASZ{'0}};
         end
         else if (clk) begin
             phase <= phase_r;
