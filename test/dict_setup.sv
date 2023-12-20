@@ -2,6 +2,7 @@
 /// eJ32 Dictionary Setup Testbench
 ///
 `include "../source/eJ32_if.sv"
+
 module dict_setup #(
     parameter MEM0 = 'h0,       /// starting address of memory block
     parameter TIB  = 'h1000,    /// terminal input buffer
@@ -11,31 +12,31 @@ module dict_setup #(
     ) (
     mb8_io b8_if,               /// 8-bit memory bus master
     input  clk,
-    output logic [ASZ-1:0] ctx, /// context
-    output logic [ASZ-1:0] here /// starting CP
+    output `IU ctx,              /// context
+    output `IU here              /// starting CP
     );
     localparam P2N_SZ = 200;
     localparam CTX    = 'h0d4d; /// starting context (hardcoded for now)
 
     typedef struct {
-        logic[ASZ-1:0] nfa;
-        logic[ASZ-1:0] pfa;
+        `IU nfa;
+        `IU pfa;
     } t_p2n;
-    logic [7:0] rom[OBUF-1:0];
-    logic [7:0] p2n_sz;
-    t_p2n       p2n[P2N_SZ-1:0];
+    `U8 rom[OBUF];
+    `U8 p2n_sz;
+    t_p2n       p2n[P2N_SZ];
 
     string tib = "123 456 +";
 
-    task add_u8([ASZ-1:0] ax, [7:0] vx);
+    task add_u8(`IU ax, `U8 vx);
         repeat(1) @(posedge clk) begin
             b8_if.put_u8(ax, vx);
         end
     endtask: add_u8
 
     task read_rom;
-        automatic logic[7:0] c;
-        automatic logic[DSZ-1:0] v;
+        automatic `U8 c;
+        automatic `DU v;
         automatic int f = $fopen("../source/eJsv32.hex", "r");
         automatic int i = 0;
         $display("ROM fed from file %d", MEM0, f);
@@ -74,10 +75,10 @@ module dict_setup #(
     endtask: setup_tib
 
     task build_p2n;
-        automatic logic[ASZ-1:0] a = ctx;
+        automatic `IU a = ctx;
         automatic integer i;
         for (i=0; a && i<P2N_SZ; i++) begin
-            automatic logic[7:0] len = rom[a] & 'h1f;
+            automatic `U8 len = rom[a] & 'h1f;
             p2n[i].nfa = a;
             p2n[i].pfa = a + len + 'h1;
             a = {rom[a-2], rom[a-1]};
@@ -85,16 +86,16 @@ module dict_setup #(
         p2n_sz = i;
     endtask: build_p2n
 
-    function logic[ASZ-1:0] to_name(logic [ASZ-1:0] pfa);
-        automatic logic[ASZ-1:0] a = 'h0;
+    function `IU to_name(`IU pfa);
+        automatic `IU a = 'h0;
         for (int i=0; i<p2n_sz && a=='h0; i++) begin
             if (p2n[i].pfa == pfa) a = p2n[i].nfa;
         end
         to_name = a;
     endfunction: to_name
 
-    task to_s(logic[ASZ-1:0] nfa);
-        automatic logic[7:0] len = rom[nfa] & 'h1f;
+    task to_s(`IU nfa);
+        automatic `U8 len = rom[nfa] & 'h1f;
         for (int i=1; i<=len; i++) begin
             $write("%c", rom[nfa+i]);
         end
@@ -102,7 +103,7 @@ module dict_setup #(
 
     task words;
         for (int i=0; i<p2n_sz; i++) begin
-            automatic logic[ASZ-1:0] a = p2n[i].nfa;
+            automatic `IU a = p2n[i].nfa;
             $write("%c%4x: ", rom[a] & 'h80 ? "*" : " ", a + (rom[a] & 'h1f) + 'h1);
             to_s(a);
             $display("");

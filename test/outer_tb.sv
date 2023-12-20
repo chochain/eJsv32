@@ -17,29 +17,30 @@ module outer_tb #(
     localparam RSZ = $clog2(RS_DEPTH);
     localparam DOT = 'h2e;
 
-    logic [7:0]      data_o_i, data_o_o, code_o;
-    logic [DSZ-1:0]  s_o, t_o;
-    logic [ASZ-1:0]  addr_o_o, p_o, a_o;
-    logic [2:0]      phase_o;
-    logic [SSZ-1:0]  sp_o;
-    logic [RSZ-1:0]  rp_o;
-    logic            write_o;
+    `U8 code_o;
+    `DU t_o, s_o, r_o;
+    `IU addr_o, p_o, a_o;
+    `U8 data_i, data_o;
+    `U3 phase_o;
+    `U5 sp_o;
+    `U5 rp_o;
+    `U1 dwe_o;
 
-    logic            clk, rst;
-    logic [ASZ-1:0]  ctx, here;
+    `U1 clk, rst;
+    `IU ctx, here;
     //
     // return address to nfa (for tracing)
     //
-    logic [ASZ-1:0] ra2nfa[RS_DEPTH-1:0];
+    `IU ra2nfa[RS_DEPTH];
 
     mb8_io      b8_if();
     spram8_128k m0(b8_if.slave, ~clk);
 
     dict_setup  #(MEM0, TIB, OBUF) dict(.*, .b8_if(b8_if.master));
-    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) ej32(.clk, .clr(rst), .*);
+    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) ej32(.clk, .rst, .*);
 
 
-    task at([ASZ-1:0] ax, [1:0] opt);
+    task at(`IU ax, `U2 opt);
         repeat(1) @(posedge clk) begin
             case (opt)
             'h1: $write("%02x", b8_if.vo);
@@ -49,7 +50,7 @@ module outer_tb #(
         end
     endtask: at
 
-    task dump_row(input [ASZ-1:0] a1);
+    task dump_row(`IU a1);
         $write("\n%04x:", a1);
         at(a1, 'h0);                     // prefetch one memory cycle
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
@@ -63,8 +64,8 @@ module outer_tb #(
         end
     endtask: dump_row
 
-    task dump(input [ASZ-1:0] addr, input [ASZ-1:0] len);
-        automatic logic [ASZ-1:0] a0 = addr & ~'hf;
+    task dump(input `IU addr, input `IU len);
+        automatic `IU a0 = addr & ~'hf;
         for (integer a1=a0; a1 < (a0 + len + 'h10); a1 += 'h10) begin
             dump_row(a1);
         end
@@ -93,16 +94,16 @@ module outer_tb #(
     endtask: activate
 
     task trace;
-        automatic jvm_opcode code;
+        automatic opcode_t code;
         if (!$cast(code, code_o)) begin
             /// JVM opcodes, some are not avialable yet
             code = op_err;
         end
         $write(
             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time/10, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code_o, phase_o, code.name);
+            $time/10, p_o, a_o, data_i, data_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code_o, phase_o, code.name);
         if (code==invokevirtual && phase_o==2) begin
-            automatic logic[ASZ-1:0] nfa = dict.to_name(addr_o_o);
+            automatic `IU nfa = dict.to_name(addr_o);
             for (int i=0; i<rp_o; i++) $write("  ");
             $write(" :: ");
             ra2nfa[rp_o] = nfa;
@@ -118,11 +119,11 @@ module outer_tb #(
 
     always #5 clk  = ~clk;
 
-    assign data_o_i = b8_if.vo;
+    assign data_i = b8_if.vo;
 
     always_comb begin
-        if (write_o) b8_if.put_u8(addr_o_o, data_o_o);
-        else         b8_if.get_u8(addr_o_o);
+        if (dwe_o) b8_if.put_u8(addr_o, data_o);
+        else       b8_if.get_u8(addr_o);
     end
 
     initial begin
