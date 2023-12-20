@@ -76,7 +76,7 @@ module spram8_128k (
     mb8_io b8_if,
     input  clk
     );
-    logic [1:0] m, _m; /// byte index of (current and previous cycle)
+    logic [1:0] m, m_r; /// byte index of (current and previous cycle)
     
     mb32_io     b32_if(clk);
     spram32_32k m0(b32_if.slave, clk);
@@ -86,12 +86,12 @@ module spram8_128k (
     assign b32_if.bmsk = 4'b1 << m;
     assign b32_if.ai   = b8_if.ai[16:2];
     assign b32_if.vi   = {b8_if.vi, b8_if.vi, b8_if.vi, b8_if.vi};
-    assign b8_if.vo    = _m[1:1]         /// byte mask from previous cycle
-            ? (_m[0:0] ? b32_if.vo[31:24] : b32_if.vo[23:16])
-            : (_m[0:0] ? b32_if.vo[15:8]  : b32_if.vo[7:0]);
+    assign b8_if.vo    = m_r[1:1]        /// byte mask from previous cycle
+            ? (m_r[0:0] ? b32_if.vo[31:24] : b32_if.vo[23:16])
+            : (m_r[0:0] ? b32_if.vo[15:8]  : b32_if.vo[7:0]);
     
     always_ff @(posedge clk) begin
-        if (!b8_if.we) _m <= m;          /// read needs to wait for one cycle
+        if (!b8_if.we) m_r <= m;         /// read needs to wait for one cycle
     end
 endmodule : spram8_128k
 `endif // EJ32_SPRAM
