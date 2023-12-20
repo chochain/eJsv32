@@ -4,10 +4,23 @@
 `ifndef EJ32_EJ32_IF
 `define EJ32_EJ32_IF
 
+`define U1 logic
+`define U2 logic[1:0]
+`define U3 logic[2:0]
+`define U5 logic[4:0]
+`define U8 logic[7:0]
+`define IU logic[ASZ-1:0]
+`define DU logic[DSZ-1:0]
+`define DU2 logic[(DSZ*2)-1:0]
+
+typedef enum logic [1:0] { EQ  = 2'b0, GE   = 2'b01, GT  = 2'b10, LE   = 2'b11 } tos_sign;
 typedef enum logic [1:0] { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
 
+interface eJ32_ctl(input logic clk);
+endinterface: eJ32_ctl
+
 interface mb32_io(input logic clk);
-    logic        we;
+    logic     we;
     logic [3:0]  bmsk;
     logic [14:0] ai;
     logic [31:0] vi;
