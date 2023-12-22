@@ -9,12 +9,12 @@
 `define U3 logic[2:0]
 `define U5 logic[4:0]
 `define U8 logic[7:0]
-`define IU logic[ASZ-1:0]
-`define DU logic[DSZ-1:0]
-`define DU2 logic[(DSZ*2)-1:0]
+`define IU logic[16:0]
+`define DU logic[31:0]
+`define DU2 logic[63:0]
 
-typedef enum logic [1:0] { EQ  = 2'b0, GE   = 2'b01, GT  = 2'b10, LE   = 2'b11 } tos_sign;
-typedef enum logic [1:0] { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
+typedef enum `U2 { EQ  = 2'b0, GE   = 2'b01, GT  = 2'b10, LE   = 2'b11 } tos_sign;
+typedef enum `U2 { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
 
 interface eJ32_ctl(input logic clk);
 endinterface: eJ32_ctl
