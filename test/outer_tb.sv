@@ -7,40 +7,34 @@
 module outer_tb #(
     parameter MEM0 = 'h0,       /* memory block addr  */
     parameter TIB  = 'h1000,    /* input buffer ptr   */
-    parameter OBUF = 'h1400,    /* output buffer ptr  */
-    parameter DSZ  = 32,        /* 32-bit data width  */
-    parameter ASZ  = 17,        /* 128K address space */
-    parameter SS_DEPTH = 32,
-    parameter RS_DEPTH = 32
+    parameter OBUF = 'h1400     /* output buffer ptr  */
     );
-    localparam SSZ = $clog2(SS_DEPTH);
-    localparam RSZ = $clog2(RS_DEPTH);
     localparam DOT = 'h2e;
-
-    `U8 code_o;
-    `DU t_o, s_o, r_o;
-    `IU addr_o, p_o, a_o;
-    `U8 data_i, data_o;
-    `U3 phase_o;
-    `U5 sp_o;
-    `U5 rp_o;
-    `U1 dwe_o;
-
-    `U1 clk, rst;
-    `IU ctx, here;
+    // debug output
+    `U8  code_o;
+    `DU  t_o, s_o, r_o;
+    `IU  addr_o, p_o, a_o;
+    `U8  data_i, data_o;
+    `U3  phase_o;
+    `U5  sp_o;
+    `U5  rp_o;
+    `U1  dwe_o;
+    // ej32 control
+    `U1  clk, rst;
+    `IU  ctx, here;
     //
     // return address to nfa (for tracing)
     //
-    `IU ra2nfa[RS_DEPTH];
+    `IU ra2nfa[32];
 
     mb8_io      b8_if();
     spram8_128k m0(b8_if.slave, ~clk);
 
     dict_setup  #(MEM0, TIB, OBUF) dict(.*, .b8_if(b8_if.master));
-    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) ej32(.clk, .rst, .*);
+    eJ32        #(TIB, OBUF)       ej32(.clk, .rst, .*);
 
 
-    task at(`IU ax, `U2 opt);
+    task at(input `IU ax, input `U2 opt);
         repeat(1) @(posedge clk) begin
             case (opt)
             'h1: $write("%02x", b8_if.vo);
@@ -50,7 +44,7 @@ module outer_tb #(
         end
     endtask: at
 
-    task dump_row(`IU a1);
+    task dump_row(input `IU a1);
         $write("\n%04x:", a1);
         at(a1, 'h0);                     // prefetch one memory cycle
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
