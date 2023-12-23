@@ -4,9 +4,10 @@
 // Chen-hanson Ting, 20220110 eJsv32k.v in Quartus II SystemVerilog-2005
 // Chochain Lee      20220209 to eJ32 for Lattice and future versions
 // Chochain Lee      20230216 consolidate ALU modules, tiddy macro tasks
+// Chochain Lee      20231216 modulization
 //
-`include "../source/eJ32_if.sv"
 `include "../source/eJ32.vh"
+`include "../source/eJ32_if.sv"
 
 `define PHASE0 phase_n = 0
 
@@ -18,14 +19,13 @@ module eJ32 #(
     parameter SS_DEPTH = 32,              ///> 32 deep data stack
     parameter RS_DEPTH = 32               ///> 32 deep return stack
     ) (
-    input  `U1 clk, rst,
+    ej32_ctl ctl,
     input  `U8 data_i,
     // instruction
-    output `U8 code_o,
     output `U3 phase_o,
     output `IU p_o, a_o,
     // data stack
-    output `DU t_o, s_o, 
+    output `DU s_o,
     output `U5 sp_o,
     // return stack 
     output `DU r_o,
@@ -38,11 +38,10 @@ module eJ32 #(
     /// @defgroup Registers
     /// @{
     // instruction
-    opcode_t code;              ///> JVM opcode
     `U3  phase;                 ///> FSM phase (aka state)
     `IU  p, a;                  ///> program counter, instruction pointer
     // data stack
-    `DU  t, s;                  ///> TOS, NOS
+    `DU  s;                     ///> NOS
     `DU  ss[SS_DEPTH];          ///> data stack, 3K LUTs, TODO: use EBR memory
     `U5  sp;                    ///> data stack pointers, sp1 = sp + 1
     // return stack
@@ -74,20 +73,22 @@ module eJ32 #(
     /// @defgroup Wires
     /// @{
     // instruction
-    `U1 code_x;                ///> instruction unit control
-    `U1 p_x, a_x;              ///> address controls
-    `IU a_d;                   ///> combine address + data
+    opcode_t code;              ///> shadow ctl.code
+    `U1 code_x;                 ///> instruction unit control
+    `U1 p_x, a_x;               ///> address controls
+    `IU a_d;                    ///> combine address + data
     // data stack
-    `U1 t_x, t_z, t_neg;       ///> TOS controls
-    `DU t_d;                   ///> combined t & data
-    `U5 sp1;                   ///> data stack pointers, sp1 = sp + 1
-    `U1 s_x, spush, spop;      ///> data stack controls
+    `DU t;                      ///> shadow TOS
+    `U1 t_x, t_z, t_neg;        ///> TOS controls
+    `DU t_d;                    ///> combined t & data
+    `U5 sp1;                    ///> data stack pointers, sp1 = sp + 1
+    `U1 s_x, spush, spop;       ///> data stack controls
     // return stack
-    `U5 rp1;                   ///> return stack pointers
-    `U1 r_x, rpush, rpop;      ///> return stack controls
+    `U5 rp1;                    ///> return stack pointers
+    `U1 r_x, rpush, rpop;       ///> return stack controls
     // IO
-    `U1 dwe, dsel_x;           ///> data/addr bus controls
-    `U1 ibuf_x, obuf_x;        ///> input/output buffer controls
+    `U1 dwe, dsel_x;            ///> data/addr bus controls
+    `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -125,7 +126,6 @@ module eJ32 #(
     .bits(t[4:0]),
     .r(iushr_o)
     );
-
     task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
     task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
     // data stack
@@ -136,8 +136,8 @@ module eJ32 #(
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input `IU a); a_n = a; `SET(a_x);    endtask;   /* build addr ptr    */
-    task JMP(input `IU a);  p_n = a; `SET(a_x);    endtask;   /* jmp and clear a   */
+    task SETA(input `IU a); a_n = a; `SET(a_x);    endtask;   // build addr ptr
+    task JMP(input `IU a);  p_n = a; `SET(a_x);    endtask;   // jmp and clear a
     task ZBRAN(input `U1 f);
         case (phase)
         0: begin STEP(1); SETA(data); end
@@ -148,12 +148,12 @@ module eJ32 #(
     task IBRAN(input `U1 f);
         case (phase)
         0: begin STEP(1); ALU(s - t); SETA(data); end
-        1: begin STEP(2); POP(); if (f) JMP(a_d); end    /* pop off s; jmp */
+        1: begin STEP(2); POP(); if (f) JMP(a_d); end    // pop off s; jmp
         default: `PHASE0;
         endcase
     endtask: IBRAN
     // memory unit
-    task MEM(input `IU a);  SETA(a); `SET(asel_n); endtask;   /* fetch from memory, data returns next cycle */
+    task MEM(input `IU a);  SETA(a); `SET(asel_n); endtask;   // fetch from memory, data returns next cycle
     task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask;
     // external
     task DIV(input `DU v);
@@ -205,19 +205,18 @@ module eJ32 #(
     assign r      = rs[rp];                   ///> return stack, TODO: EBR
     assign a_d    = {a[ASZ-9:0], data};       ///> shift combined address
     assign t_d    = {t[DSZ-9:0], data};       ///> shift combined t (top of stack)
-    assign t_z    = t == 0;                   ///> TOS zero flag
-    assign t_neg  = t[DSZ-1];                 ///> TOS neg flag
     assign sp1    = sp + 1;
     assign rp1    = rp + 1;
-    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
     ///
     /// IO signals wires
     ///
-    assign code_o   = code;
+    assign code     = ctl.code;
+    assign t        = ctl.t;
+    assign t_z      = ctl.t_z;
+    assign t_neg    = ctl.t_neg;
     assign phase_o  = phase;
     assign p_o      = p;
     assign a_o      = a;
-    assign t_o      = t;
     assign s_o      = s;
     assign r_o      = r;
     assign sp_o     = sp;
@@ -234,6 +233,7 @@ module eJ32 #(
                         : (dsel == 1)
                             ? t[23:16]
                             : t[31:24];
+    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
     ///
     /// combinational
     ///
@@ -243,7 +243,7 @@ module eJ32 #(
         /// instruction dispatcher
         ///
         case (code)
-        nop        : begin /* do nothing */ end
+        nop        : begin end  // do nothing
         aconst_null: PUSH(0);
         iconst_m1  : PUSH(-1);
         iconst_0   : PUSH(0);
@@ -263,7 +263,7 @@ module eJ32 #(
             1: begin STEP(2); TOS(t_d); end
             default: `PHASE0;
             endcase
-        iload:   PUSH(rs[rp - data]);  // CC: not tested
+        iload:   PUSH(rs[rp - data]);    // CC: not tested
         iload_0: PUSH(rs[rp]);           // CC: not tested
         iload_1: PUSH(rs[rp - 1]);       // CC: not tested
         iload_2: PUSH(rs[rp - 2]);       // CC: not tested
@@ -308,11 +308,10 @@ module eJ32 #(
             endcase
         sastore:
             case (phase)
-            /* CC: logic changed
-            0: begin WAIT(1); MEM(s); `SET(spop); end
-            1: begin WAIT(2); MEM(a + 1); DW(2); end
-            2: begin WAIT(3); POP(); DW(3); `SET(asel_n); end
-            */
+            // CC: logic changed
+            // 0: begin WAIT(1); MEM(s); `SET(spop); end
+            // 1: begin WAIT(2); MEM(a + 1); DW(2); end
+            // 2: begin WAIT(3); POP(); DW(3); `SET(asel_n); end
             0: begin WAIT(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_n = 2; end
             1: begin WAIT(2); MEM(a + 1); DW(3); end
             2: begin WAIT(3); DW(3); POP(); end
@@ -447,9 +446,9 @@ module eJ32 #(
         default: `PHASE0;
         endcase
     end
-// registers
-    always_ff @(posedge clk, posedge rst) begin
-        if (rst) begin
+    // registers
+    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+        if (ctl.rst) begin
             phase <= 3'b0;
             asel  <= 1'b0;
             dsel  <= 3;
@@ -457,19 +456,18 @@ module eJ32 #(
             rp    <= '0;
             ibuf  <= TIB;
             obuf  <= OBUF;
-            t     <= {DSZ{1'b0}};
             a     <= {ASZ{1'b0}};
             p     <= {ASZ{1'b0}};
         end
-        else if (clk) begin
+        else if (ctl.clk) begin
             phase <= phase_n;
             asel  <= asel_n;
             // instruction
-            if (code_x)    code <= code_n;
+            if (code_x)    ctl.code <= code_n;
             if (p_x)       p    <= p_n;
             if (a_x)       a    <= a_n;
             // data stack
-            if (t_x)       t    <= t_n;
+            if (t_x)       ctl.t  <= t_n;
             if      (s_x)  ss[sp] <= t;
             else if (spop)  begin sp <= sp - 1; end
             else if (spush) begin ss[sp1] <= t; sp <= sp + 1; end   // CC: ERROR -> EBR with multiple writers
@@ -501,7 +499,7 @@ module eJ32 #(
                 end
                 assert(code_x == 1) else begin
                     $write(", code_x=%d code_n=%s, p=%4x forced +1", code_x, code_n.name, p);
-                    code <= code_n; p <= p + 1;
+                    ctl.code <= code_n; p <= p + 1;
                 end
                 assert(spop == 1) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
@@ -509,7 +507,7 @@ module eJ32 #(
                 end
                 assert(t_n == (t_n==(idiv ? div_q : div_r))) else begin
                     $write(", t_x=%d t_n=%8x =q/r", t_x, t_n);
-                    t <= code==idiv ? div_q : div_r;
+                    ctl.t <= code==idiv ? div_q : div_r;
                 end
                 $display(" :ERR");
             end
