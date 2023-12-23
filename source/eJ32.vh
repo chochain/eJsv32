@@ -140,8 +140,8 @@ typedef enum `U8 {  ///> JVM opcodes
         op_err = 'hff
 } opcode_t /*verilator public*/;
 
-typedef enum `U2 { EQ  = 2'b0, GT   = 2'b01, GE  = 2'b10, LT  = 2'b11 } tos_sign /*verilator public*/;
-typedef enum `U2 { NOP = 2'b0, PUSH = 2'b01, PICK= 2'b10, POP = 2'b11 } stack_op /*verilator public*/;
+typedef enum `U2 { tEQ  = 2'b0, tGT   = 2'b01, tGE  = 2'b10, tLT  = 2'b11 } tos_sign /*verilator public*/;
+typedef enum `U2 { sNOP = 2'b0, sPUSH = 2'b01, sMOVE= 2'b10, sPOP = 2'b11 } stack_op /*verilator public*/;
 
 endpackage: ej32_pkg
 `endif // EJ32_EJ32_VH
