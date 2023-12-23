@@ -2,9 +2,10 @@
 /// eJ32 Outer Interpreter Testbench
 ///
 `timescale 1ps / 1ps
-
 `include "../source/eJ32.vh"
 `include "../source/eJ32_if.sv"
+
+import ej32_pkg::*;             // import enum types
 
 module outer_tb #(
     parameter MEM0 = 'h0,       // memory block addr
@@ -83,8 +84,8 @@ module outer_tb #(
 
     task activate;
         b8_if.get_u8(0);
-        repeat(1) @(posedge ctl.clk) ctl.rst = 1;
-        repeat(1) @(posedge ctl.clk) ctl.rst = 0;
+        repeat(1) @(posedge ctl.clk) ctl.rst = 1'b1;
+        repeat(1) @(posedge ctl.clk) ctl.rst = 1'b0;
     endtask: activate
 
     task trace;
@@ -121,9 +122,8 @@ module outer_tb #(
     end
     
     initial begin
-        ctl.clk = 1'b0;
+        ctl.clk = 1'b1;       // memory fetch on negative edge
         ctl.rst = 1'b1;
-        ctl.t   = 32'b0;
 
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
