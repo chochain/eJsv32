@@ -2,6 +2,8 @@
 /// eJ32 Outer Interpreter Testbench
 ///
 `timescale 1ps / 1ps
+
+`include "../source/eJ32.vh"
 `include "../source/eJ32_if.sv"
 
 module outer_tb #(
