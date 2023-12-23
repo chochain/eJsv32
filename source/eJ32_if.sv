@@ -7,6 +7,7 @@
 `include "../source/eJ32.vh"
 
 interface ej32_ctl;
+   import ej32_pkg::*;
    `U1  clk;
    `U1  rst;
    `DU  t;                     // use bus as TOS register
@@ -61,6 +62,7 @@ interface mb8_io;
 endinterface : mb8_io
 
 interface ss_io();
+    import ej32_pkg::*;
     stack_op op;
     `DU vi;
     `DU s;
@@ -80,4 +82,5 @@ interface ss_io();
     
 endinterface: ss_io
 `endif // EJ32_EJ32_IF
+
 

@@ -35,6 +35,7 @@ module eJ32 #(
     output `U8 data_o,
     output `U1 dwe_o
     );
+    import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
     // instruction
