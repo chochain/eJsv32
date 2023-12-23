@@ -71,12 +71,12 @@ interface ss_io();
     modport slave(input op, vi, output s);
 
     function void push(input `DU v);
-        op  = PUSH;
+        op  = sPUSH;
         vi  = v;
     endfunction: push
 
     function `DU pop;
-        op   = POP;
+        op   = sPOP;
         pop  = s;
     endfunction: pop
     

@@ -83,10 +83,12 @@ module eJ32 #(
     `U1 t_x, t_z, t_neg;        ///> TOS controls
     `DU t_d;                    ///> combined t & data
     `U5 sp1;                    ///> data stack pointers, sp1 = sp + 1
-    `U1 s_x, spush, spop;       ///> data stack controls
+    `U1 s_x;                    ///> data stack controls
+    stack_op ss_op;
     // return stack
     `U5 rp1;                    ///> return stack pointers
-    `U1 r_x, rpush, rpop;       ///> return stack controls
+    `U1 r_x;                    ///> return stack controls
+    stack_op rs_op;
     // IO
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
@@ -131,9 +133,9 @@ module eJ32 #(
     task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
     // data stack
     task TOS(input `DU v);  t_n = v; `SET(t_x);    endtask;
-    task ALU(input `DU v);  TOS(v); `SET(spop);    endtask;
-    task PUSH(input `DU v); TOS(v); `SET(spush);   endtask;
-    task POP();             TOS(s); `SET(spop);    endtask;
+    task ALU(input `DU v);  TOS(v); ss_op = sPOP;  endtask;
+    task PUSH(input `DU v); TOS(v); ss_op = sPUSH; endtask;
+    task POP();             TOS(s); ss_op = sPOP;  endtask;
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
@@ -175,13 +177,9 @@ module eJ32 #(
         code_x    = 1'b1;
         t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
-        s_x       = 1'b0;         /// data stack
-        spush     = 1'b0;
-        spop      = 1'b0;
+        ss_op     = sNOP;
         r_n       = {DSZ{1'b0}};  /// return stack
-        r_x       = 1'b0;
-        rpush     = 1'b0;
-        rpop      = 1'b0;
+        rs_op     = sNOP;
         dsel_x    = 1'b0;         /// data bus
         dsel_n    = 3;
         dwe       = 1'b0;         /// data write
@@ -291,10 +289,10 @@ module eJ32 #(
             2: begin WAIT(3); TOS(t_d); end
             default: `PHASE0;
             endcase
-        istore_0: begin r_n = t; `SET(r_x); POP(); end  // CC: not tested
+        istore_0: begin r_n = t; rs_op = sMOVE; POP(); end  // CC: not tested
         iastore:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_n = 0; end
+            0: begin WAIT(1); MEM(`XDA(s)); ss_op = sPOP; `SET(dsel_x); dsel_n = 0; end
             1: begin WAIT(2); MEM(a + 1); DW(1); end
             2: begin WAIT(3); MEM(a + 1); DW(2); end
             3: begin WAIT(4); MEM(a + 1); DW(3); end
@@ -303,7 +301,7 @@ module eJ32 #(
             endcase
         bastore:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(s)); `SET(spop); end
+            0: begin WAIT(1); MEM(`XDA(s)); ss_op = sPOP; end
             1: begin WAIT(2); POP(); DW(3); end
             default: `PHASE0;       // CC: extra cycle
             endcase
@@ -313,7 +311,7 @@ module eJ32 #(
             // 0: begin WAIT(1); MEM(s); `SET(spop); end
             // 1: begin WAIT(2); MEM(a + 1); DW(2); end
             // 2: begin WAIT(3); POP(); DW(3); `SET(asel_n); end
-            0: begin WAIT(1); MEM(`XDA(s)); `SET(spop); `SET(dsel_x); dsel_n = 2; end
+            0: begin WAIT(1); MEM(`XDA(s)); ss_op = sPOP; `SET(dsel_x); dsel_n = 2; end
             1: begin WAIT(2); MEM(a + 1); DW(3); end
             2: begin WAIT(3); DW(3); POP(); end
             default: `PHASE0;
@@ -324,7 +322,7 @@ module eJ32 #(
             0: begin WAIT(1); POP(); end
             default: begin `PHASE0; POP(); end
             endcase
-        dup: `SET(spush);
+        dup: ss_op = sPUSH;
         dup_x1:                     // CC: logic changed since a_n is 16-bit only
             case (phase)
             0: begin WAIT(1); PUSH(s); end
@@ -339,7 +337,7 @@ module eJ32 #(
             2: begin WAIT(3); PUSH(s); end
             default: `PHASE0;
             endcase
-        swap: begin TOS(s); `SET(s_x); end
+        swap: begin TOS(s); ss_op = sMOVE; end
         //
         // ALU ops
         //
@@ -401,12 +399,12 @@ module eJ32 #(
         ret: JMP(`XDA(r));
         jreturn:
             case (phase)
-            0: begin STEP(1); `SET(rpop); JMP(`XDA(r)); end
+            0: begin STEP(1); rs_op = sPOP; JMP(`XDA(r)); end
             default: `PHASE0;
             endcase
         invokevirtual:
             case (phase)
-            0: begin STEP(1); SETA(`X8A(data)); r_n = `XAD(p) + 2; `SET(rpush); end
+            0: begin STEP(1); SETA(`X8A(data)); r_n = `XAD(p) + 2; rs_op = sPUSH; end
             1: begin STEP(2); JMP(a_d); end
             default: `PHASE0;
             endcase
@@ -414,9 +412,9 @@ module eJ32 #(
             case (phase)
             0: begin STEP(1); SETA(`X8A(data)); end
             1: begin STEP(2);
-               if (r == 0) begin `SET(rpop); end
+               if (r == 0) begin rs_op = sPOP; end
                else begin
-                  r_n = r - 1; `SET(r_x);
+                  r_n = r - 1; rs_op = sMOVE;
                   JMP(a_d);
                end
             end
@@ -430,12 +428,12 @@ module eJ32 #(
             3: begin STEP(4); TOS(t_d); end
             default: `PHASE0;
             endcase
-        popr: begin PUSH(r); `SET(rpop); end
-        pushr:begin POP(); r_n = t; `SET(rpush); end
+        popr: begin PUSH(r); rs_op = sPOP; end
+        pushr:begin POP(); r_n = t; rs_op = sPUSH; end
         dupr: PUSH(r);
         get:
             case (phase)
-            0: begin WAIT(1); MEM(ibuf); `SET(spush); end
+            0: begin WAIT(1); MEM(ibuf); ss_op = sPUSH; end
             1: begin WAIT(2); TOS(`X8D(data)); `SET(ibuf_x); end
             default: `PHASE0;     // CC: extra memory cycle
             endcase
@@ -469,14 +467,18 @@ module eJ32 #(
             if (a_x)       a    <= a_n;
             // data stack
             if (t_x)       ctl.t  <= t_n;
-            if      (s_x)  ss[sp] <= t;
-            else if (spop)  begin sp <= sp - 1; end
-            else if (spush) begin ss[sp1] <= t; sp <= sp + 1; end   // CC: ERROR -> EBR with multiple writers
-//            else if (spush) begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
+            case (ss_op)
+            sMOVE: ss[sp] <= t;
+            sPOP:  sp <= sp - 1;
+            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end // CC: ERROR -> EBR with multiple writers
+//          PUSH: begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
+            endcase
             // return stack
-            if (r_x)      rs[rp] <= r_n;
-            else if (rpop)  begin rp <= rp - 1; end
-            else if (rpush) begin rs[rp1] <= r_n; rp <= rp + 1; end
+            case (rs_op)
+            sMOVE: rs[rp] <= r_n;
+            sPOP:  rp <= rp - 1;
+            sPUSH: begin rs[rp1] <= r_n; rp <= rp + 1; end
+            endcase
             // memory
             if (dsel_x)    dsel <= dsel_n;
             if (ibuf_x)    ibuf <= ibuf + 1;
@@ -502,7 +504,7 @@ module eJ32 #(
                     $write(", code_x=%d code_n=%s, p=%4x forced +1", code_x, code_n.name, p);
                     ctl.code <= code_n; p <= p + 1;
                 end
-                assert(spop == 1) else begin
+                assert(ss_op == sPOP) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
                     sp <= sp - 1;
                 end
