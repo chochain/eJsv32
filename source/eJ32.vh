@@ -3,7 +3,27 @@
 //
 // Note: https://www.infoworld.com/article/2077625/control-flow.html
 //
-typedef enum logic [7:0] {  ///> JVM opcodes
+// Universal data type
+//
+`define U1 logic
+`define U2 logic[1:0]
+`define U3 logic[2:0]
+`define U5 logic[4:0]
+`define U8 logic[7:0]
+`define IU logic[16:0]
+`define DU logic[31:0]
+`define DU2 logic[63:0]
+//
+// data conversion macros
+//
+`define SET(v) v=1'b1
+`define CLR(v) v=1'b0
+`define X8A(b) { 9'b0,  b }
+`define X8D(b) { 24'b0, b }
+`define XAD(a) { 15'b0, a }
+`define XDA(d) d[16:0]
+
+typedef enum `U8 {  ///> JVM opcodes
         //
         // constants
         //
@@ -118,12 +138,5 @@ typedef enum logic [7:0] {  ///> JVM opcodes
         //
         op_err = 'hff
 } opcode_t /*verilator public*/;
-
-`define SET(v) v = '1
-`define CLR(v) v = '0
-`define X8A(b) {{ASZ-8{'0}}, b}
-`define X8D(b) {{DSZ-8{'0}}, b}
-`define XAD(a) {{DSZ-ASZ{'0}}, a}
-`define XDA(d) d[ASZ-1:0]
 
 `endif // EJ32_EJ32_VH

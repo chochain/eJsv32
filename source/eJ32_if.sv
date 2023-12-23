@@ -4,27 +4,34 @@
 `ifndef EJ32_EJ32_IF
 `define EJ32_EJ32_IF
 
-`define U1 logic
-`define U2 logic[1:0]
-`define U3 logic[2:0]
-`define U5 logic[4:0]
-`define U8 logic[7:0]
-`define IU logic[16:0]
-`define DU logic[31:0]
-`define DU2 logic[63:0]
+`include "../source/eJ32.vh"
 
-typedef enum `U2 { EQ  = 2'b0, GE   = 2'b01, GT  = 2'b10, LE   = 2'b11 } tos_sign;
-typedef enum `U2 { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
+typedef enum `U2 { EQ  = 2'b0, GT   = 2'b01, GE  = 2'b10, LT  = 2'b11 } tos_sign;
+typedef enum `U2 { NOP = 2'b0, PUSH = 2'b01, PICK= 2'b10, POP = 2'b11 } stack_op;
 
-interface eJ32_ctl(input logic clk);
-endinterface: eJ32_ctl
+interface ej32_ctl;
+   `U1  clk;
+   `U1  rst;
+   `DU  t;                     // use bus as TOS register
+   `U1  t_z;
+   `U1  t_neg;
+   `U3  ss_op;
+   `U3  rs_op;
+   opcode_t code;
+   
+   function void tick();
+       clk   = ~clk;
+       t_z   = t == 0;
+       t_neg = t[31];
+   endfunction: tick
+endinterface: ej32_ctl
 
-interface mb32_io(input logic clk);
-    logic     we;
+interface mb32_io(input `U1 clk);
     logic [3:0]  bmsk;
     logic [14:0] ai;
-    logic [31:0] vi;
-    logic [31:0] vo;
+    `U1  we;
+    `DU  vi;
+    `DU  vo;
     
     clocking io_clk @(posedge clk);
         default input #1 output #1;
@@ -35,21 +42,21 @@ interface mb32_io(input logic clk);
 endinterface: mb32_io
 
 interface mb8_io;
-    logic        we;
-    logic [16:0] ai;
-    logic [7:0]  vi;
-    logic [7:0]  vo;
+    `U1  we;
+    `IU  ai;
+    `U8  vi;
+    `U8  vo;
     
     modport master(output we, ai, vi, import put_u8, get_u8);
     modport slave(input we, ai, vi, output vo);
 
-    function void put_u8([16:0] ax, [7:0] vx);
+    function void put_u8(input `IU ax, input `U8 vx);
         we = 1'b1;
         ai = ax;
         vi = vx;
     endfunction: put_u8
     
-    function void get_u8([16:0] ax);
+    function void get_u8(input `IU ax);
         we = 1'b0;
         ai = ax;
         // return vo
@@ -57,19 +64,19 @@ interface mb8_io;
 endinterface : mb8_io
 
 interface ss_io();
-    stack_ops    op;
-    logic [31:0] vi;
-    logic [31:0] s;
+    stack_op op;
+    `DU vi;
+    `DU s;
     
     modport master(input s, output op, vi, import push, pop);
     modport slave(input op, vi, output s);
 
-    function void push(input [31:0] v);
+    function void push(input `DU v);
         op  = PUSH;
         vi  = v;
     endfunction: push
 
-    function logic [31:0] pop;
+    function `DU pop;
         op   = POP;
         pop  = s;
     endfunction: pop
