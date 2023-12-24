@@ -28,6 +28,8 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   + use common tasks and macros to reduce verbosity
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
+  + add control bus with t and stack ops
+  + modulize stacks
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice)
@@ -61,7 +63,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * vsim COLD start - completed
   + 97K cycles, ~/docs/eJ32_trace.txt
 * vsim Dr. Ting's 6 embeded test cases - completed
-  + 600K+ cycles sucessfully, ~/docs/eJ32_trace_full_20220414.txt
+  + 520K+ cycles sucessfully, ~/docs/eJ32_trace_full_20220414.txt
 
 ### TODO
 * read Project-F, https://github.com/projf/projf-explore
