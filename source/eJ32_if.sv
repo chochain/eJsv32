@@ -10,12 +10,12 @@ interface ej32_ctl;
    import ej32_pkg::*;
    `U1  clk;
    `U1  rst;
-   `DU  t;                     // use bus as TOS register
-   `U1  t_z;
-   `U1  t_neg;
-   `U3  ss_op;
-   `U3  rs_op;
-   opcode_t code;
+   opcode_t code;              // opcode
+   `DU  t;                     // TOS, on bus
+   `U1  t_z;                   // TOS zero flag
+   `U1  t_neg;                 // TOS neg flag
+   stack_op ss_op;             // data stack op
+   stack_op rs_op;             // return stack op
    
    function void tick();
        clk   = ~clk;
