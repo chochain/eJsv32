@@ -14,12 +14,12 @@ module outer_tb #(
     );
     localparam DOT = 'h2e;
     // debug output
-    `DU  s_o, r_o;
-    `IU  addr_o, p_o, a_o;
-    `U8  data_i, data_o;
     `U3  phase_o;
+    `IU  addr_o, p_o, a_o;
+    `DU  s_o, r_o;
     `U5  sp_o;
     `U5  rp_o;
+    `U8  data_i, data_o;
     `U1  dwe_o;
     // ej32 control
     `IU  ctx, here;
@@ -96,7 +96,7 @@ module outer_tb #(
         end
         $write(
             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time/10, p_o, a_o, data_i, data_o, rp_o, ej32.rs[rp_o], sp_o, s_o, ctl.t, ctl.code, phase_o, code.name);
+            $time/10, p_o, a_o, data_i, data_o, rp_o, r_o, sp_o, s_o, ctl.t, code, phase_o, code.name);
         if (code==invokevirtual && phase_o==2) begin
             automatic `IU nfa = dict.to_name(addr_o);
             for (int i=0; i<rp_o; i++) $write("  ");
