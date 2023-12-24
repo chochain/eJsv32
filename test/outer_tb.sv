@@ -69,7 +69,7 @@ module outer_tb #(
 
     task verify_tib;
         $display("\ndump tib: 0x%04x", TIB);
-        dump(TIB, 'h120);
+        dump(TIB, 'h200);
     endtask: verify_tib;
 
     task verify_dict;
@@ -79,7 +79,7 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf: 0x%04x", OBUF);
-        dump(OBUF, 'h80);
+        dump(OBUF, 'h600);
     endtask: verify_obuf
 
     task activate;
@@ -130,7 +130,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge ctl.clk) trace();
+        repeat(800000) @(posedge ctl.clk) trace();
         ctl.rst = 1'b1;       // disable eJsv32
 
         verify_dict();        // validate output dictionary words
