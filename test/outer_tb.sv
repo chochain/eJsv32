@@ -124,6 +124,7 @@ module outer_tb #(
     initial begin
         ctl.clk = 1'b1;       // memory fetch on negative edge
         ctl.rst = 1'b1;
+        ctl.t   = 0;
 
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
