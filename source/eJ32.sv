@@ -132,15 +132,15 @@ module eJ32 #(
     task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
     task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
     // data stack
-    task TOS(input `DU v);  t_n = v; `SET(t_x);        endtask;
-    task ALU(input `DU v);  TOS(v); `S(sPOP);  endtask;
-    task PUSH(input `DU v); TOS(v); `S(sPUSH); endtask;
-    task POP();             TOS(s); `S(sPOP);  endtask;
+    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask;
+    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask;
+    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask;
+    task POP();             TOS(s); `S(sPOP);   endtask;
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input `IU a); a_n = a; `SET(a_x);    endtask;   // build addr ptr
-    task JMP(input `IU a);  p_n = a; `SET(a_x);    endtask;   // jmp and clear a
+    task SETA(input `IU a); a_n = a; `SET(a_x); endtask;   // build addr ptr
+    task JMP(input `IU a);  p_n = a; `SET(a_x); endtask;   // jmp and clear a
     task ZBRAN(input `U1 f);
         case (phase)
         0: begin STEP(1); SETA(data); end
@@ -151,7 +151,7 @@ module eJ32 #(
     task IBRAN(input `U1 f);
         case (phase)
         0: begin STEP(1); ALU(s - t); SETA(data); end
-        1: begin STEP(2); POP(); if (f) JMP(a_d); end    // pop off s; jmp
+        1: begin STEP(2); POP(); if (f) JMP(a_d); end      // pop off s; jmp
         default: `PHASE0;
         endcase
     endtask: IBRAN
@@ -168,35 +168,6 @@ module eJ32 #(
         end
         endcase
     endtask: DIV
-    task SET_INIT();
-        a_n       = {ASZ{1'b0}};  /// address
-        a_x       = 1'b0;
-        asel_n    = 1'b0;
-        p_n       = p + 'h1;      /// advance program counter
-        p_x       = 1'b1;
-        code_x    = 1'b1;
-        t_n       = {DSZ{1'b0}};  /// TOS
-        t_x       = 1'b0;
-        r_n       = {DSZ{1'b0}};  /// return stack
-        `S(sNOP);
-        `R(sNOP);
-        dsel_x    = 1'b0;         /// data bus
-        dsel_n    = 3;
-        dwe       = 1'b0;         /// data write
-        ///
-        /// external module control flags
-        ///
-        shr_f     = 1'b0;         /// shifter flag
-
-        if (!$cast(code_n, data)) begin
-            /// JVM opcodes, some are not avialable yet
-            code_n = op_err;
-        end
-
-        phase_n   = 3'b0;         /// phase and IO controls
-        ibuf_x    = 1'b0;
-        obuf_x    = 1'b0;
-    endtask: SET_INIT
     ///
     /// wires to reduce verbosity
     ///
@@ -236,8 +207,40 @@ module eJ32 #(
     ///
     /// combinational
     ///
+    task INIT();
+        a_n       = {ASZ{1'b0}};  /// address
+        a_x       = 1'b0;
+        asel_n    = 1'b0;
+        p_n       = p + 'h1;      /// advance program counter
+        p_x       = 1'b1;
+        code_x    = 1'b1;
+        t_n       = {DSZ{1'b0}};  /// TOS
+        t_x       = 1'b0;
+        r_n       = {DSZ{1'b0}};  /// return stack
+        dsel_x    = 1'b0;         /// data bus
+        dsel_n    = 3;
+        dwe       = 1'b0;         /// data write
+        ///
+        /// external module control flags
+        ///
+        shr_f     = 1'b0;         /// shifter flag
+
+        if (!$cast(code_n, data)) begin
+            /// JVM opcodes, some are not avialable yet
+            code_n = op_err;
+        end
+
+        phase_n   = 3'b0;         /// phase and IO controls
+        ibuf_x    = 1'b0;
+        obuf_x    = 1'b0;
+    endtask: INIT
+    task INIT_STACKS();
+        `S(sNOP);
+        `R(sNOP);
+    endtask: INIT_STACKS
     always_comb begin
-        SET_INIT();
+        INIT();
+        INIT_STACKS();
         ///
         /// instruction dispatcher
         ///
