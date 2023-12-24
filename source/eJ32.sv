@@ -52,7 +52,6 @@ module eJ32 #(
     `DU  rs[RS_DEPTH];          ///> return stack, 3K LUTs, TODO: use EBR memory
     `U5  rp;                    ///> return stack pointers
     // IO
-    `IU  addr;
     `U8  data;
     `IU  ibuf, obuf;            ///> input, output buffer pointers
     `U1  asel;                  ///> address bus mux (P|A)
@@ -191,8 +190,7 @@ module eJ32 #(
     assign r_o      = r;
     assign sp_o     = sp;
     assign rp_o     = rp;
-    assign addr_o   = addr;
-    assign addr     = (asel) ? a : p;         // address, data or instruction
+    assign addr_o   = (asel) ? a : p;         // address, data or instruction
     assign data     = data_i;
     assign data_o   = data_n;
     assign dwe_o    = dwe;
@@ -462,7 +460,7 @@ module eJ32 #(
             sMOVE: ss[sp] <= t;
             sPOP:  sp <= sp - 1;
             sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end // CC: ERROR -> EBR with multiple writers
-//          PUSH: begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
+//          sPUSH: begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
             endcase
             // return stack
             case (ctl.rs_op)
