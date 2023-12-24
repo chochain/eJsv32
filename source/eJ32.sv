@@ -109,7 +109,7 @@ module eJ32 #(
     .r(mul_v)
     );
     div_int   divide_inst(
-    .clk(clk),
+    .clk(ctl.clk),
     .rst(div_rst),
     .x(s),
     .y(t),
