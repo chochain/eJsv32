@@ -37,9 +37,9 @@ module top #(
     ///
     /// debug tasks
     ///
-    assign rp_x    = rp_o;
-    assign addr_x  = addr;
-    assign phase_x = phase_o;
+    assign rp_t    = rp_o;
+    assign addr_t  = addr;
+    assign phase_t = phase_o;
    
     task trace;
         automatic opcode_t code;
