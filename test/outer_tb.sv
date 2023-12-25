@@ -27,7 +27,7 @@ module outer_tb #(
     ej32_ctl    ctl();
     mb8_io      b8_if();
     dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~ctl.clk), .b8_if(b8_if.master), .*);
-    top         top_inst(.*);
+    eJ32        ej32(.*);
 
     task at(input `IU ax, input `U2 opt);
         repeat(1) @(posedge ctl.clk) begin
@@ -112,7 +112,7 @@ module outer_tb #(
 
         activate();           // activate eJsv32
         repeat(1000) @(posedge ctl.clk) begin
-           top_inst.trace();
+           ej32.trace();
            show_callstack();
         end
         ctl.rst = 1'b1;       // disable eJsv32
