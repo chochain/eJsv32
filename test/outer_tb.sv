@@ -2,32 +2,26 @@
 /// eJ32 Outer Interpreter Testbench
 ///
 `timescale 1ps / 1ps
-`include "../source/eJ32.vh"
 `include "../source/eJ32_if.sv"
 
+`define CORE ej32.core
 import ej32_pkg::*;             // import enum types
 
 module outer_tb #(
-    parameter MEM0 = 'h0,       // memory block addr
-    parameter TIB  = 'h1000,    // input buffer ptr
-    parameter OBUF = 'h1400     // output buffer ptr
+    parameter MEM0 = 'h0,       ///> memory block addr
+    parameter TIB  = 'h1000,    ///> input buffer ptr
+    parameter OBUF = 'h1400     ///> output buffer ptr
     );
-    localparam DOT = 'h2e;
-    // dict module
-    `IU  ctx, here;
-    // ej32 module
-    `IU  addr_t;
-    `U3  phase_t;
-    `U5  rp_t;
+    localparam DOT = 'h2e;      ///> '.'
     //
-    // return address to nfa (for tracing)
+    // return address to nfa lookup table (for tracing)
     //
     `IU ra2nfa[32];
-
-    ej32_ctl    ctl();
-    mb8_io      b8_if();
-    dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~ctl.clk), .b8_if(b8_if.master), .*);
-    eJ32        ej32(.*);
+    ///
+    mb8_io      b8_if();        ///> memory bus interface
+    ej32_ctl    ctl();          ///> ej32 control bus
+    eJ32        ej32(.*);       ///> ej32 top module
+    dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~ctl.clk), .b8_if(b8_if.master));
 
     task at(input `IU ax, input `U2 opt);
         repeat(1) @(posedge ctl.clk) begin
@@ -82,23 +76,37 @@ module outer_tb #(
         repeat(1) @(posedge ctl.clk) ctl.rst = 1'b0;
     endtask: activate
 
-    task show_callstack;
+    task trace;
+         automatic `U5 rp  = `CORE.rp;
+         automatic `U3 ph  = `CORE.phase;
+         automatic opcode_t code;
+         if (!$cast(code, ctl.code)) begin
+             /// JVM opcodes, some are not avialable yet
+             code = op_err;
+         end
+         $write(
+             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
+             $time/10, 
+             `CORE.p,  `CORE.a, ej32.data, ej32.data_o,
+             `CORE.rp, `CORE.r,
+             `CORE.sp, `CORE.s, ctl.t,
+             code, `CORE.phase, code.name);
         case (ctl.code)
-        invokevirtual: if (phase_t==2) begin
-            automatic `IU nfa = dict.to_name(addr_t);
-            for (int i=0; i<rp_t; i++) $write("  ");
+        invokevirtual: if (ph==2) begin
+            automatic `IU nfa = dict.to_name(ej32.addr);
+            for (int i=0; i<rp; i++) $write("  ");
             $write(" :: ");
-            ra2nfa[rp_t] = nfa;
+            ra2nfa[rp] = nfa;
             dict.to_s(nfa);
         end
-        jreturn: if (phase_t==0) begin
-            for (int i=0; i<rp_t; i++) $write("  ");
+        jreturn: if (ph==0) begin
+            for (int i=0; i<rp; i++) $write("  ");
             $write(" ;; ");
-            dict.to_s(ra2nfa[rp_t]);
+            dict.to_s(ra2nfa[rp]);
         end
         endcase
         $display("");
-    endtask: show_callstack
+    endtask: trace
    
     always #5 ctl.tick();
 
@@ -111,10 +119,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge ctl.clk) begin
-           ej32.trace();
-           show_callstack();
-        end
+        repeat(1000) @(posedge ctl.clk) trace();
         ctl.rst = 1'b1;       // disable eJsv32
 
         verify_dict();        // validate output dictionary words
