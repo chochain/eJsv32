@@ -162,29 +162,32 @@ module ej32_core #(
     ///
     assign s      = ss[sp];                   ///> data stack, TODO: EBR
     assign r      = rs[rp];                   ///> return stack, TODO: EBR
-    assign a_d    = {a[ASZ-9:0], data};       ///> shift combined address
-    assign t_d    = {t[DSZ-9:0], data};       ///> shift combined t (top of stack)
     assign sp1    = sp + 1;
     assign rp1    = rp + 1;
     ///
     /// IO signals wires
     ///
-    assign code     = ctl.code;
+    assign code     = ctl.code;               ///> input from ej32 control
     assign t        = ctl.t;
     assign t_z      = ctl.t_z;
     assign t_neg    = ctl.t_neg;
-    assign addr_o   = (asel) ? a : p;         // address, data or instruction
-    assign data     = data_i;
-    assign data_o   = data_n;
-    assign dwe_o    = dwe;
-    assign data_n   = (dsel == 3)             // data byte select (Big-Endian)
+    assign addr_o   = (asel) ? a : p;         ///> address, data or instruction
+    assign data     = data_i;                 ///> data from memory bus
+    assign data_o   = data_n;                 ///> data sent to memory bus
+    assign dwe_o    = dwe;                    ///> data write enable
+    assign data_n   = (dsel == 3)             ///> data byte select (Big-Endian)
                     ? t[7:0]
                     : (dsel == 2)
                         ? t[15:8]
                         : (dsel == 1)
                             ? t[23:16]
                             : t[31:24];
+    ///
+    /// wires to external modules
+    ///
     assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
+    assign a_d    = {a[ASZ-9:0], data};       ///> shift combined address
+    assign t_d    = {t[DSZ-9:0], data};       ///> shift combined t (top of stack)
     ///
     /// combinational
     ///
