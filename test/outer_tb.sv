@@ -5,6 +5,9 @@
 `include "../source/eJ32_if.sv"
 
 `define CORE ej32.core
+`define CTL  ej32.ctl
+`define DBUS ej32.b8_if
+
 import ej32_pkg::*;             // import enum types
 
 module outer_tb #(
@@ -12,38 +15,27 @@ module outer_tb #(
     parameter TIB  = 'h1000,    ///> input buffer ptr
     parameter OBUF = 'h1400     ///> output buffer ptr
     );
-    localparam DOT = 'h2e;      ///> '.'
     //
     // return address to nfa lookup table (for tracing)
     //
     `IU ra2nfa[32];
     ///
-    mb8_io      b8_if();        ///> memory bus interface
-    ej32_ctl    ctl();          ///> ej32 control bus
     eJ32        ej32(.*);       ///> ej32 top module
-    dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~ctl.clk), .b8_if(b8_if.master));
-
-    task at(input `IU ax, input `U2 opt);
-        repeat(1) @(posedge ctl.clk) begin
-            case (opt)
-            'h1: $write("%02x", b8_if.vo);
-            'h2: $write("%c", b8_if.vo < 'h20 ? DOT : b8_if.vo);
-            endcase
-            b8_if.get_u8(ax);
-        end
-    endtask: at
-
+    dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~`CTL.clk), .b8_if(`DBUS.master));
+    ///
+    /// debugging tasks
+    ///
     task dump_row(input `IU a1);
         $write("\n%04x:", a1);
-        at(a1, 'h0);                     // prefetch one memory cycle
+        ej32.fetch(a1, 'h0);     // prefetch one memory cycle
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
             if ((i % 4)==1) $write(" ");
-            at(i, 'h1);
+            ej32.fetch(i, 'h1);
         end
         $write("  ");
-        at(a1, 'h0);
+        ej32.fetch(a1, 'h0);
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
-            at(i, 'h2);
+            ej32.fetch(i, 'h2);
         end
     endtask: dump_row
 
@@ -71,16 +63,16 @@ module outer_tb #(
     endtask: verify_obuf
 
     task activate;
-        b8_if.get_u8(0);
-        repeat(1) @(posedge ctl.clk) ctl.rst = 1'b1;
-        repeat(1) @(posedge ctl.clk) ctl.rst = 1'b0;
+        `DBUS.get_u8(0);
+        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b1;
+        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b0;
     endtask: activate
 
     task trace;
          automatic `U5 rp  = `CORE.rp;
          automatic `U3 ph  = `CORE.phase;
          automatic opcode_t code;
-         if (!$cast(code, ctl.code)) begin
+         if (!$cast(code, `CTL.code)) begin
              /// JVM opcodes, some are not avialable yet
              code = op_err;
          end
@@ -89,9 +81,9 @@ module outer_tb #(
              $time/10, 
              `CORE.p,  `CORE.a, ej32.data, ej32.data_o,
              `CORE.rp, `CORE.r,
-             `CORE.sp, `CORE.s, ctl.t,
+             `CORE.sp, `CORE.s, `CTL.t,
              code, `CORE.phase, code.name);
-        case (ctl.code)
+        case (`CTL.code)
         invokevirtual: if (ph==2) begin
             automatic `IU nfa = dict.to_name(ej32.addr);
             for (int i=0; i<rp; i++) $write("  ");
@@ -108,19 +100,19 @@ module outer_tb #(
         $display("");
     endtask: trace
    
-    always #5 ctl.tick();
+    always #5 `CTL.tick();
 
     initial begin
-        ctl.clk = 1'b1;       // memory fetch on negative edge
-        ctl.rst = 1'b1;
-        ctl.t   = 0;
+        `CTL.clk = 1'b1;       // memory fetch on negative edge
+        `CTL.rst = 1'b1;
+        `CTL.t   = 0;
 
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge ctl.clk) trace();
-        ctl.rst = 1'b1;       // disable eJsv32
+        repeat(1000) @(posedge `CTL.clk) trace();
+        `CTL.rst = 1'b1;       // disable eJsv32
 
         verify_dict();        // validate output dictionary words
         verify_obuf();        // validate output buffer content
