@@ -25,15 +25,7 @@ module ej32_core #(
     input  `U8 data_i,                    ///> data from memory bus
     output `IU addr_o,                    ///> address to memory bus
     output `U8 data_o,                    ///> data to memory bus
-    output `U1 dwe_o,                     ///> data write enable
-    // debug outputs
-    output `U3 phase_o,
-    output `IU p_o, a_o,
-    output `DU s_o,
-    output `U5 sp_o,
-    output `DU r_o,
-    output `U5 rp_o
-    // IO
+    output `U1 dwe_o                      ///> data write enable
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -181,13 +173,6 @@ module ej32_core #(
     assign t        = ctl.t;
     assign t_z      = ctl.t_z;
     assign t_neg    = ctl.t_neg;
-    assign phase_o  = phase;
-    assign p_o      = p;
-    assign a_o      = a;
-    assign s_o      = s;
-    assign r_o      = r;
-    assign sp_o     = sp;
-    assign rp_o     = rp;
     assign addr_o   = (asel) ? a : p;         // address, data or instruction
     assign data     = data_i;
     assign data_o   = data_n;
