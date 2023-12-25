@@ -51,4 +51,4 @@ module eJ32 #(
             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
             $time/10, p_o, a_o, data, data_o, rp_o, r_o, sp_o, s_o, ctl.t, code, phase_o, code.name);
     endtask: trace
-endmodule: top
+endmodule: eJ32
