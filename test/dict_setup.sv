@@ -4,31 +4,30 @@
 `include "../source/eJ32_if.sv"
 
 module dict_setup #(
-    parameter MEM0 = 'h0,       /// starting address of memory block
-    parameter TIB  = 'h1000,    /// terminal input buffer
-    parameter OBUF = 'h1400,    /// terminal output buffer
-    parameter DSZ  = 8,         /// 8-bit data path
-    parameter ASZ  = 17         /// 128K address space
+    parameter MEM0 = 'h0,       ///> starting address of memory block
+    parameter TIB  = 'h1000,    ///> terminal input buffer
+    parameter OBUF = 'h1400     ///> terminal output buffer
     ) (
-    mb8_io b8_if,               /// 8-bit memory bus master
     input  clk,
-    output `IU ctx,              /// context
-    output `IU here              /// starting CP
+    mb8_io b8_if                ///> 8-bit memory bus master
     );
     localparam P2N_SZ = 200;
-    localparam CTX    = 'h0d4d; /// starting context (hardcoded for now)
-
+    localparam CTX    = 'h0d4d; ///> starting context (hardcoded for now)
+    `IU ctx, here;              ///> dictionary context, current
+    //
+    // pfa2nfa lookup
+    //
     typedef struct {
-        `IU nfa;
-        `IU pfa;
+        `IU nfa;                ///> name field address
+        `IU pfa;                ///> parameter field address
     } t_p2n;
-    `U8 rom[OBUF];
-    `U8 p2n_sz;
-    t_p2n       p2n[P2N_SZ];
+    `U8   rom[OBUF];            ///> fake initial ROM
+    `U8   p2n_sz;               ///> size of lookup table
+    t_p2n p2n[P2N_SZ];          ///> lookup table
 
     string tib = "123 456 +";
 
-    task add_u8(`IU ax, `U8 vx);
+    task add_u8(input `IU ax, input `U8 vx);
         repeat(1) @(posedge clk) begin
             b8_if.put_u8(ax, vx);
         end
