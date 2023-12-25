@@ -22,20 +22,18 @@ module eJ32 #(
     parameter RS_DEPTH = 32               ///> 32 deep return stack
     ) (
     ej32_ctl ctl,
-    input  `U8 data_i,
-    // instruction
+    input  `U8 data_i,                    ///> data from memory bus
+    output `IU addr_o,                    ///> address to memory bus
+    output `U8 data_o,                    ///> data to memory bus
+    output `U1 dwe_o,                     ///> data write enable
+    // debug outputs
     output `U3 phase_o,
     output `IU p_o, a_o,
-    // data stack
     output `DU s_o,
     output `U5 sp_o,
-    // return stack 
     output `DU r_o,
-    output `U5 rp_o,
+    output `U5 rp_o
     // IO
-    output `IU addr_o,
-    output `U8 data_o,
-    output `U1 dwe_o
     );
     import ej32_pkg::*;
     /// @defgroup Registers
