@@ -13,16 +13,12 @@ module outer_tb #(
     parameter OBUF = 'h1400     // output buffer ptr
     );
     localparam DOT = 'h2e;
-    // debug output
-    `U3  phase_o;
-    `IU  addr_o, p_o, a_o;
-    `DU  s_o, r_o;
-    `U5  sp_o;
-    `U5  rp_o;
-    `U8  data_i, data_o;
-    `U1  dwe_o;
-    // ej32 control
+    // dict module
     `IU  ctx, here;
+    // ej32 module
+    `IU  addr_t;
+    `U3  phase_t;
+    `U5  rp_t;
     //
     // return address to nfa (for tracing)
     //
@@ -30,10 +26,8 @@ module outer_tb #(
 
     ej32_ctl    ctl();
     mb8_io      b8_if();
-    spram8_128k m0(b8_if.slave, ~ctl.clk);
-
     dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~ctl.clk), .b8_if(b8_if.master), .*);
-    eJ32        #(TIB, OBUF)       ej32(.ctl(ctl), .*);
+    top         top_inst(.*);
 
     task at(input `IU ax, input `U2 opt);
         repeat(1) @(posedge ctl.clk) begin
@@ -59,8 +53,8 @@ module outer_tb #(
         end
     endtask: dump_row
 
-    task dump(input `IU addr, input `IU len);
-        automatic `IU a0 = addr & ~'hf;
+    task dump(input `IU a, input `IU len);
+        automatic `IU a0 = a & ~'hf;
         for (integer a1=a0; a1 < (a0 + len + 'h10); a1 += 'h10) begin
             dump_row(a1);
         end
@@ -88,39 +82,26 @@ module outer_tb #(
         repeat(1) @(posedge ctl.clk) ctl.rst = 1'b0;
     endtask: activate
 
-    task trace;
-        automatic opcode_t code;
-        if (!$cast(code, ctl.code)) begin
-            /// JVM opcodes, some are not avialable yet
-            code = op_err;
-        end
-        $write(
-            "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time/10, p_o, a_o, data_i, data_o, rp_o, r_o, sp_o, s_o, ctl.t, code, phase_o, code.name);
-        if (code==invokevirtual && phase_o==2) begin
-            automatic `IU nfa = dict.to_name(addr_o);
-            for (int i=0; i<rp_o; i++) $write("  ");
+    task show_callstack;
+        case (ctl.code)
+        invokevirtual: if (phase_t==2) begin
+            automatic `IU nfa = dict.to_name(addr_t);
+            for (int i=0; i<rp_t; i++) $write("  ");
             $write(" :: ");
-            ra2nfa[rp_o] = nfa;
+            ra2nfa[rp_t] = nfa;
             dict.to_s(nfa);
         end
-        else if (code==jreturn && phase_o==0) begin
-            for (int i=0; i<rp_o; i++) $write("  ");
+        jreturn: if (phase_t==0) begin
+            for (int i=0; i<rp_t; i++) $write("  ");
             $write(" ;; ");
-            dict.to_s(ra2nfa[rp_o]);
+            dict.to_s(ra2nfa[rp_t]);
         end
+        endcase
         $display("");
-    endtask: trace
-
+    endtask: show_callstack
+   
     always #5 ctl.tick();
 
-    assign data_i = b8_if.vo;
-
-    always_comb begin
-        if (dwe_o) b8_if.put_u8(addr_o, data_o);
-        else       b8_if.get_u8(addr_o);
-    end
-    
     initial begin
         ctl.clk = 1'b1;       // memory fetch on negative edge
         ctl.rst = 1'b1;
@@ -130,7 +111,10 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(800000) @(posedge ctl.clk) trace();
+        repeat(1000) @(posedge ctl.clk) begin
+           top_inst.trace();
+           show_callstack();
+        end
         ctl.rst = 1'b1;       // disable eJsv32
 
         verify_dict();        // validate output dictionary words
