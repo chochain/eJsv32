@@ -11,44 +11,21 @@ module eJ32 #(
     parameter OBUF = 'h1400     // output buffer ptr
     ) (
        ej32_ctl ctl,            // eJ32 bus
-       mb8_io   b8_if,          // memory bus
-       output `IU addr_t,       // debug output
-       output `U3 phase_t,
-       output `U5 rp_t
+       mb8_io   b8_if           // memory bus
     );
     // ej32 memory bus
-    `IU  addr;
-    `U8  data, data_o;
-    `U1  dwe_o;
-    // ej32 debug output
-    `U3  phase_o;
-    `IU  p_o, a_o;
-    `DU  s_o, r_o;
-    `U5  sp_o, rp_o;
+    `IU  addr;                  ///> shared memory address
+    `U8  data;                  ///> data return from SRAM (sent to core)
+    `U8  data_o;                ///> data return from core
+    `U1  dwe_o;                 ///> data write enable driven by core
 
     spram8_128k            smem(b8_if.slave, ~ctl.clk);
     ej32_core #(TIB, OBUF) core(.ctl(ctl), .data_i(data), .addr_o(addr), .*);
 
-    assign data    = b8_if.vo;
-    always_comb begin
-        if (dwe_o) b8_if.put_u8(addr, data_o);
-        else       b8_if.get_u8(addr);
-    end
-    ///
-    /// debug tasks
-    ///
-    assign rp_t    = rp_o;
-    assign addr_t  = addr;
-    assign phase_t = phase_o;
+    assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
    
-    task trace;
-        automatic opcode_t code;
-        if (!$cast(code, ctl.code)) begin
-            /// JVM opcodes, some are not avialable yet
-            code = op_err;
-        end
-        $write(
-            "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time/10, p_o, a_o, data, data_o, rp_o, r_o, sp_o, s_o, ctl.t, code, phase_o, code.name);
-    endtask: trace
+    always_comb begin
+        if (dwe_o) b8_if.put_u8(addr, data_o);  ///> write to SRAM
+        else       b8_if.get_u8(addr);          ///> read from SRAM
+    end
 endmodule: eJ32
