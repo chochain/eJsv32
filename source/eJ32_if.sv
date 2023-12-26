@@ -11,11 +11,20 @@ interface ej32_ctl;
    `U1  clk;
    `U1  rst;
    opcode_t code;              // opcode
+   `U3  phase;                 // opcode phase i.e. nth-cycle of opcode
    `DU  t;                     // TOS, on bus
    `U1  t_z;                   // TOS zero flag
    `U1  t_neg;                 // TOS neg flag
    stack_op ss_op;             // data stack op
    stack_op rs_op;             // return stack op
+   
+   function void reset();
+       clk   = 1'b1;
+       rst   = 1'b1;
+       code  = nop;
+       phase = 3'b0;
+       t     = 0;
+   endfunction: reset
    
    function void tick();
        clk   = ~clk;
