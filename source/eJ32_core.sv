@@ -68,17 +68,18 @@ module ej32_core #(
     opcode_t code;              ///> shadow ctl.code
     `U1 code_x;                 ///> instruction unit control
     `U1 p_x, a_x;               ///> address controls
-    `IU a_d;                    ///> combine address + data
+    `IU a_d;                    ///> 2-byte merged address
     // data stack
     `DU t;                      ///> shadow TOS
     `U1 t_x, t_z, t_neg;        ///> TOS controls
-    `DU t_d;                    ///> combined t & data
+    `DU t_d;                    ///> 4-byte merged data
     `U5 sp1;                    ///> data stack pointers, sp1 = sp + 1
     `U1 s_x;                    ///> data stack controls
     // return stack
     `U5 rp1;                    ///> return stack pointers
     `U1 r_x;                    ///> return stack controls
     // IO
+    `U8 d8x4[4];                ///> 4-to-1 byte select
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
     /// @}
@@ -139,14 +140,14 @@ module ej32_core #(
     endtask: ZBRAN
     task IBRAN(input `U1 f);
         case (phase)
-        0: begin STEP(1); ALU(s - t); SETA(data); end
+        0: begin STEP(1); SETA(data); ALU(s - t); end
         1: begin STEP(2); POP(); if (f) JMP(a_d); end      // pop off s; jmp
         default: `PHASE0;
         endcase
     endtask: IBRAN
     // memory unit
-    task MEM(input `IU a);  SETA(a); `SET(asel_n); endtask;   // fetch from memory, data returns next cycle
-    task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask;
+    task MEM(input `IU a); SETA(a); `SET(asel_n); endtask;  // fetch from memory, data returns next cycle
+    task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask;   // data write n-th byte
     // external
     task DIV(input `DU v);
         case (phase)
@@ -175,29 +176,25 @@ module ej32_core #(
     assign data     = data_i;                 ///> data from memory bus
     assign data_o   = data_n;                 ///> data sent to memory bus
     assign dwe_o    = dwe;                    ///> data write enable
-    assign data_n   = (dsel == 3)             ///> data byte select (Big-Endian)
-                    ? t[7:0]
-                    : (dsel == 2)
-                        ? t[15:8]
-                        : (dsel == 1)
-                            ? t[23:16]
-                            : t[31:24];
+    assign d8x4     =                         ///> 4-to-1 Big-Endian
+        {t[31:24],t[23:16],t[15:8],t[7:0]};
+    assign data_n   = d8x4[dsel];             ///> data byte select (Big-Endian)
     ///
     /// wires to external modules
     ///
     assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
-    assign a_d    = {a[ASZ-9:0], data};       ///> shift combined address
-    assign t_d    = {t[DSZ-9:0], data};       ///> shift combined t (top of stack)
+    assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
+    assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
     ///
     /// combinational
     ///
     task INIT();
-        a_n       = {ASZ{1'b0}};  /// address
+        code_x    = 1'b1;         /// fetch opcode by default
+        a_n       = {ASZ{1'b0}};  /// default to clear address
         a_x       = 1'b0;
-        asel_n    = 1'b0;
+        asel_n    = 1'b0;         /// address default to program counter
         p_n       = p + 'h1;      /// advance program counter
-        p_x       = 1'b1;
-        code_x    = 1'b1;
+        p_x       = 1'b1;         /// advance PC by default
         t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
         r_n       = {DSZ{1'b0}};  /// return stack
@@ -283,13 +280,13 @@ module ej32_core #(
             1: begin WAIT(2); MEM(a + 1); DW(1); end
             2: begin WAIT(3); MEM(a + 1); DW(2); end
             3: begin WAIT(4); MEM(a + 1); DW(3); end
-            4: begin WAIT(5); DW(3); POP(); end
+            4: begin WAIT(5); DW(3); POP(); end         // CC: reset a?
             default: `PHASE0;
             endcase
         bastore:
             case (phase)
             0: begin WAIT(1); MEM(`XDA(s)); `S(sPOP); end
-            1: begin WAIT(2); POP(); DW(3); end
+            1: begin WAIT(2); POP(); DW(3); end         // CC: reset a?
             default: `PHASE0;       // CC: extra cycle
             endcase
         sastore:
@@ -370,8 +367,8 @@ module ej32_core #(
         //
         goto:
             case (phase)
-            0: begin STEP(1); SETA(`X8A(data)); end
-            1: begin STEP(2); JMP(a_d); end
+            0: begin STEP(1); SETA(`X8A(data)); end // set addr higher byte
+            1: begin STEP(2); JMP(a_d); end         // merge addr lower byte
             default: `PHASE0;
             endcase
         jsr:
