@@ -169,6 +169,7 @@ module ej32_core #(
     /// IO signals wires
     ///
     assign code     = ctl.code;               ///> input from ej32 control
+    assign phase    = ctl.phase;
     assign t        = ctl.t;
     assign t_z      = ctl.t_z;
     assign t_neg    = ctl.t_neg;
@@ -455,7 +456,6 @@ module ej32_core #(
     end
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            phase <= 3'b0;
             asel  <= 1'b0;
             dsel  <= 3;
             ibuf  <= TIB;
@@ -464,8 +464,8 @@ module ej32_core #(
             p     <= {ASZ{1'b0}};
         end
         else if (ctl.clk) begin
-            phase <= phase_n;
-            asel  <= asel_n;
+            ctl.phase <= phase_n;
+            asel      <= asel_n;
             // instruction
             if (code_x)    ctl.code <= code_n;
             if (t_x)       ctl.t    <= t_n;
@@ -490,7 +490,7 @@ module ej32_core #(
                 $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
                 assert(phase_n == 0) else begin
                     $write(", phase_n=%d reset =0", phase_n) ;
-                    phase <= 0;
+                    ctl.phase <= 0;
                 end
                 assert(code_x == 1) else begin
                     $write(", code_x=%d code_n=%s, p=%4x forced +1", code_x, code_n.name, p);

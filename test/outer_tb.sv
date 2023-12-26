@@ -103,17 +103,15 @@ module outer_tb #(
     always #5 `CTL.tick();
 
     initial begin
-        `CTL.clk = 1'b1;       // memory fetch on negative edge
-        `CTL.rst = 1'b1;
-        `CTL.t   = 0;
+        `CTL.reset();         // initialize control interface
 
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
         repeat(1000) @(posedge `CTL.clk) trace();
-        `CTL.rst = 1'b1;       // disable eJsv32
-
+        
+        `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
         verify_obuf();        // validate output buffer content
 
