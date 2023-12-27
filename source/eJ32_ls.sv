@@ -14,9 +14,9 @@ module EJ32_LS #(
     parameter ASZ      = 17               ///> 128K address space
     ) (
     EJ32_CTL ctl,
+    input  `U1 ls_en,
     input  `U8 data,                      ///> data from memory bus
     input  `DU s,                         ///> NOS
-    output `U1 ls_en,
     output `U1 ls_asel_o,
     output `IU ls_addr_o,                 ///> address to memory bus
     output `U8 data_o,                    ///> data to memory bus
@@ -170,9 +170,17 @@ module EJ32_LS #(
             // default: begin `PHASE0; `HOLD; TOS(s); DW(0); end
             // CC: change Dr. Ting's logic
             0: begin WAIT(1); MEM(`XDA(s)); end
-            1: begin WAIT(2); ALU(t + `X8D(data)); `SET(asel_n); end
+            1: begin WAIT(2); `SET(asel_n); end
             default: begin `PHASE0; TOS(s); DW(0); end
             endcase // case (phase)
+        ldi:
+            case (phase)
+            0: begin STEP(1); PUSH(`X8D(data)); end
+            1: begin STEP(2); TOS(t_d); end
+            2: begin STEP(3); TOS(t_d); end
+            3: begin STEP(4); TOS(t_d); end
+            default: `PHASE0;
+            endcase
         get:
             case (phase)
             0: begin WAIT(1); MEM(ibuf); `S(sPUSH); end
@@ -196,7 +204,7 @@ module EJ32_LS #(
             obuf  <= OBUF;
             a     <= {ASZ{1'b0}};
         end
-        else if (ctl.clk) begin
+        else if (ctl.clk && ls_en) begin
             ctl.phase <= phase_n;
             asel      <= asel_n;
             // instruction

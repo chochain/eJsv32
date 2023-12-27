@@ -9,10 +9,10 @@
 
 module EJ32_AU #(
     parameter DSZ      = 32,              ///> 32-bit data width
-    parameter ASZ      = 17,              ///> 128K address space
     parameter SS_DEPTH = 32               ///> 32 deep data stack
     ) (
     EJ32_CTL ctl,
+    input  `U1 au_en,                     ///> arithmetic unit enable
     input  `U8 data,                      ///> data from memory bus
     /// for div_patch
     input  `IU p,                         ///> program counter
@@ -124,7 +124,8 @@ module EJ32_AU #(
     ///
     task INIT();
         code_x    = 1'b1;         /// fetch opcode by default
-        phase_n   = 3'b0;         /// phase and IO controls        t_n       = {DSZ{1'b0}};  /// TOS
+        phase_n   = 3'b0;         /// phase and IO controls        
+        t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
         ctl.ss_op = sNOP;         /// data stack
         ///
@@ -200,14 +201,7 @@ module EJ32_AU #(
         iand: ALU(s & t);
         ior:  ALU(s | t);
         ixor: ALU(s ^ t);
-        ldi:
-            case (phase)
-            0: begin STEP(1); PUSH(`X8D(data)); end
-            1: begin STEP(2); TOS(t_d); end
-            2: begin STEP(3); TOS(t_d); end
-            3: begin STEP(4); TOS(t_d); end
-            default: `PHASE0;
-            endcase
+        iinc: if (phase==1) ALU(t + `X8D(data));
         default: `PHASE0;
         endcase
     end // always_comb
@@ -230,7 +224,7 @@ module EJ32_AU #(
     end // always_ff @ (posedge ctl.clk, posedge ctl.rst)
     
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
-        if (!ctl.rst && ctl.clk) begin
+        if (!ctl.rst && ctl.clk && au_en) begin
             ctl.phase <= phase_n;
             // instruction
             if (code_x)    ctl.code <= code_n;
