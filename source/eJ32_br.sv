@@ -13,9 +13,9 @@ module EJ32_BR #(
     parameter RS_DEPTH = 32               ///> 32 deep return stack
     ) (
     EJ32_CTL ctl,
+    input  `U1 br_en,                     ///> branching unit active
     input  `U8 data,                      ///> data from memory bus
     input  `DU s,                         ///> NOS from stack unit
-    output `U1 br_en,                     ///> branching unit active
     output `IU br_addr_o                  ///> address to memory bus
     );
     import ej32_pkg::*;
@@ -105,7 +105,6 @@ module EJ32_BR #(
     /// combinational
     ///
     task INIT();
-        br_en     = 1'b0;
         code_x    = 1'b1;         /// fetch opcode by default
         phase_n   = 3'b0;         /// phase and IO controls
         p_n       = p + 'h1;      /// advance program counter
@@ -213,7 +212,7 @@ module EJ32_BR #(
             a    <= {ASZ{1'b0}};
             p    <= {ASZ{1'b0}};
         end
-        else if (ctl.clk) begin
+        else if (ctl.clk && br_en) begin
             ctl.phase <= phase_n;
             asel      <= asel_n;
             // instruction
