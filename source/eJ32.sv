@@ -1,26 +1,33 @@
 ///
 /// eJ32 top module (Outer Interpreter)
 ///
-`include "../source/eJ32.vh"
 `include "../source/eJ32_if.sv"
 
 import ej32_pkg::*;
 
-module eJ32 #(
+module EJ32 #(
     parameter TIB  = 'h1000,    // input buffer ptr
     parameter OBUF = 'h1400     // output buffer ptr
     );
     // ej32 memory bus
-    `IU  addr;                  ///> shared memory address
+    `IU  addr;
+    `IU  ls_addr_o;             ///> shared memory address
+    `U1  ls_asel_o;
+    `IU  br_addr_o;
     `U8  data;                  ///> data return from SRAM (sent to core)
+    `IU  p, p_o;
+    `DU  s;
     `U8  data_o;                ///> data return from core
     `U1  dwe_o;                 ///> data write enable driven by core
+    `U1  br_en, ls_en, au_en;
 
     mb8_io      b8_if();        ///> memory bus
-    ej32_ctl    ctl();          ///> ej32 control bus
+    EJ32_CTL    ctl();          ///> ej32 control bus
    
     spram8_128k smem(b8_if.slave, ~ctl.clk);
-    ej32_core #(TIB, OBUF) core(.ctl(ctl), .data_i(data), .addr_o(addr), .*);
+    EJ32_AU                au(.ctl(ctl), .*);
+    EJ32_LS   #(TIB, OBUF) ls(.ctl(ctl), .*); 
+    EJ32_BR                br(.ctl(ctl), .*);
 
     assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
    
@@ -41,4 +48,4 @@ module eJ32 #(
             b8_if.get_u8(ax);
         end
     endtask: fetch
-endmodule: eJ32
+endmodule: EJ32
