@@ -7,12 +7,12 @@
 `define R(op)  ctl.rs_op = op
 `define S(op)  ctl.ss_op = op
 
-module ej32_core #(
+module EJ32_AU #(
     parameter DSZ      = 32,              ///> 32-bit data width
     parameter ASZ      = 17,              ///> 128K address space
     parameter SS_DEPTH = 32               ///> 32 deep data stack
     ) (
-    ej32_ctl ctl,
+    EJ32_CTL ctl,
     input  `U8 data,                      ///> data from memory bus
     /// for div_patch
     input  `IU p,                         ///> program counter
@@ -47,9 +47,6 @@ module ej32_core #(
     `U1 t_x, t_z, t_neg;        ///> TOS controls
     `DU t_d;                    ///> 4-byte merged data
     `U5 sp1;                    ///> data stack pointers, sp1 = sp + 1
-    // return stack
-    `U5 rp1;                    ///> return stack pointers
-    `U1 r_x;                    ///> return stack controls
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -121,7 +118,6 @@ module ej32_core #(
     /// wires to external modules
     ///
     assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
-//    assign a_d    = {a[ASZ-9:0], data};     ///> merge lowest byte into addr
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
     ///
     /// combinational
@@ -277,4 +273,4 @@ module ej32_core #(
             assert(div_r == (s % t));
         end
     endtask: div_patch
-endmodule: ej32_core
+endmodule: EJ32_AU
