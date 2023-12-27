@@ -6,7 +6,7 @@
 
 `include "../source/eJ32.vh"
 
-interface ej32_ctl;
+interface EJ32_CTL;
    import ej32_pkg::*;
    `U1  clk;
    `U1  rst;
@@ -19,7 +19,7 @@ interface ej32_ctl;
    stack_op rs_op;             // return stack op
    
    function void reset();
-       clk   = 1'b1;
+       clk   = 1'b1;           // memory fetch at neg edge
        rst   = 1'b1;
        code  = nop;
        phase = 3'b0;
@@ -31,7 +31,7 @@ interface ej32_ctl;
        t_z   = t == 0;
        t_neg = t[31];
    endfunction: tick
-endinterface: ej32_ctl
+endinterface: EJ32_CTL
 
 interface mb32_io(input `U1 clk);
     logic [3:0]  bmsk;
