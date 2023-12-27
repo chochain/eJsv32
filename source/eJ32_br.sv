@@ -55,9 +55,7 @@ module EJ32_BR #(
     // return stack
     `U5 rp1;                    ///> return stack pointers
     `U1 r_x;                    ///> return stack controls
-   
-    task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
-    task WAIT(input `U3 n); STEP(n); `CLR(p_x);  endtask;
+
     // data stack
     task TOS(input `DU v);  t_n = v;  `SET(t_x); endtask;
     task ALU(input `DU v);  TOS(v);   `S(sPOP);  endtask;
@@ -69,20 +67,12 @@ module EJ32_BR #(
     //
     task SETA(input `IU a); a_n = a; `SET(a_x); endtask;   // build addr ptr
     task JMP(input `IU a);  p_n = a; `SET(a_x); endtask;   // jmp and clear a
-    task ZBRAN(input `U1 f);
+    task BRAN(input `U1 f);
         case (phase)
-        0: begin STEP(1); SETA(data); end
-        1: begin STEP(2); POP(); if (f) JMP(a_d); end
-        default: `PHASE0;
+        0: SETA(data);
+        1: begin POP(); if (f) JMP(a_d); end
         endcase
-    endtask: ZBRAN
-    task IBRAN(input `U1 f);
-        case (phase)
-        0: begin STEP(1); SETA(data); ALU(s - t); end
-        1: begin STEP(2); POP(); if (f) JMP(a_d); end      // pop off s; jmp
-        default: `PHASE0;
-        endcase
-    endtask: IBRAN
+    endtask: BRAN
     // memory unit
     task MEM(input `IU a); SETA(a); `SET(asel_n); endtask;  // fetch from memory, data returns next cycle
     ///
@@ -131,58 +121,50 @@ module EJ32_BR #(
         // conditional branching ops
         // Logical ops
         //
-        ifeq:      ZBRAN(t_z);
-        ifne:      ZBRAN(!t_z);
-        iflt:      ZBRAN(t_neg);
-        ifge:      ZBRAN(!t_neg);
-        ifgt:      ZBRAN(!t_z && !t_neg);
-        ifle:      ZBRAN(t_z || t_neg);
-        if_icmpeq: IBRAN(t_z);
-        if_icmpne: IBRAN(!t_z);
-        if_icmplt: IBRAN(t_neg);
-        if_icmpgt: IBRAN(!t_z && !t_neg);
+        ifeq:      BRAN(t_z);
+        ifne:      BRAN(!t_z);
+        iflt:      BRAN(t_neg);
+        ifge:      BRAN(!t_neg);
+        ifgt:      BRAN(!t_z && !t_neg);
+        ifle:      BRAN(t_z || t_neg);
+        if_icmpeq: BRAN(t_z);
+        if_icmpne: BRAN(!t_z);
+        if_icmplt: BRAN(t_neg);
+        if_icmpgt: BRAN(!t_z && !t_neg);
         //
         // unconditional branching ops
         // branching
         //
         goto:
             case (phase)
-            0: begin STEP(1); SETA(`X8A(data)); end // set addr higher byte
-            1: begin STEP(2); JMP(a_d); end         // merge addr lower byte
-            default: `PHASE0;
+            0: SETA(`X8A(data)); // set addr higher byte
+            1: JMP(a_d);         // merge addr lower byte
             endcase
         jsr:
             case (phase)
             // 0: begin phase_n = 1; MEM(t); end
             // 1: begin phase_n = 2; `HOLD; MEM(a + 1); TOS(data); end
             // CC: change Dr. Ting's logic
-            0: begin WAIT(1); MEM(`XDA(t)); end
-            1: begin WAIT(2); MEM(a + 1); TOS(`X8D(data)); end
-            default: begin `PHASE0; JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
+            0: MEM(`XDA(t));
+            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            2: begin JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
             endcase
         ret: JMP(`XDA(r));
-        jreturn:
-            case (phase)
-            0: begin STEP(1); `R(sPOP); JMP(`XDA(r)); end
-            default: `PHASE0;
-            endcase
+        jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
         invokevirtual:
             case (phase)
-            0: begin STEP(1); SETA(`X8A(data)); RPUSH(`XAD(p) + 2); end
-            1: begin STEP(2); JMP(a_d); end
+            0: begin SETA(`X8A(data)); RPUSH(`XAD(p) + 2); end
+            1: begin JMP(a_d); end
             default: `PHASE0;
             endcase
         donext:
             case (phase)
-            0: begin STEP(1); SETA(`X8A(data)); end
-            1: begin STEP(2);
-               if (r == 0) begin `R(sPOP); end
+            0: SETA(`X8A(data));
+            1: if (r == 0) `R(sPOP);
                else begin
                   r_n = r - 1; `R(sMOVE);
                   JMP(a_d);
                end
-            end
-            default: `PHASE0;
             endcase
         dupr: PUSH(r);
         popr: begin PUSH(r); `R(sPOP); end
@@ -196,7 +178,7 @@ module EJ32_BR #(
         if (ctl.rst) begin
             rp <= '0;
         end
-        else if (ctl.clk) begin
+        else if (ctl.clk && br_en) begin
             // return stack
             case (ctl.rs_op)
             sMOVE: rs[rp] <= r_n;
@@ -205,7 +187,7 @@ module EJ32_BR #(
             endcase
         end
     end // always_ff @ (posedge ctl.clk, posedge ctl.rst)
-    
+
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
             asel <= 1'b0;

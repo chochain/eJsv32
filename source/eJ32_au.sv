@@ -3,20 +3,20 @@
 //
 `include "../source/eJ32_if.sv"
 
-`define PHASE0 phase_n = 0
 `define R(op)  ctl.rs_op = op
 `define S(op)  ctl.ss_op = op
 
 module EJ32_AU #(
-    parameter DSZ      = 32,              ///> 32-bit data width
-    parameter SS_DEPTH = 32               ///> 32 deep data stack
+    parameter DSZ      = 32,    ///> 32-bit data width
+    parameter SS_DEPTH = 32     ///> 32 deep data stack
     ) (
     EJ32_CTL ctl,
-    input  `U1 au_en,                     ///> arithmetic unit enable
-    input  `U8 data,                      ///> data from memory bus
+    input  `U1 au_en,           ///> arithmetic unit enable
+    input  `U8 data,            ///> data from memory bus
     /// for div_patch
-    input  `IU p,                         ///> program counter
-    output `IU p_o                        
+    input  `IU p,               ///> program counter
+    output `IU p_o,
+    output `U1 div_bsy_o
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -31,7 +31,7 @@ module EJ32_AU #(
     /// @defgroup Next Register
     /// @{
     // instruction
-    opcode_t code_n;            ///> JVM opcode
+    opcode_t code_n;
     `U3 phase_n;                ///> FSM phase (aka state)
     `DU t_n;                    ///> TOS
     /// @}
@@ -84,23 +84,12 @@ module EJ32_AU #(
     .bits(t[4:0]),
     .r(iushr_o)
     );
-    task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
-    task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
     // data stack
-    task TOS(input `DU v);  t_n = v; `SET(t_x);  endtask;
-    task ALU(input `DU v);  TOS(v); `S(sPOP);    endtask;
-    task PUSH(input `DU v); TOS(v); `S(sPUSH);   endtask;
-    task POP();             TOS(s); `S(sPOP);    endtask;
-    // external ALU modules
-    task DIV(input `DU v);
-        case (phase)
-        0: WAIT(1);
-        default: begin
-            if (div_bsy) WAIT(1);
-            else begin `PHASE0; ALU(v); end
-        end
-        endcase
-    endtask: DIV
+    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask;
+    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask;
+    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask;
+    task POP();             TOS(s); `S(sPOP);   endtask;
+    task BRAN(); if (phase==0) ALU(s - t);      endtask;
     ///
     /// wires to reduce verbosity
     ///
@@ -124,7 +113,7 @@ module EJ32_AU #(
     ///
     task INIT();
         code_x    = 1'b1;         /// fetch opcode by default
-        phase_n   = 3'b0;         /// phase and IO controls        
+        phase_n   = 3'b0;         /// phase and IO controls
         t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
         ctl.ss_op = sNOP;         /// data stack
@@ -132,12 +121,8 @@ module EJ32_AU #(
         /// external module control flags
         ///
         shr_f     = 1'b0;         /// shifter flag
-        if (!$cast(code_n, data)) begin
-            /// JVM opcodes, some are not avialable yet
-            code_n = op_err;
-        end
     endtask: INIT
-    
+
     always_comb begin
         INIT();
         ///
@@ -153,37 +138,21 @@ module EJ32_AU #(
         iconst_3   : PUSH(3);
         iconst_4   : PUSH(4);
         iconst_5   : PUSH(5);
-        bipush:
-            case (phase)
-            0: begin STEP(1); PUSH(`X8D(data)); end
-            default: `PHASE0;
-            endcase
+        bipush: if (phase==0) PUSH(`X8D(data));
         sipush:                     // CC: not tested
             case (phase)
-            0: begin STEP(1); PUSH(`X8D(data)); end
-            1: begin STEP(2); TOS(t_d); end
-            default: `PHASE0;
+            0: PUSH(`X8D(data));
+            1: TOS(t_d);
             endcase
-        pop: POP();
-        pop2:
-            case (phase)
-            0: begin WAIT(1); POP(); end
-            default: begin `PHASE0; POP(); end
-            endcase
+        pop:  POP();
+        pop2: POP();
         dup: `S(sPUSH);
-        dup_x1:                     // CC: logic changed since a_n is 16-bit only
-            case (phase)
-            0: begin WAIT(1); PUSH(s); end
-            1: WAIT(2);             // wait for stack update??
-            default: `PHASE0;
-            endcase
+        dup_x1: if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
         dup_x2: PUSH(ss[sp - 1]);
-        dup2:                       // CC: logic changed since a_n is 16-bit only 
+        dup2:                           // CC: logic changed since a_n is 16-bit only 
             case (phase)
-            0: begin WAIT(1); PUSH(s); end
-            1: WAIT(2);             // CC: wait for stack update??
-            2: begin WAIT(3); PUSH(s); end
-            default: `PHASE0;
+            0: PUSH(s);
+            2: PUSH(s);
             endcase
         swap: begin TOS(s); `S(sMOVE); end
         //
@@ -192,8 +161,8 @@ module EJ32_AU #(
         iadd: ALU(s + t);
         isub: ALU(s - t);
         imul: ALU(mul_v[DSZ-1:0]);
-        idiv: DIV(div_q);
-        irem: DIV(div_r);
+        idiv: if (phase==1 && !div_bsy) ALU(div_q);
+        irem: if (phase==1 && !div_bsy) ALU(div_r);
         ineg: ALU(0 - t);
         ishl: ALU(isht_o);
         ishr: begin ALU(isht_o); `SET(shr_f); end
@@ -202,7 +171,11 @@ module EJ32_AU #(
         ior:  ALU(s | t);
         ixor: ALU(s ^ t);
         iinc: if (phase==1) ALU(t + `X8D(data));
-        default: `PHASE0;
+        // branching unit
+        if_icmpeq: BRAN();
+        if_icmpne: BRAN();
+        if_icmplt: BRAN();
+        if_icmpgt: BRAN();
         endcase
     end // always_comb
     ///
@@ -210,9 +183,9 @@ module EJ32_AU #(
     ///
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            sp    <= '0;
+            sp <= '0;
         end
-        else if (ctl.clk) begin
+        else if (ctl.clk && au_en) begin
             // data stack
             case (ctl.ss_op)
             sMOVE: ss[sp] <= t;
@@ -222,13 +195,12 @@ module EJ32_AU #(
             endcase
         end
     end // always_ff @ (posedge ctl.clk, posedge ctl.rst)
-    
+
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (!ctl.rst && ctl.clk && au_en) begin
             ctl.phase <= phase_n;
             // instruction
-            if (code_x)    ctl.code <= code_n;
-            if (t_x)       ctl.t    <= t_n;
+            if (t_x) ctl.t <= t_n;
             ///
             /// validate and patch
             /// CC: do not know why DIV is skipping the branch

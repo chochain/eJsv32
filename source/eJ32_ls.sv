@@ -61,9 +61,7 @@ module EJ32_LS #(
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
     /// @}
-   
-    task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
-    task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
+
     // data stack
     task TOS(input `DU v);  t_n = v; `SET(t_x);  endtask;
     task ALU(input `DU v);  TOS(v); `S(sPOP);    endtask;
@@ -98,7 +96,6 @@ module EJ32_LS #(
     ///
     task INIT();
         code_x    = 1'b1;         /// fetch opcode by default
-        phase_n   = 3'b0;         /// phase and IO controls
         a_n       = {ASZ{1'b0}};  /// default to clear address
         a_x       = 1'b0;
         asel_n    = 1'b0;         /// address default to program counter
@@ -111,46 +108,41 @@ module EJ32_LS #(
         obuf_x    = 1'b0;
         ctl.ss_op = sNOP;         /// data stack
     endtask: INIT
-    
+
     always_comb begin
         INIT();
         case (code)
         iaload:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(t)); end
-            1: begin WAIT(2); MEM(a + 1); TOS(`X8D(data)); end
-            2: begin WAIT(3); MEM(a + 1); TOS(t_d); end
-            3: begin WAIT(4); MEM(a + 1); TOS(t_d); end
-            4: begin WAIT(5); TOS(t_d); end
-            default: `PHASE0;
+            0: MEM(`XDA(t));
+            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            2: begin MEM(a + 1); TOS(t_d); end
+            3: begin MEM(a + 1); TOS(t_d); end
+            4: TOS(t_d);
             endcase
         baload:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(t));    end
-            1: begin WAIT(2); TOS(`X8D(data)); end
-            default: `PHASE0;
+            0: MEM(`XDA(t));
+            1: TOS(`X8D(data));
             endcase
         saload:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(t)); end
-            1: begin WAIT(2); MEM(a + 1); TOS(`X8D(data)); end
-            2: begin WAIT(3); TOS(t_d); end
-            default: `PHASE0;
+            0: MEM(`XDA(t));
+            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            2: TOS(t_d);
             endcase
         iastore:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(s)); `S(sPOP); `SET(dsel_x); dsel_n = 0; end
-            1: begin WAIT(2); MEM(a + 1); DW(1); end
-            2: begin WAIT(3); MEM(a + 1); DW(2); end
-            3: begin WAIT(4); MEM(a + 1); DW(3); end
-            4: begin WAIT(5); DW(3); POP(); end         // CC: reset a?
-            default: `PHASE0;
+            0: begin MEM(`XDA(s)); `S(sPOP); `SET(dsel_x); dsel_n = 0; end
+            1: begin MEM(a + 1); DW(1); end
+            2: begin MEM(a + 1); DW(2); end
+            3: begin MEM(a + 1); DW(3); end
+            4: begin DW(3); POP(); end         // CC: reset a?
             endcase
         bastore:
             case (phase)
-            0: begin WAIT(1); MEM(`XDA(s)); `S(sPOP); end
-            1: begin WAIT(2); POP(); DW(3); end         // CC: reset a?
-            default: `PHASE0;       // CC: extra cycle
+            0: begin MEM(`XDA(s)); `S(sPOP); end
+            1: begin POP(); DW(3); end         // CC: reset a?
             endcase
         sastore:
             case (phase)
@@ -158,9 +150,9 @@ module EJ32_LS #(
             // 0: begin WAIT(1); MEM(s); `SET(spop); end
             // 1: begin WAIT(2); MEM(a + 1); DW(2); end
             // 2: begin WAIT(3); POP(); DW(3); `SET(asel_n); end
-            0: begin WAIT(1); MEM(`XDA(s)); `S(sPOP); `SET(dsel_x); dsel_n = 2; end
-            1: begin WAIT(2); MEM(a + 1); DW(3); end
-            2: begin WAIT(3); DW(3); POP(); end
+            0: begin MEM(`XDA(s)); `S(sPOP); `SET(dsel_x); dsel_n = 2; end
+            1: begin MEM(a + 1); DW(3); end
+            2: begin DW(3); POP(); end
             default: `PHASE0;
             endcase
         iinc:
@@ -169,33 +161,30 @@ module EJ32_LS #(
             // 1: begin phase_n = 2; `HOLD; ALU(t + data); asel_n = 1'b1; end
             // default: begin `PHASE0; `HOLD; TOS(s); DW(0); end
             // CC: change Dr. Ting's logic
-            0: begin WAIT(1); MEM(`XDA(s)); end
-            1: begin WAIT(2); `SET(asel_n); end
-            default: begin `PHASE0; TOS(s); DW(0); end
+            0: begin MEM(`XDA(s)); end
+            1: begin `SET(asel_n); end
+            default: begin TOS(s); DW(0); end
             endcase // case (phase)
         ldi:
             case (phase)
-            0: begin STEP(1); PUSH(`X8D(data)); end
-            1: begin STEP(2); TOS(t_d); end
-            2: begin STEP(3); TOS(t_d); end
-            3: begin STEP(4); TOS(t_d); end
-            default: `PHASE0;
+            0: PUSH(`X8D(data));
+            1: TOS(t_d);
+            2: TOS(t_d);
+            3: TOS(t_d);
             endcase
         get:
             case (phase)
-            0: begin WAIT(1); MEM(ibuf); `S(sPUSH); end
-            1: begin WAIT(2); TOS(`X8D(data)); `SET(ibuf_x); end
-            default: `PHASE0;     // CC: extra memory cycle
+            0: begin MEM(ibuf); `S(sPUSH); end
+            1: begin TOS(`X8D(data)); `SET(ibuf_x); end
             endcase
         put:
             case (phase)
-            0: begin WAIT(1); MEM(obuf); `SET(dsel_x); end
-            default: begin `PHASE0; POP(); DW(3); `SET(obuf_x); end
+            0: begin MEM(obuf); `SET(dsel_x); end
+            default: begin POP(); DW(3); `SET(obuf_x); end
             endcase
-        default: `PHASE0;
         endcase
     end // always_comb
-    
+
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
             asel  <= 1'b0;
