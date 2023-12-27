@@ -7,13 +7,13 @@
 `define R(op)  ctl.rs_op = op
 `define S(op)  ctl.ss_op = op
 
-module ej32_ls #(
+module EJ32_LS #(
     parameter TIB      = 'h1000,          ///> input buffer address
     parameter OBUF     = 'h1400,          ///> output buffer address
     parameter DSZ      = 32,              ///> 32-bit data width
     parameter ASZ      = 17               ///> 128K address space
     ) (
-    ej32_ctl ctl,
+    EJ32_CTL ctl,
     input  `U8 data,                      ///> data from memory bus
     input  `DU s,                         ///> NOS
     output `U1 ls_en,
@@ -208,4 +208,4 @@ module ej32_ls #(
             if (obuf_x)  obuf     <= obuf + 1;
         end
     end // always_ff @ (posedge clk, posedge rst)
-endmodule: ej32_ls
+endmodule: EJ32_LS

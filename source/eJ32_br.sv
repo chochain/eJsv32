@@ -7,12 +7,12 @@
 `define S(op)  ctl.ss_op = op
 `define R(op)  ctl.rs_op = op
 
-module ej32_br #(
+module EJ32_BR #(
     parameter DSZ      = 32,              ///> 32-bit data width
     parameter ASZ      = 17,              ///> 128K address space
     parameter RS_DEPTH = 32               ///> 32 deep return stack
     ) (
-    ej32_ctl ctl,
+    EJ32_CTL ctl,
     input  `U8 data,                      ///> data from memory bus
     input  `DU s,                         ///> NOS from stack unit
     output `U1 br_en,                     ///> branching unit active
@@ -223,4 +223,4 @@ module ej32_br #(
             if (p_x)    p        <= p_n;
         end
     end // always_ff @ (posedge clk, posedge rst)
-endmodule: ej32_br
+endmodule: EJ32_BR
