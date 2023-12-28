@@ -13,48 +13,31 @@ module EJ32_AU #(
     EJ32_CTL ctl,
     input  `U1 au_en,           ///> arithmetic unit enable
     input  `U8 data,            ///> data from memory bus
-    /// for div_patch
-    input  `IU p,               ///> program counter
-    output `IU p_o,
     output `U1 div_bsy_o
     );
     import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
-    // instruction
-    `U3  phase;                 ///> FSM phase (aka state)
-    // data stack
-    `DU  s;                     ///> NOS
-    `DU  ss[SS_DEPTH];          ///> data stack, 3K LUTs, TODO: use EBR memory
-    `U5  sp;                    ///> data stack pointers, sp1 = sp + 1
-    /// @}
-    /// @defgroup Next Register
-    /// @{
-    // instruction
-    opcode_t code_n;
-    `U3 phase_n;                ///> FSM phase (aka state)
-    `DU t_n;                    ///> TOS
+    `DU ss[SS_DEPTH];           ///> data stack, 3K LUTs, TODO: use EBR memory
+    `DU t_n;                    ///> next TOS
     /// @}
     /// @defgroup Wires
     /// @{
-    // instruction
     opcode_t code;              ///> shadow ctl.code
-    `U1 code_x;                 ///> instruction unit control
-    `U1 p_x;
-    `IU a_d;                    ///> 2-byte merged address
-    // data stack
-    `DU t;                      ///> shadow TOS
-    `U1 t_x, t_z, t_neg;        ///> TOS controls
+    `U3 phase;                  ///> FSM phase (aka state)
+    `DU t, s;                   ///> shadow TOS, NOS
+    `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
-    `U5 sp1;                    ///> data stack pointers, sp1 = sp + 1
+    `U5 sp, sp1;                ///> data stack pointers, sp1 = sp + 1
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
     `DU  isht_o, iushr_o;
     `U1  shr_f;
     `DU2 mul_v;
+    `U1  div_en, div_bsy;
     `DU  div_q, div_r;
-    `U1  div_rst, div_by_z, div_bsy;
+    `U1  div_by_z;
     ///
     /// extended ALU units
     ///
@@ -63,9 +46,9 @@ module EJ32_AU #(
     .b(s),
     .r(mul_v)
     );
-    div_int   divide_inst(
+    div_int   div_inst(
     .clk(ctl.clk),
-    .rst(div_rst),
+    .rst(~div_en),
     .x(s),
     .y(t),
     .busy(div_bsy),
@@ -89,31 +72,28 @@ module EJ32_AU #(
     task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask;
     task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask;
     task POP();             TOS(s); `S(sPOP);   endtask;
-    task BRAN(); if (phase==0) ALU(s - t);      endtask;
+    task IBRAN(); 
+        case (phase)
+        0: ALU(s - t);
+        1: POP();
+        endcase
+    endtask: IBRAN
+    task ZBRAN(); if (phase==1) POP(); endtask;
+    task DIV();  if (phase==1 && !div_bsy) ALU(div_q); endtask;
     ///
     /// wires to reduce verbosity
     ///
-    assign s      = ss[sp];                 ///> data stack, TODO: EBR
-    assign sp1    = sp + 1;
-    ///
-    /// IO signals wires
-    ///
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
-    assign t      = ctl.t;
-    assign t_z    = ctl.t_z;
-    assign t_neg  = ctl.t_neg;
-    ///
-    /// wires to external modules
-    ///
-    assign div_rst= (code!=idiv && code!=irem) ? '1 : phase==0;
+    assign t      = ctl.t;                  ///> shadow TOS from control bus
+    assign s      = ss[sp];                 ///> data stack, TODO: EBR
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
+    assign sp1    = sp + 1;
+    assign div_en = (code==idiv || code==irem);
     ///
     /// combinational
     ///
     task INIT();
-        code_x    = 1'b1;         /// fetch opcode by default
-        phase_n   = 3'b0;         /// phase and IO controls
         t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
         ctl.ss_op = sNOP;         /// data stack
@@ -130,6 +110,7 @@ module EJ32_AU #(
         ///
         case (code)
         nop        : begin end    // do nothing
+        // data stack ops
         aconst_null: PUSH(0);
         iconst_m1  : PUSH(-1);
         iconst_0   : PUSH(0);
@@ -155,14 +136,12 @@ module EJ32_AU #(
             2: PUSH(s);
             endcase
         swap: begin TOS(s); `S(sMOVE); end
-        //
         // ALU ops
-        //
         iadd: ALU(s + t);
         isub: ALU(s - t);
         imul: ALU(mul_v[DSZ-1:0]);
-        idiv: if (phase==1 && !div_bsy) ALU(div_q);
-        irem: if (phase==1 && !div_bsy) ALU(div_r);
+        idiv: DIV();
+        irem: DIV();
         ineg: ALU(0 - t);
         ishl: ALU(isht_o);
         ishr: begin ALU(isht_o); `SET(shr_f); end
@@ -171,11 +150,38 @@ module EJ32_AU #(
         ior:  ALU(s | t);
         ixor: ALU(s ^ t);
         iinc: if (phase==1) ALU(t + `X8D(data));
-        // branching unit
-        if_icmpeq: BRAN();
-        if_icmpne: BRAN();
-        if_icmplt: BRAN();
-        if_icmpgt: BRAN();
+        // branching ops
+        ifeq:      ZBRAN();
+        ifne:      ZBRAN();
+        iflt:      ZBRAN();
+        ifge:      ZBRAN();
+        ifgt:      ZBRAN();
+        ifle:      ZBRAN();
+        if_icmpeq: IBRAN();
+        if_icmpne: IBRAN();
+        if_icmplt: IBRAN();
+        if_icmpgt: IBRAN();
+        pushr:     POP();
+        // load/store ops
+        istore_0: POP();
+        iastore: 
+            case (phase)
+            0: `S(sPOP);
+            4: POP();
+            endcase
+        bastore: 
+            case (phase)
+            0: `S(sPOP);
+            1: POP();
+            endcase
+        sastore:
+            case (phase)
+            0: `S(sPOP);
+            2: POP();
+            endcase
+        ldi: if (phase==0) PUSH(`X8D(data));
+        get: if (phase==0) `S(sPUSH);
+        put: if (phase==1) POP();
         endcase
     end // always_comb
     ///
@@ -186,6 +192,7 @@ module EJ32_AU #(
             sp <= '0;
         end
         else if (ctl.clk && au_en) begin
+            if (t_x) ctl.t <= t_n;
             // data stack
             case (ctl.ss_op)
             sMOVE: ss[sp] <= t;
@@ -193,35 +200,19 @@ module EJ32_AU #(
             sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end // CC: ERROR -> EBR with multiple writers
 //          sPUSH: begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
             endcase
-        end
-    end // always_ff @ (posedge ctl.clk, posedge ctl.rst)
-
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
-        if (!ctl.rst && ctl.clk && au_en) begin
-            ctl.phase <= phase_n;
-            // instruction
-            if (t_x) ctl.t <= t_n;
             ///
             /// validate and patch
             /// CC: do not know why DIV is skipping the branch
             ///
-            if (!div_rst) div_patch();
+            if (div_en) div_patch();
         end
-    end // always_ff @ (posedge clk, posedge rst)
+    end
 
     task div_patch();
         automatic `U8 op = code==idiv ? "/" : "%";
-        if (phase_n==1) begin
+        if (phase==0) begin
             if (!div_bsy) begin
                 $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-                assert(phase_n == 0) else begin
-                    $write(", phase_n=%d reset =0", phase_n) ;
-                    ctl.phase <= 0;
-                end
-                assert(code_x == 1) else begin
-                    $write(", code_x=%d code_n=%s, p=%4x forced +1", code_x, code_n.name, p);
-                    ctl.code <= code_n; p_o <= p + 1;
-                end
                 assert(ctl.ss_op == sPOP) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
                     sp <= sp - 1;
@@ -230,7 +221,6 @@ module EJ32_AU #(
                     $write(", t_x=%d t_n=%8x =q/r", t_x, t_n);
                     ctl.t <= code==idiv ? div_q : div_r;
                 end
-                $display(" :ERR");
             end
         end
         else begin // done div_int
