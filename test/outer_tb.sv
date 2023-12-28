@@ -4,9 +4,10 @@
 `timescale 1ps / 1ps
 `include "../source/eJ32_if.sv"
 
-`define CORE ej32.core
-`define CTL  ej32.ctl
 `define DBUS ej32.b8_if
+`define CTL  ej32.ctl
+`define AU   ej32.au
+`define BR   ej32.br
 
 import ej32_pkg::*;             // import enum types
 
@@ -20,7 +21,7 @@ module outer_tb #(
     //
     `IU ra2nfa[32];
     ///
-    eJ32        ej32(.*);       ///> ej32 top module
+    EJ32        ej32(.*);       ///> ej32 top module
     dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~`CTL.clk), .b8_if(`DBUS.master));
     ///
     /// debugging tasks
@@ -59,7 +60,7 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf: 0x%04x", OBUF);
-        dump(OBUF, 'h600);
+        dump(OBUF, 'h200);
     endtask: verify_obuf
 
     task activate;
@@ -69,8 +70,8 @@ module outer_tb #(
     endtask: activate
 
     task trace;
-         automatic `U5 rp  = `CORE.rp;
-         automatic `U3 ph  = `CORE.phase;
+         automatic `U5 rp = `BR.rp;
+         automatic `U3 ph = `AU.phase;
          automatic opcode_t code;
          if (!$cast(code, `CTL.code)) begin
              /// JVM opcodes, some are not avialable yet
@@ -79,10 +80,10 @@ module outer_tb #(
          $write(
              "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
              $time/10, 
-             `CORE.p,  `CORE.a, ej32.data, ej32.data_o,
-             `CORE.rp, `CORE.r,
-             `CORE.sp, `CORE.s, `CTL.t,
-             code, `CORE.phase, code.name);
+             `BR.p,  `BR.a, ej32.data, ej32.data_o,
+             `BR.rp, `BR.r,
+             `AU.sp, `AU.s, `CTL.t,
+             code, ph, code.name);
         case (`CTL.code)
         invokevirtual: if (ph==2) begin
             automatic `IU nfa = dict.to_name(ej32.addr);
