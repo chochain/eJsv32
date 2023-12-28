@@ -69,8 +69,6 @@ module EJ32_BR #(
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
-    // memory unit
-    task MEM(input `IU a); SETA(a); `SET(asel_n); endtask; // fetch from memory, data returns next cycle
     ///
     /// wires to reduce verbosity
     ///
@@ -105,12 +103,12 @@ module EJ32_BR #(
     always_comb begin
         INIT();
         case (code)
-        iload:   PUSH(rs[rp - data]);    // CC: not tested
-        iload_0: PUSH(rs[rp]);           // CC: not tested
-        iload_1: PUSH(rs[rp - 1]);       // CC: not tested
-        iload_2: PUSH(rs[rp - 2]);       // CC: not tested
-        iload_3: PUSH(rs[rp - 3]);       // CC: not tested
-        istore_0: begin r_n = t; `R(sMOVE); end  // local var, CC: not tested
+        iload:     PUSH(rs[rp - data]);    // CC: not tested
+        iload_0:   PUSH(rs[rp]);           // CC: not tested
+        iload_1:   PUSH(rs[rp - 1]);       // CC: not tested
+        iload_2:   PUSH(rs[rp - 2]);       // CC: not tested
+        iload_3:   PUSH(rs[rp - 3]);       // CC: not tested
+        istore_0:  begin r_n = t; `R(sMOVE); end  // local var, CC: not tested
         //
         // conditional branching ops
         // Logical ops
@@ -134,16 +132,8 @@ module EJ32_BR #(
             0: SETA(`X8A(data)); // set addr higher byte
             1: JMP(a_d);         // merge addr lower byte
             endcase
-        jsr:
-            case (phase)
-            // 0: begin phase_n = 1; MEM(t); end
-            // 1: begin phase_n = 2; `HOLD; MEM(a + 1); TOS(data); end
-            // CC: change Dr. Ting's logic
-            0: MEM(`XDA(t));
-            1: begin MEM(a + 1); TOS(`X8D(data)); end
-            2: begin JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
-            endcase
-        ret: JMP(`XDA(r));
+        jsr:     if (phase==2) begin JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
+        ret:     JMP(`XDA(r));
         jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
         invokevirtual:
             case (phase)
@@ -159,9 +149,9 @@ module EJ32_BR #(
                   JMP(a_d);
                end
             endcase
-        dupr: PUSH(r);
-        popr: begin PUSH(r); `R(sPOP); end
-        pushr:RPUSH(t);
+        dupr:  PUSH(r);
+        popr:  begin PUSH(r); `R(sPOP); end
+        pushr: RPUSH(t);
         endcase
     end
 
@@ -176,8 +166,8 @@ module EJ32_BR #(
             asel <= asel_n;
             // instruction pointer
             if (t_x) ctl.t <= t_n;
-            if (a_x) a     <= a_n;
             if (p_x) p     <= p_n;
+            if (a_x) a     <= a_n;
             // return stack
             case (ctl.rs_op)
             sMOVE: rs[rp] <= r_n;

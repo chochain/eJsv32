@@ -138,6 +138,11 @@ module EJ32_LS #(
             1: `SET(asel_n);
             2: begin TOS(s); DW(0); end
             endcase
+        jsr:
+            case (phase)
+            0: MEM(`XDA(t));
+            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            endcase
         ldi: 
             case (phase)
             1: TOS(t_d);

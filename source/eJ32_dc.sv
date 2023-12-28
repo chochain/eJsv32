@@ -21,6 +21,7 @@ module EJ32_DC #(
        output `IU dc_p_o
     );
     `U3  phase_n;
+    `IU  p_n;
     ///
     /// wire
     ///
@@ -74,12 +75,20 @@ module EJ32_DC #(
     assign code = ctl.code;
     assign phase= ctl.phase;
 
-    always_comb begin           ///> decoder unit
-        phase_n = 0;
+    task INIT();
         au_en   = 1'b0;
         br_en   = 1'b0;
         ls_en   = 1'b0;
+        // instruction
+        phase_n = 0;
+        code_x  = 1'b1;
+        p_x     = 1'b1;
+        p_n     = p + 'h1;
+    endtask: INIT     
 
+    always_comb begin           ///> decoder unit
+        INIT();
+        // state machine
         case (code)
         // AU unit
         nop        :  `AU1;
@@ -136,7 +145,7 @@ module EJ32_DC #(
         if_icmplt: BRAN();
         if_icmpgt: BRAN();
         goto:      BRAN();
-        jsr:     begin `BR1; WAIT2(); end
+        jsr:     begin `BR1; `LS1; WAIT2(); end
         ret:     `BR1;
         jreturn: begin `BR1; if (phase==0) STEP(1); end
         invokevirtual: BRAN();
@@ -171,7 +180,7 @@ module EJ32_DC #(
         end
         else if (ctl.clk) begin
             ctl.phase <= phase_n;
-            dc_p_o    <= p_x ? p : p + 1;
+            if (p_x) dc_p_o <= p_n;
         end
     end
 endmodule: EJ32_DC

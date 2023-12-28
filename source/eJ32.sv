@@ -9,17 +9,18 @@ module EJ32 #(
     parameter TIB  = 'h1000,    // input buffer ptr
     parameter OBUF = 'h1400     // output buffer ptr
     );
+    `U1  au_en, br_en, ls_en;
     // ej32 memory bus
     `IU  addr;
     `IU  ls_addr_o;             ///> shared memory address
     `U1  ls_asel_o;
     `IU  br_addr_o;
     `U8  data;                  ///> data return from SRAM (sent to core)
-    `IU  p, p_o;
+    `IU  p;
+    `IU  dc_p_o, br_p_o;
     `DU  s;
     `U8  data_o;                ///> data return from core
     `U1  dwe_o;                 ///> data write enable driven by core
-    `U1  au_en, br_en, ls_en;
     `U1  div_bsy_o;
 
     mb8_io               b8_if();                      ///> 8-bit memory bus
@@ -28,12 +29,13 @@ module EJ32 #(
     EJ32_CTL             ctl();                        ///> ej32 control bus
     EJ32_DC              dc(.ctl(ctl), .div_bsy(div_bsy_o), .*);
     EJ32_AU              au(.ctl(ctl), .*);
-    EJ32_LS #(TIB, OBUF) ls(.ctl(ctl), .*); 
     EJ32_BR              br(.ctl(ctl), .*);
+    EJ32_LS #(TIB, OBUF) ls(.ctl(ctl), .*); 
 
     assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
 
     always_comb begin
+        p = p + 'h1;                            ///> advance program counter
         if (dwe_o) b8_if.put_u8(addr, data_o);  ///> write to SRAM
         else       b8_if.get_u8(addr);          ///> read from SRAM
     end
