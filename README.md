@@ -28,8 +28,12 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   + use common tasks and macros to reduce verbosity
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
-  + add control bus with t and stack ops
-  + modulize stacks
+* modulization
+  + CTL- fishbone (TOS, ss_op, rs_op on bus)
+  + DC - decoder (state machine)
+  + AU - arithmetic unit (ALU and data stack)
+  + BR - branching unit (program counter and return stack)
+  + LS - load/store unit (memory and buffer IO)
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice)
@@ -63,7 +67,8 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * vsim COLD start - completed
   + 97K cycles, ~/docs/eJ32_trace.txt
 * vsim Dr. Ting's 6 embeded test cases - completed
-  + 520K+ cycles sucessfully, ~/docs/eJ32_trace_full_20220414.txt
+  + 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
+  + 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
 
 ### TODO
 * read Project-F, https://github.com/projf/projf-explore
@@ -71,4 +76,11 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * learn Verilator
   + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
 * study SpinalHDL
+* Consider Pipeline design
+  + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
 
+### Revision History
+* 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
+* 20220209 - Chochain Lee: rename to eJ32 for Lattice and future versions
+* 20230216 - Chochain Lee: consolidate ALU modules, tiddy macro tasks
+* 20231216 - Chochain Lee: fishbone modulization to
