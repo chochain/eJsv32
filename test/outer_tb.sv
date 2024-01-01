@@ -66,7 +66,7 @@ module outer_tb #(
 
     task activate;
         `DBUS.get_u8(0);
-        repeat(5) @(posedge `CTL.clk) `CTL.rst = 1'b1;
+        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b1;
         repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b0;
     endtask: activate
 
