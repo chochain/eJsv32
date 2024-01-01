@@ -7,25 +7,24 @@
 `define R(op)  ctl.rs_op = op
 
 module EJ32_BR #(
+    parameter RS_DEPTH = 32,    ///> 32 deep return stack
     parameter DSZ      = 32,    ///> 32-bit data width
-    parameter ASZ      = 17,    ///> 128K address space
-    parameter RS_DEPTH = 32     ///> 32 deep return stack
+    parameter ASZ      = 17     ///> 128K address space
     ) (
-    EJ32_CTL ctl,
-    input  `U1 br_en,           ///> branching unit active
-    input  `U8 data,            ///> data from memory bus
-    input  `DU s,               ///> NOS from stack unit
-    output `IU br_p_o,
-    output `IU br_addr_o
+    EJ32_CTL ctl,               ///> eJ32 control bus
+    input    `U1 br_en,         ///> branching unit active
+    input    `IU p,             ///> instruction pointer
+    input    `U8 data,          ///> data from memory bus
+    input    `DU s,             ///> NOS from stack unit
+    output   `IU br_p_o,        ///> target instruction pointer
+    output   `U1 br_psel
     );
     import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
     // instruction
+    `IU  a;                     ///> instrunction address
     `U3  phase;                 ///> FSM phase (aka state)
-    `IU  p, a;                  ///> program counter, instruction pointer
-    `U1  asel;                  ///> address bus mux (P|A)
-    // return stack
     `DU  rs[RS_DEPTH];          ///> return stack, 3K LUTs, TODO: use EBR memory
     `DU  r;                     ///> top of RS
     `U5  rp;                    ///> return stack pointers
@@ -33,18 +32,16 @@ module EJ32_BR #(
     /// @}
     /// @defgroup Next Register
     /// @{
-    // instruction
-    `IU p_n;                    ///> program counter
     `IU a_n;                    ///> instruction pointer
-    `U1 asel_n;                 ///> address bus mux (P|A)
-    // data & return stacks
+    `U1 asel_n;
     `DU t_n, r_n;               ///> TOS, top of return stack
     /// @}
     /// @defgroup Wires
     /// @{
     // instruction
     opcode_t code;              ///> shadow ctl.code
-    `U1 p_x, a_x;               ///> address controls
+    `U1 asel;                   ///> address select
+    `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
     // data stack
     `DU t;                      ///> shadow TOS
@@ -55,17 +52,17 @@ module EJ32_BR #(
     `U1 r_x;                    ///> return stack control
 
     // data stack
-    task TOS(input `DU v);  t_n = v;  `SET(t_x); endtask;
-    task PUSH(input `DU v); TOS(v);   `S(sPUSH); endtask;
-    task RPUSH(input `DU v); r_n = v; `R(sPUSH); endtask;
+    task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
+    task PUSH(input `DU d); TOS(d);   `S(sPUSH); endtask;
+    task RPUSH(input `DU d); r_n = d; `R(sPUSH); endtask;
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input `IU a); a_n = a; `SET(a_x); endtask;   // build addr ptr
-    task JMP(input `IU a);  p_n = a; `SET(a_x); endtask;   // jmp and clear a
+    task SETA(input `IU i); a_n = i; `SET(a_x);    endtask;  // build addr ptr
+    task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask;  // jmp and clear a
     task BRAN(input `U1 f);
         case (phase)
-        0: SETA(data);
+        0: SETA(`XDA(data));
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
@@ -77,23 +74,22 @@ module EJ32_BR #(
     ///
     /// IO signals wires
     ///
-    assign code   = ctl.code;                 ///> input from ej32 control
+    assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
     assign t_z    = ctl.t_z;
     assign t_neg  = ctl.t_neg;
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into t
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
-    assign br_addr_o = (asel) ? a : p;        ///> address, data or instruction
+    /// output ports
+    assign br_p_o = a;
+    assign br_psel= asel;
     ///
     /// combinational
     ///
     task INIT();
-        p_n       = p + 'h1;      /// advance program counter
-        p_x       = 1'b1;         /// advance PC by default
-        a_n       = {ASZ{1'b0}};  /// default to clear address
+        asel_n    = 1'b0;
         a_x       = 1'b0;
-        asel_n    = 1'b0;         /// address default to program counter
         t_n       = {DSZ{1'b0}};  /// TOS
         t_x       = 1'b0;
         r_n       = {DSZ{1'b0}};  /// return stack
@@ -157,17 +153,15 @@ module EJ32_BR #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            p    <= {ASZ{1'b0}};
-            a    <= {ASZ{1'b0}};
-            asel <= 1'b0;
+            a    <= {ASZ{1'b0}};     /// init address
+            asel <= 1'b0;            /// cold start by decoder
             rp   <= '0;
         end
         else if (ctl.clk && br_en) begin
             asel <= asel_n;
-            // instruction pointer
             if (t_x) ctl.t <= t_n;
-            if (p_x) p     <= p_n;
             if (a_x) a     <= a_n;
+            
             // return stack
             case (ctl.rs_op)
             sMOVE: rs[rp] <= r_n;
