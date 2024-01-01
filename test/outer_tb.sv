@@ -8,6 +8,7 @@
 `define CTL  ej32.ctl
 `define AU   ej32.au
 `define BR   ej32.br
+`define LS   ej32.ls
 
 import ej32_pkg::*;             // import enum types
 
@@ -65,7 +66,7 @@ module outer_tb #(
 
     task activate;
         `DBUS.get_u8(0);
-        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b1;
+        repeat(5) @(posedge `CTL.clk) `CTL.rst = 1'b1;
         repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b0;
     endtask: activate
 
@@ -80,13 +81,13 @@ module outer_tb #(
          $write(
              "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
              $time/10, 
-             `BR.p,  `BR.a, ej32.data, ej32.data_o,
+             ej32.p, `LS.a, `BR.a_n, ej32.data,
              `BR.rp, `BR.r,
              `AU.sp, `AU.s, `CTL.t,
              code, ph, code.name);
         case (`CTL.code)
         invokevirtual: if (ph==2) begin
-            automatic `IU nfa = dict.to_name(ej32.addr);
+            automatic `IU nfa = dict.to_name(ej32.p);
             for (int i=0; i<rp; i++) $write("  ");
             $write(" :: ");
             ra2nfa[rp] = nfa;
@@ -105,12 +106,11 @@ module outer_tb #(
 
     initial begin
         `CTL.reset();         // initialize control interface
-
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge `CTL.clk) trace();
+        repeat(100) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
