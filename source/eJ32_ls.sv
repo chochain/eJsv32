@@ -12,11 +12,8 @@ module EJ32_LS #(
     EJ32_CTL ctl,               ///> ej32 control bus
     mb8_io   b8_if,             ///> 8-bit memory bus
     input    `U1 ls_en,
-    input    `DU s,             ///> NOS
-    output   `IU ls_a_o,
-    output   `U1 ls_asel,
-    output   `U1 ls_dwe,
-    output   `U2 ls_dsel
+    input    `IU p,
+    input    `DU s              ///> NOS
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -46,6 +43,7 @@ module EJ32_LS #(
     `U1 t_x;
     `DU t_d;                    ///> 4-byte merged data
     // memory & IO buffers
+    `IU addr;                   ///> b8_if.ai driver
     `U8 data;                   ///> b8_if.vo shadow
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
@@ -61,17 +59,25 @@ module EJ32_LS #(
     assign code   = ctl.code;                 ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;
+    assign addr   = asel ? a : p;             ///> b8_if memory access address
     assign data   = b8_if.vo;                 ///> shadow data on memory bus
     ///
     /// address, data shifter
     ///
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
-    /// output ports
-    assign ls_a_o  = a;
-    assign ls_asel = asel;
-    assign ls_dwe  = dwe;
-    assign ls_dsel = dsel;
+    ///
+    /// memory bus interface
+    ///
+    always_comb begin
+        if (dwe) begin
+            automatic `U8 d8x4[4] =              ///> 4-to-1 Big-Endian
+                {t[31:24],t[23:16],t[15:8],t[7:0]};
+            automatic `U8 v = d8x4[dsel];        ///> data byte select (Big-Endian)
+            b8_if.put_u8(addr, v);               ///> write to SRAM
+        end    
+        else b8_if.get_u8(addr);                 ///> read from SRAM
+    end
     ///
     /// combinational
     ///
