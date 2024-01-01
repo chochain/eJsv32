@@ -7,13 +7,15 @@
 `define S(op)  ctl.ss_op = op
 
 module EJ32_AU #(
-    parameter DSZ      = 32,    ///> 32-bit data width
-    parameter SS_DEPTH = 32     ///> 32 deep data stack
+    parameter SS_DEPTH = 32,    ///> 32 deep data stack
+    parameter DSZ      = 32     ///> 32-bit data width
     ) (
     EJ32_CTL ctl,
-    input  `U1 au_en,           ///> arithmetic unit enable
-    input  `U8 data,            ///> data from memory bus
-    output `U1 div_bsy_o
+    mb8_io   b8_if,
+    input    `U1 au_en,         ///> arithmetic unit enable
+    input    `U8 data,          ///> data from memory bus
+    output   `U1 div_bsy_o,
+    output   `DU s_o
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -90,6 +92,9 @@ module EJ32_AU #(
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
     assign sp1    = sp + 1;
     assign div_en = (code==idiv || code==irem);
+    /// wired to output
+    assign div_bsy_o = div_bsy;
+    assign s_o    = s;
     ///
     /// combinational
     ///
@@ -109,7 +114,6 @@ module EJ32_AU #(
         /// instruction dispatcher
         ///
         case (code)
-        nop        : begin end    // do nothing
         // data stack ops
         aconst_null: PUSH(0);
         iconst_m1  : PUSH(-1);
