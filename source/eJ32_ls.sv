@@ -4,27 +4,26 @@
 `include "../source/eJ32_if.sv"
 
 module EJ32_LS #(
-    parameter TIB      = 'h1000,          ///> input buffer address
-    parameter OBUF     = 'h1400,          ///> output buffer address
-    parameter DSZ      = 32,              ///> 32-bit data width
-    parameter ASZ      = 17               ///> 128K address space
+    parameter TIB  = 'h1000,    ///> input buffer address
+    parameter OBUF = 'h1400,    ///> output buffer address
+    parameter DSZ  = 32,        ///> 32-bit data width
+    parameter ASZ  = 17         ///> 128K address space
     ) (
-    EJ32_CTL ctl,
-    input  `U1 ls_en,
-    input  `U8 data,                      ///> data from memory bus
-    input  `DU s,                         ///> NOS
-    output `U1 ls_asel_o,
-    output `IU ls_addr_o,                 ///> address to memory bus
-    output `U8 data_o,                    ///> data to memory bus
-    output `U1 dwe_o                      ///> data write enable
+    EJ32_CTL ctl,               ///> ej32 control bus
+    mb8_io   b8_if,             ///> 8-bit memory bus
+    input    `U1 ls_en,
+    input    `DU s,             ///> NOS
+    output   `IU ls_a_o,
+    output   `U1 ls_asel,
+    output   `U1 ls_dwe,
+    output   `U2 ls_dsel
     );
     import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
     // instruction
     `IU  a;                     ///> memory address
-    `IU  asel;
-    // IO
+    `U1  asel;                  ///> memory address select
     `U2  dsel;                  ///> 32-bit, 4-to-1 mux, byte select
     `IU  ibuf, obuf;            ///> input, output buffer pointers
     /// @}
@@ -32,15 +31,14 @@ module EJ32_LS #(
     /// @{
     `DU t_n;                    ///> TOS
     `IU a_n;                    ///> data address
-    `IU asel_n;                 ///> address select
-    `U8 data_n;
+    `U1 asel_n;                 ///> address select
     `U2 dsel_n;                 ///> 32-bit, 4-to-1 mux, byte select
     /// @}
     /// @defgroup Wires
     /// @{
     // instruction
     opcode_t code;              ///> shadow ctl.code
-    `U3  phase;                 ///> FSM phase (aka state)
+    `U3 phase;                  ///> FSM phase (aka state)
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
     // data stack
@@ -48,33 +46,32 @@ module EJ32_LS #(
     `U1 t_x;
     `DU t_d;                    ///> 4-byte merged data
     // memory & IO buffers
-    `U8 d8x4[4];                ///> 4-to-1 byte select
+    `U8 data;                   ///> b8_if.vo shadow
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
     /// @}
 
-    task TOS(input `DU v);  t_n = v; `SET(t_x);   endtask;   ///> update TOS
-    task SETA(input `IU a); a_n = a; `SET(a_x);   endtask;   ///> build addr ptr
-    task MEM(input `IU a); SETA(a); `SET(asel_n); endtask;   ///> fetch from memory, data returns next cycle
+    task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask;   ///> update TOS
+    task SETA(input `IU i); a_n = i; `SET(a_x);   endtask;   ///> build addr ptr
+    task MEM(input `IU i); SETA(i); `SET(asel_n); endtask;   ///> fetch from memory, data returns next cycle
     task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask;   ///> data write n-th byte
     ///
     /// wires to reduce verbosity
     ///
-    assign code     = ctl.code;               ///> input from ej32 control
-    assign phase    = ctl.phase;
-    assign t        = ctl.t;
-    assign ls_addr_o= a;                      ///> memory address
-    assign ls_asel_o= asel;
-    assign data_o   = data_n;                 ///> data sent to memory bus
-    assign dwe_o    = dwe;                    ///> data write enable
-    assign d8x4     =                         ///> 4-to-1 Big-Endian
-        {t[31:24],t[23:16],t[15:8],t[7:0]};
-    assign data_n   = d8x4[dsel];             ///> data byte select (Big-Endian)
+    assign code   = ctl.code;                 ///> input from ej32 control
+    assign phase  = ctl.phase;
+    assign t      = ctl.t;
+    assign data   = b8_if.vo;                 ///> shadow data on memory bus
     ///
-    /// wires to external modules
+    /// address, data shifter
     ///
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
+    /// output ports
+    assign ls_a_o  = a;
+    assign ls_asel = asel;
+    assign ls_dwe  = dwe;
+    assign ls_dsel = dsel;
     ///
     /// combinational
     ///
@@ -90,7 +87,7 @@ module EJ32_LS #(
         ibuf_x    = 1'b0;
         obuf_x    = 1'b0;
     endtask: INIT
-
+    
     always_comb begin
         INIT();
         case (code)
@@ -164,11 +161,11 @@ module EJ32_LS #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            asel  <= 1'b0;
+            a     <= {ASZ{1'b0}}; ///> clear address
+            asel  <= 1'b0;        ///> note: cold start by decoder
             dsel  <= 3;
             ibuf  <= TIB;
             obuf  <= OBUF;
-            a     <= {ASZ{1'b0}};
         end
         else if (ctl.clk && ls_en) begin
             asel <= asel_n;
@@ -178,5 +175,5 @@ module EJ32_LS #(
             if (ibuf_x)  ibuf     <= ibuf + 1;
             if (obuf_x)  obuf     <= obuf + 1;
         end
-    end // always_ff @ (posedge clk, posedge rst)
+    end
 endmodule: EJ32_LS
