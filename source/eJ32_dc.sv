@@ -28,10 +28,8 @@ module EJ32_DC #(
     ///
     /// wire
     ///
-    opcode_t code;
     `U3  phase;
-    `U1  code_x;         // delay 1st cycle
-    `U1  dc_code;        // delay 2nd cycle
+    `U1  code_x, code_x2;  // opcode pipeline delays
     `U1  p_x;
 
     task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
@@ -72,21 +70,8 @@ module EJ32_DC #(
         endcase
     endtask: WAIT5
     ///
-    /// fetch instruction
+    /// combinational
     ///
-    always_comb begin
-        // instruction
-        if (!$cast(code_n, data)) begin
-            /// JVM opcodes, some are not avialable yet
-            code_n = op_err;
-        end
-    end
-    
-    always_ff @(posedge ctl.clk) begin
-        ctl.phase <= phase;
-        if (dc_code) ctl.code <= code_n;
-    end
-
     task INIT();
         au_en   = 1'b0;
         br_en   = 1'b0;
@@ -182,16 +167,28 @@ module EJ32_DC #(
         put: begin `AU1; `LS1; WAIT1(); end
         endcase
     end
+    ///
+    /// fetch instruction
+    ///
+    always_comb begin
+        // instruction
+        if (!$cast(code_n, data)) begin
+            /// JVM opcodes, some are not avialable yet
+            code_n = op_err;
+        end
+    end
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+        ctl.phase <= phase;
+        if (code_x2) ctl.code <= code_n;
         if (ctl.rst) begin
             phase   <= 3'b0;
-            dc_code <= 1'b1;
+            code_x2 <= 1'b1;
             dc_p_o  <= COLD;
         end
         else if (ctl.clk) begin
-            phase   <= phase_n;
-            dc_code <= code_x;
+            phase    <= phase_n;
+            code_x2  <= code_x;
             if (p_x) dc_p_o <= p + 'h1;
         end
     end
