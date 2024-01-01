@@ -9,19 +9,22 @@
 import ej32_pkg::*;
 
 module EJ32_DC #(
-    parameter TIB  = 'h1000,    // input buffer ptr
-    parameter OBUF = 'h1400     // output buffer ptr
+       parameter COLD = 'h0     // cold start address
     ) (
        EJ32_CTL ctl,
-       input  `IU p,            // program counter
+       input  `IU p,            // instruction address
+       input  `U8 data,         // byte return from memory bus
        input  `U1 div_bsy,
        output `U1 au_en,
        output `U1 br_en,
        output `U1 ls_en,
-       output `IU dc_p_o
+       output `IU dc_p_o,
+       output `U1 dc_code
     );
+    ///
+    /// register next 
+    ///
     `U3  phase_n;
-    `IU  p_n;
     ///
     /// wire
     ///
@@ -32,25 +35,30 @@ module EJ32_DC #(
 
     task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
     task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask;
-    task BRAN();
-        `AU1; `BR1;
-        case (phase)
-        0: STEP(1);
-        1: STEP(2);
+    task DIV();  `AU1; 
+        case (phase) 
+        0: WAIT(1); 
+        1: if (div_bsy) WAIT(1);
+        endcase
+    endtask: DIV
+    task BRAN(); `AU1; `BR1; 
+        case (phase) 
+        0: STEP(1); 
+        1: STEP(2); 
         endcase
     endtask: BRAN
-    task WAIT1(); if (phase==0) WAIT(1); endtask;
-    task WAIT2();
-        case (phase)
-        0: WAIT(1);
-        1: WAIT(2);
+    task WAIT1(); if (phase==0) WAIT(1); endtask
+    task WAIT2(); 
+        case (phase) 
+        0: WAIT(1); 
+        1: WAIT(2);  
         endcase
     endtask: WAIT2
     task WAIT3();
-        case (phase)
-        0: WAIT(1);
-        1: WAIT(2);
-        2: WAIT(3);
+        case (phase) 
+        0: WAIT(1); 
+        1: WAIT(2); 
+        2: WAIT(3); 
         endcase
     endtask: WAIT3
     task WAIT5();
@@ -62,28 +70,24 @@ module EJ32_DC #(
         4: WAIT(5);
         endcase
     endtask: WAIT5
-    task DIV();
-        `AU1;
-        case (phase)
-        0: WAIT(1);
-        1: if (div_bsy) WAIT(1);
-        endcase
-    endtask: DIV
     ///
     /// wire to reduce verbosity
     ///
-    assign code = ctl.code;
-    assign phase= ctl.phase;
+    assign code  = ctl.code;
+    assign phase = ctl.phase;
 
     task INIT();
         au_en   = 1'b0;
         br_en   = 1'b0;
         ls_en   = 1'b0;
-        // instruction
         phase_n = 0;
-        code_x  = 1'b1;
-        p_x     = 1'b1;
-        p_n     = p + 'h1;
+        code_x  = 1'b1;         ///> update opcode by default
+        p_x     = 1'b1;         ///> advance program counter by default
+       
+        if (!$cast(code_n, data)) begin
+            /// JVM opcodes, some are not avialable yet
+            code_n = op_err;
+        end
     endtask: INIT     
 
     always_comb begin           ///> decoder unit
@@ -91,7 +95,6 @@ module EJ32_DC #(
         // state machine
         case (code)
         // AU unit
-        nop        :  `AU1;
         aconst_null:  `AU1;
         iconst_m1  :  `AU1;
         iconst_0   :  `AU1;
@@ -176,11 +179,14 @@ module EJ32_DC #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            // do nothing
+            ctl.phase <= 3'b0;
+            dc_code   <= 1'b1;
+            dc_p_o    <= COLD;
         end
         else if (ctl.clk) begin
             ctl.phase <= phase_n;
-            if (p_x) dc_p_o <= p_n;
+            dc_code   <= code_x;
+            if (p_x) dc_p_o <= p + 'h1;
         end
     end
 endmodule: EJ32_DC
