@@ -22,6 +22,7 @@ module EJ32 #(
     `DU  s;
     `IU  dc_p_o;
     `U1  dc_code;
+    `U2  dc_phase;
     `U1  div_bsy_o;
     `IU  br_p_o;
     `U1  br_psel;
@@ -50,8 +51,10 @@ module EJ32 #(
     end
     
     always_ff @(posedge ctl.clk) begin
-        if (dc_code) ctl.code = code_n;
+        ctl.phase <= dc_phase;
+        if (dc_code) ctl.code <= code_n;
     end
+   
     assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
     assign p    = br_psel ? br_p_o : dc_p_o;     ///> instruction address
     assign addr = ls_asel ? ls_a_o : p;

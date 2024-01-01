@@ -19,7 +19,8 @@ module EJ32_DC #(
        output `U1 br_en,
        output `U1 ls_en,
        output `IU dc_p_o,
-       output `U1 dc_code
+       output `U1 dc_code,
+       output `U2 dc_phase
     );
     ///
     /// register next 
@@ -41,7 +42,7 @@ module EJ32_DC #(
         1: if (div_bsy) WAIT(1);
         endcase
     endtask: DIV
-    task BRAN(); `AU1; `BR1; 
+    task BRAN(); `AU1; `BR1;
         case (phase) 
         0: STEP(1); 
         1: STEP(2); 
@@ -71,29 +72,22 @@ module EJ32_DC #(
         endcase
     endtask: WAIT5
     ///
-    /// wire to reduce verbosity
-    ///
-    assign code  = ctl.code;
-    assign phase = ctl.phase;
+    /// drive output ports
+    assign dc_phase = phase;
 
     task INIT();
         au_en   = 1'b0;
         br_en   = 1'b0;
         ls_en   = 1'b0;
-        phase_n = 0;
         code_x  = 1'b1;         ///> update opcode by default
+        phase_n = 3'b0;
         p_x     = 1'b1;         ///> advance program counter by default
-       
-        if (!$cast(code_n, data)) begin
-            /// JVM opcodes, some are not avialable yet
-            code_n = op_err;
-        end
     endtask: INIT     
 
     always_comb begin           ///> decoder unit
         INIT();
         // state machine
-        case (code)
+        case (ctl.code)
         // AU unit
         aconst_null:  `AU1;
         iconst_m1  :  `AU1;
@@ -179,13 +173,13 @@ module EJ32_DC #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-            ctl.phase <= 3'b0;
-            dc_code   <= 1'b1;
-            dc_p_o    <= COLD;
+            phase   <= 3'b0;
+            dc_code <= 1'b1;
+            dc_p_o  <= COLD;
         end
         else if (ctl.clk) begin
-            ctl.phase <= phase_n;
-            dc_code   <= code_x;
+            phase   <= phase_n;
+            dc_code <= code_x;
             if (p_x) dc_p_o <= p + 'h1;
         end
     end
