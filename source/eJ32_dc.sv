@@ -18,20 +18,20 @@ module EJ32_DC #(
        output `U1 au_en,
        output `U1 br_en,
        output `U1 ls_en,
-       output `IU dc_p_o,
-       output `U1 dc_code,
-       output `U2 dc_phase
+       output `IU dc_p_o
     );
     ///
     /// register next 
     ///
+    opcode_t code_n;
     `U3  phase_n;
     ///
     /// wire
     ///
     opcode_t code;
     `U3  phase;
-    `U1  code_x;
+    `U1  code_x;         // delay 1st cycle
+    `U1  dc_code;        // delay 2nd cycle
     `U1  p_x;
 
     task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask;
@@ -72,8 +72,20 @@ module EJ32_DC #(
         endcase
     endtask: WAIT5
     ///
-    /// drive output ports
-    assign dc_phase = phase;
+    /// fetch instruction
+    ///
+    always_comb begin
+        // instruction
+        if (!$cast(code_n, data)) begin
+            /// JVM opcodes, some are not avialable yet
+            code_n = op_err;
+        end
+    end
+    
+    always_ff @(posedge ctl.clk) begin
+        ctl.phase <= phase;
+        if (dc_code) ctl.code <= code_n;
+    end
 
     task INIT();
         au_en   = 1'b0;
