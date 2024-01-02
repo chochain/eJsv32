@@ -190,17 +190,17 @@ module EJ32_DC #(
     end
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
-        ctl.phase <= phase;
-        if (code_x2) ctl.code <= code_n;
         if (ctl.rst) begin
-            phase    <= 3'b0;
-            code_x2  <= 1'b1;
-            p_inc    <= 1'b0;
+            phase     <= 3'b0;
+            code_x2   <= 1'b1;
+            p_inc     <= 1'b0;
         end
         else if (ctl.clk) begin
-            phase    <= phase_n;
-            code_x2  <= code_x;
-            p_inc    <= p_x;
+            if (code_x2) ctl.code <= code_n;
+            ctl.phase <= phase;
+            phase     <= phase_n;
+            code_x2   <= code_x;
+            p_inc     <= p_x;
         end
     end
 endmodule: EJ32_DC
