@@ -13,10 +13,6 @@ interface EJ32_CTL;
    opcode_t code;              // opcode
    `U3  phase;                 // opcode phase i.e. nth-cycle of opcode
    `DU  t;                     // TOS, on bus
-   `U1  t_z;                   // TOS zero flag
-   `U1  t_neg;                 // TOS neg flag
-   stack_op ss_op;             // data stack op
-   stack_op rs_op;             // return stack op
    
    function void reset();
        clk   = 1'b1;           // memory fetch at neg edge
@@ -26,11 +22,9 @@ interface EJ32_CTL;
        t     = 0;
    endfunction: reset
    
-   function void tick();
+   function void clk_tick();
        clk   = ~clk;
-       t_z   = t == 0;
-       t_neg = t[31];
-   endfunction: tick
+   endfunction: clk_tick
 endinterface: EJ32_CTL
 
 interface mb32_io(input `U1 clk);
