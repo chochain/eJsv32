@@ -3,8 +3,7 @@
 //
 `include "../source/eJ32_if.sv"
 
-`define S(op)  ctl.ss_op = op
-`define R(op)  ctl.rs_op = op
+`define R(op) rs_op=op
 
 module EJ32_BR #(
     parameter RS_DEPTH = 32,    ///> 32 deep return stack
@@ -28,6 +27,7 @@ module EJ32_BR #(
     `DU  rs[RS_DEPTH];          ///> return stack, 3K LUTs, TODO: use EBR memory
     `DU  r;                     ///> top of RS
     `U5  rp;                    ///> return stack pointers
+    stack_op rs_op;             ///> return stack opcode
     // IO
     /// @}
     /// @defgroup Next Register
@@ -53,7 +53,7 @@ module EJ32_BR #(
 
     // data stack
     task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
-    task PUSH(input `DU d); TOS(d);   `S(sPUSH); endtask;
+    task PUSH(input `DU d); TOS(d);              endtask;    // `S(sPUSH) in AU
     task RPUSH(input `DU d); r_n = d; `R(sPUSH); endtask;
     // branching
     // Note: address is memory offset (instead of Java class file reference)
@@ -77,8 +77,8 @@ module EJ32_BR #(
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = ctl.t_z;
-    assign t_neg  = ctl.t_neg;
+    assign t_z    = ctl.t == 0;               ///> zero flag
+    assign t_neg  = ctl.t[DSZ-1];             ///> negative flag
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into t
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     /// output ports
@@ -88,17 +88,18 @@ module EJ32_BR #(
     /// combinational
     ///
     task INIT();
-        asel_n    = 1'b0;
-        a_x       = 1'b0;
-        t_n       = {DSZ{1'b0}};  /// TOS
-        t_x       = 1'b0;
-        r_n       = {DSZ{1'b0}};  /// return stack
-        ctl.rs_op = sNOP;
+        asel_n  = 1'b0;
+        a_x     = 1'b0;
+        t_n     = {DSZ{1'b0}};  /// TOS
+        t_x     = 1'b0;
+        r_n     = {DSZ{1'b0}};  /// return stack
+        rs_op   = sNOP;
     endtask: INIT
 
     always_comb begin
         INIT();
         case (code)
+        // return stack => TOS
         iload:     PUSH(rs[rp - data]);    // CC: not tested
         iload_0:   PUSH(rs[rp]);           // CC: not tested
         iload_1:   PUSH(rs[rp - 1]);       // CC: not tested
@@ -107,7 +108,6 @@ module EJ32_BR #(
         istore_0:  begin r_n = t; `R(sMOVE); end  // local var, CC: not tested
         //
         // conditional branching ops
-        // Logical ops
         //
         ifeq:      BRAN(t_z);
         ifne:      BRAN(!t_z);
@@ -121,7 +121,6 @@ module EJ32_BR #(
         if_icmpgt: BRAN(!t_z && !t_neg);
         //
         // unconditional branching ops
-        // branching
         //
         goto:
             case (phase)
@@ -136,6 +135,7 @@ module EJ32_BR #(
             0: begin SETA(`X8A(data)); RPUSH(`XAD(p) + 2); end
             1: begin JMP(a_d); end
             endcase
+        // eForth VM specific ops
         donext:
             case (phase)
             0: SETA(`X8A(data));
@@ -161,9 +161,9 @@ module EJ32_BR #(
             asel <= asel_n;
             if (t_x) ctl.t <= t_n;
             if (a_x) a     <= a_n;
-            
+
             // return stack
-            case (ctl.rs_op)
+            case (rs_op)
             sMOVE: rs[rp] <= r_n;
             sPOP:  rp     <= rp - 1;
             sPUSH: begin rs[rp1] <= r_n; rp <= rp + 1; end
