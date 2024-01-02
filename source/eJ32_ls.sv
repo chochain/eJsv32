@@ -47,6 +47,7 @@ module EJ32_LS #(
     `U8 data;                   ///> b8_if.vo shadow
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
+    `U8 d8x4[4];                ///> 4-to-1 byte mux
     /// @}
 
     task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask;   ///> update TOS
@@ -66,17 +67,13 @@ module EJ32_LS #(
     ///
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
+    assign d8x4   = {t[31:24],t[23:16],t[15:8],t[7:0]}; ///> 4-to-1 mux (Big-Endian)
     ///
     /// memory bus interface
     ///
     always_comb begin
-        if (dwe) begin
-            automatic `U8 d8x4[4] =              ///> 4-to-1 Big-Endian
-                {t[31:24],t[23:16],t[15:8],t[7:0]};
-            automatic `U8 v = d8x4[dsel];        ///> data byte select (Big-Endian)
-            b8_if.put_u8(addr, v);               ///> write to SRAM
-        end
-        else b8_if.get_u8(addr);                 ///> read from SRAM
+        if (dwe) b8_if.put_u8(addr, d8x4[dsel]);   ///> write to SRAM
+        else     b8_if.get_u8(addr);               ///> read from SRAM
     end
     ///
     /// combinational
