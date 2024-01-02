@@ -113,7 +113,7 @@ module EJ32_DC #(
         iconst_3:     `AU1;
         iconst_4:     `AU1;
         iconst_5:     `AU1;
-        bipush: begin `AU1; if (phase==1) STEP(1); end
+        bipush: begin `AU1; if (phase==0) STEP(1); end
         sipush: begin `AU1; STEP2(); end
         // return stack => data stack
         iload:        `AB1
