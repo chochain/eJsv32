@@ -62,7 +62,7 @@ module EJ32_BR #(
     task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask;  // jmp and clear a
     task BRAN(input `U1 f);
         case (phase)
-        0: SETA(`XDA(data));
+        0: SETA(`X8A(data));
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
@@ -77,8 +77,8 @@ module EJ32_BR #(
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = ctl.t == 0;               ///> zero flag
-    assign t_neg  = ctl.t[DSZ-1];             ///> negative flag
+    assign t_z    = t == 0;                   ///> zero flag
+    assign t_neg  = t[DSZ-1];                 ///> negative flag
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into t
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     /// output ports
