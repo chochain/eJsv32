@@ -20,22 +20,24 @@ module EJ32 #(
     `IU  p;
     `U8  data;
     `DU  s;
-    `IU  dc_p_o;
+    `U1  p_inc;
     `U1  div_bsy_o;
     `IU  br_p_o;
     `U1  br_psel;
 
     mb8_io      b8_if();                         ///> 8-bit memory bus
     spram8_128k smem(b8_if.slave, ~ctl.clk);     ///> tick on neg cycle
-   
+
     EJ32_CTL    ctl();                           ///> ej32 control bus
     EJ32_DC     #(COLD) dc(.div_bsy(div_bsy_o), .*);
     EJ32_AU     #(SS_DEPTH, DSZ)       au(.s_o(s), .*);
     EJ32_BR     #(RS_DEPTH, DSZ, ASZ)  br(.*);
-    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*); 
-   
+    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);
+
     assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
-    assign p    = br_psel ? br_p_o : dc_p_o;     ///> instruction address
+    assign p    = ctl.rst       ///> instruction address
+        ? COLD
+        : (br_psel ? br_p_o : p + { {ASZ-1{1'b0}}, p_inc });
     ///
     /// debugging
     ///

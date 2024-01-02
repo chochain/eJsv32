@@ -75,7 +75,7 @@ module EJ32_LS #(
                 {t[31:24],t[23:16],t[15:8],t[7:0]};
             automatic `U8 v = d8x4[dsel];        ///> data byte select (Big-Endian)
             b8_if.put_u8(addr, v);               ///> write to SRAM
-        end    
+        end
         else b8_if.get_u8(addr);                 ///> read from SRAM
     end
     ///
@@ -93,7 +93,7 @@ module EJ32_LS #(
         ibuf_x    = 1'b0;
         obuf_x    = 1'b0;
     endtask: INIT
-    
+
     always_comb begin
         INIT();
         case (code)
