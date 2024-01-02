@@ -88,6 +88,7 @@ module EJ32_BR #(
     /// combinational
     ///
     task INIT();
+        a_n     = {ASZ{1'b0}};
         asel_n  = 1'b0;
         a_x     = 1'b0;
         t_n     = {DSZ{1'b0}};  /// TOS
