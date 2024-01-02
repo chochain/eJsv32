@@ -191,6 +191,7 @@ module EJ32_DC #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
+           if (code_x2) ctl.code <= code_n;
             phase     <= 3'b0;
             code_x2   <= 1'b1;
             p_inc     <= 1'b0;
