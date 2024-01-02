@@ -3,23 +3,22 @@
 //
 `include "../source/eJ32_if.sv"
 
-`define R(op)  ctl.rs_op = op
-`define S(op)  ctl.ss_op = op
+`define S(op) ss_op=op
 
 module EJ32_AU #(
     parameter SS_DEPTH = 32,    ///> 32 deep data stack
     parameter DSZ      = 32     ///> 32-bit data width
     ) (
     EJ32_CTL ctl,
-    mb8_io   b8_if,
     input    `U1 au_en,         ///> arithmetic unit enable
-    input    `U8 data,          ///> data from memory bus
+    input    `U8 data,          ///> 8-bit data from memory bus
     output   `U1 div_bsy_o,
     output   `DU s_o
     );
     import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
+    stack_op ss_op;             ///> stack opcode
     `DU ss[SS_DEPTH];           ///> data stack, 3K LUTs, TODO: use EBR memory
     `DU t_n;                    ///> next TOS
     /// @}
@@ -74,7 +73,7 @@ module EJ32_AU #(
     task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask;
     task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask;
     task POP();             TOS(s); `S(sPOP);   endtask;
-    task IBRAN(); 
+    task IBRAN();
         case (phase)
         0: ALU(s - t);
         1: POP();
@@ -82,6 +81,10 @@ module EJ32_AU #(
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask;
     task DIV();  if (phase==1 && !div_bsy) ALU(div_q); endtask;
+    task STOR(int n);
+       if (phase==0) `S(sPOP);
+       else if (phase==n) POP();
+    endtask: STOR
     ///
     /// wires to reduce verbosity
     ///
@@ -99,13 +102,13 @@ module EJ32_AU #(
     /// combinational
     ///
     task INIT();
-        t_n       = {DSZ{1'b0}};  /// TOS
-        t_x       = 1'b0;
-        ctl.ss_op = sNOP;         /// data stack
+        t_n   = {DSZ{1'b0}};  /// TOS
+        t_x   = 1'b0;
+        ss_op = sNOP;         /// data stack
         ///
         /// external module control flags
         ///
-        shr_f     = 1'b0;         /// shifter flag
+        shr_f = 1'b0;         /// shifter flag
     endtask: INIT
 
     always_comb begin
@@ -114,47 +117,60 @@ module EJ32_AU #(
         /// instruction dispatcher
         ///
         case (code)
-        // data stack ops
+        // constant => TOS
         aconst_null: PUSH(0);
-        iconst_m1  : PUSH(-1);
-        iconst_0   : PUSH(0);
-        iconst_1   : PUSH(1);
-        iconst_2   : PUSH(2);
-        iconst_3   : PUSH(3);
-        iconst_4   : PUSH(4);
-        iconst_5   : PUSH(5);
+        iconst_m1:   PUSH(-1);
+        iconst_0:    PUSH(0);
+        iconst_1:    PUSH(1);
+        iconst_2:    PUSH(2);
+        iconst_3:    PUSH(3);
+        iconst_4:    PUSH(4);
+        iconst_5:    PUSH(5);
+        // data => TOS
         bipush: if (phase==0) PUSH(`X8D(data));
         sipush:                     // CC: not tested
             case (phase)
             0: PUSH(`X8D(data));
             1: TOS(t_d);
             endcase
-        pop:  POP();
-        pop2: POP();
-        dup: `S(sPUSH);
-        dup_x1: if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
-        dup_x2: PUSH(ss[sp - 1]);
-        dup2:                           // CC: logic changed since a_n is 16-bit only 
+        // rs => TOS
+        iload:     `S(sPUSH);       // CC: not tested
+        iload_0:   `S(sPUSH);       // CC: not tested
+        iload_1:   `S(sPUSH);       // CC: not tested
+        iload_2:   `S(sPUSH);       // CC: not tested
+        iload_3:   `S(sPUSH);       // CC: not tested
+        // LS ops (TOS => memory bus)
+        istore_0:  POP();
+        iastore:   STOR(4);
+        bastore:   STOR(1);
+        sastore:   STOR(2);
+        // stack ops
+        pop:       POP();
+        pop2:      POP();
+        dup:       `S(sPUSH);
+        dup_x1:    if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
+        dup_x2:    PUSH(ss[sp - 1]);
+        dup2:                              // CC: logic changed since a_n is 16-bit only 
             case (phase)
             0: PUSH(s);
             2: PUSH(s);
             endcase
-        swap: begin TOS(s); `S(sMOVE); end
-        // ALU ops
-        iadd: ALU(s + t);
-        isub: ALU(s - t);
-        imul: ALU(mul_v[DSZ-1:0]);
-        idiv: DIV();
-        irem: DIV();
-        ineg: ALU(0 - t);
-        ishl: ALU(isht_o);
-        ishr: begin ALU(isht_o); `SET(shr_f); end
-        iushr:ALU(iushr_o);
-        iand: ALU(s & t);
-        ior:  ALU(s | t);
-        ixor: ALU(s ^ t);
-        iinc: if (phase==1) ALU(t + `X8D(data));
-        // branching ops
+        swap:      begin TOS(s); `S(sMOVE); end
+        // arithmetic ops
+        iadd:      ALU(s + t);
+        isub:      ALU(s - t);
+        imul:      ALU(mul_v[DSZ-1:0]);
+        idiv:      DIV();
+        irem:      DIV();
+        ineg:      ALU(0 - t);
+        ishl:      ALU(isht_o);
+        ishr:      begin ALU(isht_o); `SET(shr_f); end
+        iushr:     ALU(iushr_o);
+        iand:      ALU(s & t);
+        ior:       ALU(s | t);
+        ixor:      ALU(s ^ t);
+        iinc:      if (phase==1) ALU(t + `X8D(data));
+        // BR conditional branching (feeds AU/TOS result to BR)
         ifeq:      ZBRAN();
         ifne:      ZBRAN();
         iflt:      ZBRAN();
@@ -165,27 +181,15 @@ module EJ32_AU #(
         if_icmpne: IBRAN();
         if_icmplt: IBRAN();
         if_icmpgt: IBRAN();
+        // BR unconditional branching
+        jsr:       if (phase==2) `S(sPUSH);
+        // eForth VM specific
+        dupr:      `S(sPUSH);
+        popr:      `S(sPUSH);
         pushr:     POP();
-        // load/store ops
-        istore_0: POP();
-        iastore: 
-            case (phase)
-            0: `S(sPOP);
-            4: POP();
-            endcase
-        bastore: 
-            case (phase)
-            0: `S(sPOP);
-            1: POP();
-            endcase
-        sastore:
-            case (phase)
-            0: `S(sPOP);
-            2: POP();
-            endcase
-        ldi: if (phase==0) PUSH(`X8D(data));
-        get: if (phase==0) `S(sPUSH);
-        put: if (phase==1) POP();
+        ldi:       if (phase==0) PUSH(`X8D(data));
+        get:       if (phase==0) `S(sPUSH);
+        put:       if (phase==1) POP();
         endcase
     end // always_comb
     ///
@@ -198,7 +202,7 @@ module EJ32_AU #(
         else if (ctl.clk && au_en) begin
             if (t_x) ctl.t <= t_n;
             // data stack
-            case (ctl.ss_op)
+            case (ss_op)
             sMOVE: ss[sp] <= t;
             sPOP:  sp <= sp - 1;
             sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end // CC: ERROR -> EBR with multiple writers
@@ -217,7 +221,7 @@ module EJ32_AU #(
         if (phase==0) begin
             if (!div_bsy) begin
                 $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-                assert(ctl.ss_op == sPOP) else begin
+                assert(ss_op == sPOP) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
                     sp <= sp - 1;
                 end
