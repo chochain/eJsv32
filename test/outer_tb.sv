@@ -102,7 +102,7 @@ module outer_tb #(
         $display("");
     endtask: trace
    
-    always #5 `CTL.tick();
+    always #5 `CTL.clk_tick();
 
     initial begin
         `CTL.reset();         // initialize control interface
@@ -110,7 +110,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(100) @(posedge `CTL.clk) trace();
+        repeat(1000) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
