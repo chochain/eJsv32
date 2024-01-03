@@ -16,7 +16,7 @@ module EJ32 #(
     parameter RS_DEPTH = 32     ///> return stack depth
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
-    `IU  p;                     ///> program counter
+    `IU  p, p_n;                ///> program counter
     `U8  data;                  ///> data return from memory bus
     `DU  s;                     ///> NOS
     `U1  p_inc;                 ///> program counter advance flag
@@ -33,10 +33,15 @@ module EJ32 #(
     EJ32_BR     #(RS_DEPTH, DSZ, ASZ)  br(.*);
     EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);
 
+    assign p    = br_psel ? br_p_o : p_n;        ///> branch target
     assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
-    assign p    = ctl.rst       ///> instruction address
-        ? COLD
-        : (br_psel ? br_p_o : p + { {ASZ-1{1'b0}}, p_inc });
+    ///
+    /// adjust program counter
+    ///
+    always_ff @(posedge ctl.rst, posedge ctl.clk) begin
+        if (ctl.rst)      p_n <= COLD;           ///> cold start address
+        else if (ctl.clk) p_n <= (p + { {ASZ-1{1'b0}}, p_inc });
+    end
     ///
     /// debugging
     ///

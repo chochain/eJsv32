@@ -178,10 +178,11 @@ module EJ32_DC (
         endcase
     end
     ///
-    /// wire to control bus
+    /// wire to control bus and output port
     ///
     assign ctl.phase = phase;
     assign ctl.code  = code;
+    assign p_inc     = p_x;
     ///
     /// instruction unit
     ///
@@ -196,12 +197,10 @@ module EJ32_DC (
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
             phase <= 3'b0;
-            p_inc <= 1'b0;
         end
         else if (ctl.clk) begin
             if (code_x) code <= code_n;
             phase <= phase_n;
-            p_inc <= p_x;
         end
     end
 endmodule: EJ32_DC
