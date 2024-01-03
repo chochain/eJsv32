@@ -1,5 +1,5 @@
 ///
-/// eJ32 top module (Outer Interpreter)
+/// eJ32 top module + Instruction unit
 ///
 `include "../source/eJ32_if.sv"
 
@@ -23,24 +23,32 @@ module EJ32 #(
     `U1  div_bsy_o;             ///> AU divider busy flag
     `IU  br_p_o;                ///> BR branching target
     `U1  br_psel;               ///> BR branching target select
-
+    ///
+    /// RAM block
+    ///
     mb8_io      b8_if();                         ///> 8-bit memory bus
     spram8_128k smem(b8_if.slave, ~ctl.clk);     ///> tick on neg cycle
-
+    ///
+    /// EJ32 core
+    ///
     EJ32_CTL    ctl();                           ///> ej32 control bus
     EJ32_DC     dc(.div_bsy(div_bsy_o), .*);     ///> decoder
     EJ32_AU     #(SS_DEPTH, DSZ)       au(.s_o(s), .*);
     EJ32_BR     #(RS_DEPTH, DSZ, ASZ)  br(.*);
     EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);
-
-    assign p    = br_psel ? br_p_o : p_n;        ///> branch target
-    assign data = b8_if.vo;     ///> data fetched from SRAM (1-cycle)
     ///
-    /// adjust program counter
+    /// Instruction Unit
     ///
+    assign p = br_psel ? br_p_o : p_n;   ///> branch target
+    assign data = b8_if.vo;              ///> data fetched from SRAM (1-cycle)
+   
     always_ff @(posedge ctl.rst, posedge ctl.clk) begin
-        if (ctl.rst)      p_n <= COLD;           ///> cold start address
-        else if (ctl.clk) p_n <= (p + { {ASZ-1{1'b0}}, p_inc });
+        if (ctl.rst) begin
+            p_n <= COLD;                 ///> cold start address
+        end
+        else if (ctl.clk) begin
+            p_n <= (p + { {ASZ-1{1'b0}}, p_inc });
+        end
     end
     ///
     /// debugging
