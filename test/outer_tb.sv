@@ -71,17 +71,18 @@ module outer_tb #(
     endtask: activate
 
     task trace;
-         automatic `U5 rp = `BR.rp;
-         automatic `U3 ph = `AU.phase;
-         automatic opcode_t code;
-         if (!$cast(code, `CTL.code)) begin
+        automatic `U5 rp = `BR.rp;
+        automatic `U3 ph = `AU.phase;
+        automatic `U8 xx;
+        automatic opcode_t code;
+        if (!$cast(code, `CTL.code)) begin
              /// JVM opcodes, some are not avialable yet
              code = op_err;
-         end
-         $write(
+        end
+        $write(
              "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
              $time/10, 
-             ej32.p, `LS.a, `BR.a_n, ej32.data,
+             ej32.p, `LS.a, `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
              `BR.rp, `BR.r,
              `AU.sp, `AU.s, `CTL.t,
              code, ph, code.name);
@@ -110,7 +111,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge `CTL.clk) trace();
+        repeat(300) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
