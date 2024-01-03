@@ -12,16 +12,14 @@
 
 import ej32_pkg::*;
 
-module EJ32_DC #(
-       parameter COLD = 'h0     // cold start address
-    ) (
+module EJ32_DC (
        EJ32_CTL ctl,
        input  `U8 data,         // byte return from memory bus
-       input  `U1 div_bsy,
-       output `U1 au_en,
-       output `U1 br_en,
-       output `U1 ls_en,
-       output `U1 p_inc
+       input  `U1 div_bsy,      // AU divider busy
+       output `U1 au_en,        // enable AU
+       output `U1 br_en,        // enable BR
+       output `U1 ls_en,        // enable LS
+       output `U1 p_inc         // advance program counter
     );
     ///
     /// register next
@@ -31,9 +29,10 @@ module EJ32_DC #(
     ///
     /// wire
     ///
-    `U3  phase;
-    `U1  code_x, code_x2;  // opcode pipeline delays
-    `U1  p_x;
+    opcode_t code;              // wired to ctl.code
+    `U3  phase;                 // wired to ctl.phase
+    `U1  code_x;                // code <= code_n
+    `U1  p_x;                   // wired to p_inc
     ///
     /// generic multi-cycle macros
     ///
@@ -103,7 +102,7 @@ module EJ32_DC #(
     ///
     always_comb begin
         INIT();
-        case (ctl.code)
+        case (code)
         // AU unit => TOS
         aconst_null:  `AU1;
         iconst_m1:    `AU1;
@@ -179,6 +178,11 @@ module EJ32_DC #(
         endcase
     end
     ///
+    /// wire to control bus
+    ///
+    assign ctl.phase = phase;
+    assign ctl.code  = code;
+    ///
     /// instruction unit
     ///
     always_comb begin
@@ -191,17 +195,13 @@ module EJ32_DC #(
 
     always_ff @(posedge ctl.clk, posedge ctl.rst) begin
         if (ctl.rst) begin
-           if (code_x2) ctl.code <= code_n;
-            phase     <= 3'b0;
-            code_x2   <= 1'b1;
-            p_inc     <= 1'b0;
+            phase <= 3'b0;
+            p_inc <= 1'b0;
         end
         else if (ctl.clk) begin
-            if (code_x2) ctl.code <= code_n;
-            ctl.phase <= phase;
-            phase     <= phase_n;
-            code_x2   <= code_x;
-            p_inc     <= p_x;
+            if (code_x) code <= code_n;
+            phase <= phase_n;
+            p_inc <= p_x;
         end
     end
 endmodule: EJ32_DC
