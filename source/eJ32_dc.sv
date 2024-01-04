@@ -34,47 +34,51 @@ module EJ32_DC (
     `U1  code_x;                // code <= code_n
     `U1  p_x;                   // wired to p_inc
     ///
+    /// code/phase updaet control
+    ///
+    task NXPH(input `U3 n); phase_n = n; `CLR(code_x); endtask
+    task HOLD(input `U3 n); NXPH(n); `CLR(p_x);        endtask
+    ///
     /// generic multi-cycle macros
     ///
-    task STEP(input `U3 n); phase_n = n; `CLR(code_x); endtask
-    task WAIT(input `U3 n); STEP(n); `CLR(p_x);        endtask
-    task WAIT1(); if (phase==0) WAIT(1); endtask
-    task WAIT2();
-        case (phase)
-        0: WAIT(1);
-        1: WAIT(2);
-        endcase
-    endtask: WAIT2
-    task WAIT3();
-        case (phase)
-        0: WAIT(1);
-        1: WAIT(2);
-        2: WAIT(3);
-        endcase
-    endtask: WAIT3
-    task WAIT5();
-        case (phase)
-        0: WAIT(1);
-        1: WAIT(2);
-        2: WAIT(3);
-        3: WAIT(4);
-        4: WAIT(5);
-        endcase
-    endtask: WAIT5
+    task STEP1(); if (phase==0) NXPH(1); endtask
     task STEP2();
         case (phase)
-        0: STEP(1);
-        1: STEP(2);
+        0: NXPH(1);
+        1: NXPH(2);
         endcase
     endtask: STEP2
     task STEP4();
         case (phase)
-        0: STEP(1);
-        1: STEP(2);
-        2: STEP(3);
-        3: STEP(4);
+        0: NXPH(1);
+        1: NXPH(2);
+        2: NXPH(3);
+        3: NXPH(4);
         endcase
     endtask: STEP4
+    task WAIT1(); if (phase==0) HOLD(1); endtask
+    task WAIT2();
+        case (phase)
+        0: HOLD(1);
+        1: HOLD(2);
+        endcase
+    endtask: WAIT2
+    task WAIT3();
+        case (phase)
+        0: HOLD(1);
+        1: HOLD(2);
+        2: HOLD(3);
+        endcase
+    endtask: WAIT3
+    task WAIT5();
+        case (phase)
+        0: HOLD(1);
+        1: HOLD(2);
+        2: HOLD(3);
+        3: HOLD(4);
+        4: HOLD(5);
+        endcase
+    endtask: WAIT5
     ///
     /// module specific tasks
     ///
@@ -82,8 +86,8 @@ module EJ32_DC (
     task DIV();                          // divider ops
         `AU1;
         case (phase)
-        0: WAIT(1);
-        1: if (div_bsy) WAIT(1);
+        0: HOLD(1);
+        1: if (div_bsy) HOLD(1);
         endcase
     endtask: DIV
     ///
@@ -112,8 +116,8 @@ module EJ32_DC (
         iconst_3:     `AU1;
         iconst_4:     `AU1;
         iconst_5:     `AU1;
-        bipush: begin `AU1; if (phase==0) STEP(1); end
-        sipush: begin `AU1; STEP2(); end
+        bipush:  begin `AU1; if (phase==0) NXPH(1); end // CC: why STEP1() doesn't work here?
+        sipush:  begin `AU1; STEP2(); end
         // return stack => data stack
         iload:        `AB1
         iload_0:      `AB1
@@ -165,16 +169,16 @@ module EJ32_DC (
         goto:      BRAN();
         jsr:       begin `ABL1; WAIT2(); end
         ret:       `BR1;
-        jreturn:   begin `BR1; if (phase==0) STEP(1); end
+        jreturn:   begin `BR1;  STEP1(); end
         invokevirtual: BRAN();
         // eForth VM specific
         donext:        BRAN();
         dupr:    `AB1
         popr:    `AB1
         pushr:   `AB1
-        ldi: begin `AL1; STEP4(); end
-        get: begin `AL1; WAIT2(); end
-        put: begin `AL1; WAIT1(); end
+        ldi:     begin `AL1; STEP4(); end
+        get:     begin `AL1; WAIT2(); end
+        put:     begin `AL1; WAIT1(); end
         endcase
     end
     ///
