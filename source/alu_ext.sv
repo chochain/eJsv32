@@ -69,7 +69,7 @@ module div_int #(parameter DSZ=32) (
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            i    <= 1;
+            i    <= 31;                // cycle counter 31->0
             q    <= 0;
             busy <= 1'b1;
             dbz  <= y == 0;
@@ -82,7 +82,7 @@ module div_int #(parameter DSZ=32) (
             end
             else r1 <= r_n;            // next digit
             q <= q_n;
-            i <= i + 1;
+            i <= i - 1;                // cycle counter
         end
     end
 endmodule: div_int
