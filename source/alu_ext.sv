@@ -48,7 +48,7 @@ module div_int #(parameter DSZ=32) (
     input  `DU  x,         // dividend
     input  `DU  y,         // divisor
     output `U1  busy,      // calculation in progress
-    output `U1  dbz,       // divide by zero flag
+    output `U1  z,         // divide by zero flag
     output `DU  q,         // quotient
     output `DU  r          // remainder
     );
@@ -58,10 +58,15 @@ module div_int #(parameter DSZ=32) (
     `DX ry;       
     `DU q_n;               // intermediate quotient
     `U1 pos;
-
+    ///
+    /// wires to reduce verbosity
+    ///
     assign pos = r1 >= {1'b0, y};
     assign ry  = r1 - y;
-   
+    ///
+    /// wire output port
+    assign z   = y==0;
+      
     always_comb begin
         if (pos) {r_n, q_n} = {ry[DSZ-1:0], q, 1'b1}; // 65-bit ops
         else     {r_n, q_n} = {r1[DSZ-1:0], q, 1'b0};
@@ -69,18 +74,17 @@ module div_int #(parameter DSZ=32) (
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            i    <= 31;                // cycle counter 31->0
-            q    <= 0;
+            i    <= ~0;                // cycle counter 31->0
             busy <= 1'b1;
-            dbz  <= y == 0;
-            {r1, q}  <= {{DSZ{1'b0}}, x, 1'b0};   // shift left with carry
+            q    <= 0;
+            {r1, q}  <= {{DSZ{1'b0}}, x, 1'b0};   // 65-bit shifter
         end
         else if (busy) begin
             if (i==0) begin            // last bit
-                busy <= 1'b0;          // we are done
+                busy <= 1'b0;
                 r    <= r_n[DSZ:1];    // undo final shift
             end
-            else r1 <= r_n;            // next digit
+            else r1  <= r_n;           // next digit
             q <= q_n;
             i <= i - 1;                // cycle counter
         end
