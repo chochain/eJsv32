@@ -38,7 +38,7 @@ module EJ32_AU #(
     `DU2 mul_v;
     `U1  div_en, div_bsy;
     `DU  div_q, div_r;
-    `U1  div_by_z;
+    `U1  div_z;
     ///
     /// extended ALU units
     ///
@@ -53,7 +53,7 @@ module EJ32_AU #(
     .x(s),
     .y(t),
     .busy(div_bsy),
-    .dbz(div_by_z),
+    .z(div_z),
     .q(div_q),
     .r(div_r)
     );
@@ -69,18 +69,17 @@ module EJ32_AU #(
     .r(iushr_o)
     );
     // data stack
-    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask;
-    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask;
-    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask;
-    task POP();             TOS(s); `S(sPOP);   endtask;
+    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask
+    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask
+    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask
+    task POP();             TOS(s); `S(sPOP);   endtask
     task IBRAN();
         case (phase)
         0: ALU(s - t);
         1: POP();
         endcase
     endtask: IBRAN
-    task ZBRAN(); if (phase==1) POP(); endtask;
-    task DIV();  if (phase==1 && !div_bsy) ALU(div_q); endtask;
+    task ZBRAN(); if (phase==1) POP(); endtask
     task STOR(int n);
        if (phase==0) `S(sPOP);
        else if (phase==n) POP();
@@ -155,13 +154,13 @@ module EJ32_AU #(
             0: PUSH(s);
             2: PUSH(s);
             endcase
-        swap:      begin TOS(s); `S(sMOVE); end
+        swap:      begin TOS(s); `S(sMOVE); end        
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
         imul:      ALU(mul_v[DSZ-1:0]);
-        idiv:      DIV();
-        irem:      DIV();
+        idiv:      if (!div_bsy) ALU(div_q);
+        irem:      if (!div_bsy) ALU(div_r);
         ineg:      ALU(0 - t);
         ishl:      ALU(isht_o);
         ishr:      begin ALU(isht_o); `SET(shr_f); end
@@ -203,23 +202,25 @@ module EJ32_AU #(
             if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
-            sMOVE: ss[sp] <= t;
+            sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
             sPOP:  sp <= sp - 1;
-            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end // CC: ERROR -> EBR with multiple writers
-//          sPUSH: begin ss[sp] <= t; sp <= sp + 1; end  // CC: use this to fix synthesizer
+            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
             endcase
             ///
-            /// validate and patch
-            /// CC: do not know why DIV is skipping the branch
+            /// validate divider
             ///
-            if (div_en) div_patch();
+            if (div_en) div_check();
         end
     end
 
-    task div_patch();
+    task div_check();
         automatic `U8 op = code==idiv ? "/" : "%";
-        if (phase==0) begin
-            if (!div_bsy) begin
+        if (phase==1 && !div_bsy) begin             // done div_int
+            $display("OK %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+            assert(div_q == (s / t));
+            assert(div_r == (s % t));
+        end
+        /*
                 $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
                 assert(ss_op == sPOP) else begin
                     $write(", sp=%d, sp1=%d forced -1", sp, sp1);
@@ -229,12 +230,6 @@ module EJ32_AU #(
                     $write(", t_x=%d t_n=%8x =q/r", t_x, t_n);
                     ctl.t <= code==idiv ? div_q : div_r;
                 end
-            end
-        end
-        else begin // done div_int
-            $display("OK %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-            assert(div_q == (s / t));
-            assert(div_r == (s % t));
-        end
-    endtask: div_patch
+         */
+    endtask: div_check
 endmodule: EJ32_AU
