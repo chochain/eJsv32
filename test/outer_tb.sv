@@ -80,13 +80,14 @@ module outer_tb #(
              code = op_err;
         end
         $write(
-             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
+             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d%s%-16s",
              $time/10, 
-             ej32.p, `LS.a, `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
+             ej32.p, `LS.a,
+             `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
              `BR.rp, `BR.r,
-             `AU.sp, `AU.s, `CTL.t,
-             code, ph, code.name);
-        case (`CTL.code)
+             `AU.sp, `AU.s, `AU.t,
+             code, ph, ej32.div_bsy_o ? "." : "_", code.name);
+        case (code)
         invokevirtual: if (ph==2) begin
             automatic `IU nfa = dict.to_name(ej32.p);
             for (int i=0; i<rp; i++) $write("  ");
@@ -111,7 +112,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(300) @(posedge `CTL.clk) trace();
+        repeat(500) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
