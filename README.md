@@ -29,11 +29,14 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
 * modulization
-  + CTL- fishbone (TOS, ss_op, rs_op on bus)
-  + DC - decoder (state machine)
-  + AU - arithmetic unit (ALU and data stack)
-  + BR - branching unit (program counter and return stack)
-  + LS - load/store unit (memory and buffer IO)
+  |module|desc|LUTs|note|err|
+  |--|--|--|--|--|
+  |CTL|fishbone (TOS, ss_op, rs_op on bus)||not synthsized||
+  |RAM|128K SPRAM|53|8-bit bus||
+  |DC|decoder (state machine)|215||divider patch|
+  |AU|arithmetic unit (ALU and data stack)|3895|1285 with ss[1]|EBR multi-write|
+  |BR|branching unit (program counter and return stack)|4652|478 with rs[1]||
+  |LS|load/store unit (memory and buffer IO)|363|||
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice)
@@ -83,4 +86,4 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
 * 20220209 - Chochain Lee: rename to eJ32 for Lattice and future versions
 * 20230216 - Chochain Lee: consolidate ALU modules, tiddy macro tasks
-* 20231216 - Chochain Lee: fishbone modulization to
+* 20231216 - Chochain Lee: fishbone modulization
