@@ -83,11 +83,16 @@ module EJ32_DC (
     /// module specific tasks
     ///
     task BRAN(); `AB1; STEP2(); endtask  // branching ops
-    task DIV();                          // divider ops
+    task DIV();  
         `AU1;
         case (phase)
         0: HOLD(1);
         1: if (div_bsy) HOLD(1);
+           else begin           // divider done
+              phase_n = 0;      // CC: why this branch been skipped?
+              code_x  = 1'b1;
+              p_x     = 1'b1;
+           end
         endcase
     endtask: DIV
     ///
@@ -116,7 +121,7 @@ module EJ32_DC (
         iconst_3:     `AU1;
         iconst_4:     `AU1;
         iconst_5:     `AU1;
-        bipush:  begin `AU1; if (phase==0) NXPH(1); end // CC: why STEP1() doesn't work here?
+        bipush:  begin `AU1; if (phase==0) NXPH(1); end // CC: why STEP1() does not work here?
         sipush:  begin `AU1; STEP2(); end
         // return stack => data stack
         iload:        `AB1
@@ -186,7 +191,7 @@ module EJ32_DC (
     ///
     assign ctl.phase = phase;
     assign ctl.code  = code;
-    assign p_inc     = p_x;
+    assign p_inc     = p_x || (phase==1 && !div_bsy);   // CC: patch, why DIV skip branch?
     ///
     /// instruction unit
     ///
@@ -203,8 +208,20 @@ module EJ32_DC (
             phase <= 3'b0;
         end
         else if (ctl.clk) begin
-            if (code_x) code <= code_n;
-            phase <= phase_n;
+            if ((code==idiv||code==irem) && !div_bsy) div_patch();  // CC: why?
+            else begin
+                if (code_x) code <= code_n;
+                phase <= phase_n;
+            end
         end
     end
+    ///
+    /// CC: do not know why DIV is skipping the branch
+    ///
+    task div_patch();
+        if (phase==1) begin
+           code  <= code_n;
+           phase <= 0;
+        end
+    endtask: div_patch
 endmodule: EJ32_DC
