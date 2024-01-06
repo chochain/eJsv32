@@ -15,7 +15,7 @@ I appreciate that Dr. Ting took me in his last projects and considered me one of
 My goal is to make the learning journey of building eJ32 as an example of designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not.
 
 ### Status
-Currently, eJ32 has not been synthesized on the targeted ICE40 for the lack of knowledge of my part. For a nice fully functional Forth CPU, *J1a*, check [here](https://https://www.excamera.com/sphinx/article-j1a-swapforth.html). Anyway, here're what I've done for eJ32 so far.
+Currently, though eJ32 has been successfully simulated with Dr. Ting's test cases but yet synthesized on the targeted ICE40. It will take sometime to realize for lack of hardware design knowledge on my part. For example, how to place & route or even how to use EBR.... If interested in a fully functional Forth CPU, *J1a*, is a great one. Check [here](https://https://www.excamera.com/sphinx/article-j1a-swapforth.html). Anyway, for a kick, here're what I've done for eJ32 so far.
 
 ### Adaptations of eJsv32k
 * keep Dr. Ting's original code in ~/orig/eJsv32k
