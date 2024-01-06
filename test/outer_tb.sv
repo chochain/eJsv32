@@ -3,68 +3,46 @@
 ///
 `timescale 1ps / 1ps
 `include "../source/eJ32_if.sv"
-`include "../source/eJ32.vh"
+
+`define DBUS ej32.b8_if
+`define CTL  ej32.ctl
+`define AU   ej32.au
+`define BR   ej32.br
+`define LS   ej32.ls
+
+import ej32_pkg::*;             // import enum types
+
 module outer_tb #(
-    parameter MEM0 = 'h0,       /* memory block addr  */
-    parameter TIB  = 'h1000,    /* input buffer ptr   */
-    parameter OBUF = 'h1400,    /* output buffer ptr  */
-    parameter DSZ  = 32,        /* 32-bit data width  */
-    parameter ASZ  = 17,        /* 128K address space */
-    parameter SS_DEPTH = 32,
-    parameter RS_DEPTH = 32
+    parameter MEM0 = 'h0,       ///> memory block addr
+    parameter TIB  = 'h1000,    ///> input buffer ptr
+    parameter OBUF = 'h1400     ///> output buffer ptr
     );
-    localparam SSZ = $clog2(SS_DEPTH);
-    localparam RSZ = $clog2(RS_DEPTH);
-    localparam DOT = 'h2e;
-
-    logic [7:0]      data_o_i, data_o_o, code_o;
-    logic [DSZ-1:0]  s_o, t_o;
-    logic [ASZ-1:0]  addr_o_o, p_o, a_o;
-    logic [2:0]      phase_o;
-    logic [SSZ-1:0]  sp_o;
-    logic [RSZ-1:0]  rp_o;
-    logic            write_o;
-
-    logic            clk, rst;
-    logic [ASZ-1:0]  ctx, here;
     //
-    // return address to nfa (for tracing)
+    // return address to nfa lookup table (for tracing)
     //
-    logic [ASZ-1:0] ra2nfa[RS_DEPTH-1:0];
-
-    mb8_io      b8_if();
-    spram8_128k m0(b8_if.slave, ~clk);
-
-    dict_setup  #(MEM0, TIB, OBUF) dict(.*, .b8_if(b8_if.master));
-    eJ32        #(TIB, OBUF, DSZ, ASZ, SS_DEPTH, RS_DEPTH) ej32(.clk, .clr(rst), .*);
-
-
-    task at([ASZ-1:0] ax, [1:0] opt);
-        repeat(1) @(posedge clk) begin
-            case (opt)
-            'h1: $write("%02x", b8_if.vo);
-            'h2: $write("%c", b8_if.vo < 'h20 ? DOT : b8_if.vo);
-            endcase
-            b8_if.get_u8(ax);
-        end
-    endtask: at
-
-    task dump_row(input [ASZ-1:0] a1);
+    `IU ra2nfa[32];
+    ///
+    EJ32        ej32(.*);       ///> ej32 top module
+    dict_setup  #(MEM0, TIB, OBUF) dict(.clk(~`CTL.clk), .b8_if(`DBUS.master));
+    ///
+    /// debugging tasks
+    ///
+    task dump_row(input `IU a1);
         $write("\n%04x:", a1);
-        at(a1, 'h0);                     // prefetch one memory cycle
+        ej32.fetch(a1, 'h0);     // prefetch one memory cycle
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
             if ((i % 4)==1) $write(" ");
-            at(i, 'h1);
+            ej32.fetch(i, 'h1);
         end
         $write("  ");
-        at(a1, 'h0);
+        ej32.fetch(a1, 'h0);
         for (integer i=a1+1; i<=(a1+'h10); i++) begin
-            at(i, 'h2);
+            ej32.fetch(i, 'h2);
         end
     endtask: dump_row
 
-    task dump(input [ASZ-1:0] addr, input [ASZ-1:0] len);
-        automatic logic [ASZ-1:0] a0 = addr & ~'hf;
+    task dump(input `IU a, input `IU len);
+        automatic `IU a0 = a & ~'hf;
         for (integer a1=a0; a1 < (a0 + len + 'h10); a1 += 'h10) begin
             dump_row(a1);
         end
@@ -73,7 +51,7 @@ module outer_tb #(
 
     task verify_tib;
         $display("\ndump tib: 0x%04x", TIB);
-        dump(TIB, 'h120);
+        dump(TIB, 'h200);
     endtask: verify_tib;
 
     task verify_dict;
@@ -83,59 +61,60 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf: 0x%04x", OBUF);
-        dump(OBUF, 'h80);
+        dump(OBUF, 'h600);
     endtask: verify_obuf
 
     task activate;
-        b8_if.get_u8(0);
-        repeat(1) @(posedge clk) rst = 1;
-        repeat(1) @(posedge clk) rst = 0;
+        `DBUS.get_u8(0);
+        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b1;
+        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b0;
     endtask: activate
 
     task trace;
-        automatic jvm_opcode code;
-        if (!$cast(code, code_o)) begin
-            /// JVM opcodes, some are not avialable yet
-            code = op_err;
+        automatic `U3 ph = `CTL.phase;
+        automatic `U5 rp = `BR.rp;
+        automatic `U8 xx;
+        automatic opcode_t code;
+        if (!$cast(code, `CTL.code)) begin
+             /// JVM opcodes, some are not avialable yet
+             code = op_err;
         end
         $write(
-            "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d.%-16s",
-            $time/10, p_o, a_o, data_o_i, data_o_o, rp_o, ej32.rs[rp_o], sp_o, s_o, t_o, code_o, phase_o, code.name);
-        if (code==invokevirtual && phase_o==2) begin
-            automatic logic[ASZ-1:0] nfa = dict.to_name(addr_o_o);
-            for (int i=0; i<rp_o; i++) $write("  ");
+             "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d%s%-16s",
+             $time/10, 
+             ej32.p, `LS.a,
+             `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
+             `BR.rp, `BR.r,
+             `AU.sp, `AU.s, `AU.t,
+             code, ph, ej32.div_bsy_o ? "." : "_", code.name);
+        case (code)
+        invokevirtual: if (ph==2) begin
+            automatic `IU nfa = dict.to_name(ej32.p);
+            for (int i=0; i<rp; i++) $write("  ");
             $write(" :: ");
-            ra2nfa[rp_o] = nfa;
+            ra2nfa[rp] = nfa;
             dict.to_s(nfa);
         end
-        else if (code==jreturn && phase_o==0) begin
-            for (int i=0; i<rp_o; i++) $write("  ");
+        jreturn: if (ph==0) begin
+            for (int i=0; i<rp; i++) $write("  ");
             $write(" ;; ");
-            dict.to_s(ra2nfa[rp_o]);
+            dict.to_s(ra2nfa[rp]);
         end
+        endcase
         $display("");
     endtask: trace
-
-    always #5 clk  = ~clk;
-
-    assign data_o_i = b8_if.vo;
-
-    always_comb begin
-        if (write_o) b8_if.put_u8(addr_o_o, data_o_o);
-        else         b8_if.get_u8(addr_o_o);
-    end
+   
+    always #5 `CTL.clk_tick();
 
     initial begin
-        clk = 1'b0;           // start clock
-        rst = 1'b1;           // disable eJsv32
-
+        `CTL.reset();         // initialize control interface
         dict.setup();         // read ROM into memory from hex file
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(1000) @(posedge clk) trace();
-        rst = 1'b1;           // disable eJsv32
-
+        repeat(500000) @(posedge `CTL.clk) trace();
+        
+        `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
         verify_obuf();        // validate output buffer content
 

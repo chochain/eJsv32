@@ -4,14 +4,35 @@
 `ifndef EJ32_EJ32_IF
 `define EJ32_EJ32_IF
 
-typedef enum logic [1:0] { NOP = 2'b0, PUSH = 2'b01, POP = 2'b10, PICK = 2'b11 } stack_ops;
+`include "../source/eJ32.vh"
 
-interface mb32_io(input logic clk);
-    logic        we;
+interface EJ32_CTL;
+   import ej32_pkg::*;
+   `U1  clk;
+   `U1  rst;
+   opcode_t code;              // opcode
+   `U3  phase;                 // opcode phase i.e. nth-cycle of opcode
+   `DU  t;                     // TOS, on bus
+   
+   function void reset();
+       clk   = 1'b1;           // memory fetch at neg edge
+       rst   = 1'b1;
+       code  = nop;
+       phase = 3'b0;
+       t     = 0;
+   endfunction: reset
+   
+   function void clk_tick();
+       clk   = ~clk;
+   endfunction: clk_tick
+endinterface: EJ32_CTL
+
+interface mb32_io(input `U1 clk);
     logic [3:0]  bmsk;
     logic [14:0] ai;
-    logic [31:0] vi;
-    logic [31:0] vo;
+    `U1  we;
+    `DU  vi;
+    `DU  vo;
     
     clocking io_clk @(posedge clk);
         default input #1 output #1;
@@ -22,21 +43,21 @@ interface mb32_io(input logic clk);
 endinterface: mb32_io
 
 interface mb8_io;
-    logic        we;
-    logic [16:0] ai;
-    logic [7:0]  vi;
-    logic [7:0]  vo;
+    `U1  we;
+    `IU  ai;
+    `U8  vi;
+    `U8  vo;
     
     modport master(output we, ai, vi, import put_u8, get_u8);
     modport slave(input we, ai, vi, output vo);
 
-    function void put_u8([16:0] ax, [7:0] vx);
+    function void put_u8(input `IU ax, input `U8 vx);
         we = 1'b1;
         ai = ax;
         vi = vx;
     endfunction: put_u8
     
-    function void get_u8([16:0] ax);
+    function void get_u8(input `IU ax);
         we = 1'b0;
         ai = ax;
         // return vo
@@ -44,23 +65,25 @@ interface mb8_io;
 endinterface : mb8_io
 
 interface ss_io();
-    stack_ops    op;
-    logic [31:0] vi;
-    logic [31:0] s;
+    import ej32_pkg::*;
+    stack_op op;
+    `DU vi;
+    `DU s;
     
     modport master(input s, output op, vi, import push, pop);
     modport slave(input op, vi, output s);
 
-    function void push(input [31:0] v);
-        op  = PUSH;
+    function void push(input `DU v);
+        op  = sPUSH;
         vi  = v;
     endfunction: push
 
-    function logic [31:0] pop;
-        op   = POP;
+    function `DU pop;
+        op   = sPOP;
         pop  = s;
     endfunction: pop
     
 endinterface: ss_io
 `endif // EJ32_EJ32_IF
+
 

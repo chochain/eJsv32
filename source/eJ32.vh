@@ -1,7 +1,30 @@
 `ifndef EJ32_EJ32_VH
 `define EJ32_EJ32_VH
+package ej32_pkg;
+//
+// Note: https://www.infoworld.com/article/2077625/control-flow.html
+//
+// Universal data type
+//
+`define U1 logic
+`define U2 logic[1:0]
+`define U3 logic[2:0]
+`define U5 logic[4:0]
+`define U8 logic[7:0]
+`define IU logic[16:0]
+`define DU logic[31:0]
+`define DU2 logic[63:0]
+//
+// data conversion macros
+//
+`define SET(v) v=1'b1
+`define CLR(v) v=1'b0
+`define X8A(b) { 9'b0,  b }
+`define X8D(b) { 24'b0, b }
+`define XAD(a) { 15'b0, a }
+`define XDA(d) d[16:0]
 
-typedef enum logic [7:0] {
+typedef enum `U8 {  ///> JVM opcodes
         //
         // constants
         //
@@ -69,14 +92,17 @@ typedef enum logic [7:0] {
         d2i, d2l, d2f,
         i2b, i2c, i2s,
         //
-        // comparision
-        //
+        // comparison
+        //                      
         lcmp    = 'h94,    fcmpl, fcmpg, dcmpl, dcmpg,
+        //
+        // conditional branching
+        //
         ifeq    = 'h99, ifne, iflt, ifge, ifgt, ifle,
         if_icmpeq, if_icmpne, if_icmplt, if_icmpge, if_icmpgt,
         if_acmpeq, if_acmpne,
         //
-        // control
+        // unconditional branching
         //
         goto    = 'ha7, jsr, ret,
         tableswitch, lookupswitch,
@@ -94,7 +120,10 @@ typedef enum logic [7:0] {
         // extended
         //
         wide    = 'hc4,
-        multianewarray, ifnull, ifnotnull, goto_w, jsr_w,
+        multianewarray,
+        // conditional branching (with null)
+        //
+        ifnull, ifnotnull, goto_w, jsr_w,
         //
         // reserved (overlapped with FVM extended)
         // breakpoint = 'hca,
@@ -109,5 +138,10 @@ typedef enum logic [7:0] {
         // Error handler
         //
         op_err = 'hff
-} jvm_opcode;
+} opcode_t /*verilator public*/;
+
+typedef enum `U2 { tEQ  = 2'b0, tGT   = 2'b01, tGE  = 2'b10, tLT  = 2'b11 } tos_sign /*verilator public*/;
+typedef enum `U2 { sNOP = 2'b0, sPUSH = 2'b01, sMOVE= 2'b10, sPOP = 2'b11 } stack_op /*verilator public*/;
+
+endpackage: ej32_pkg
 `endif // EJ32_EJ32_VH
