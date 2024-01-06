@@ -20,7 +20,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * create ~/source/eJ32.sv as the main core
 * update mult/divide/shifter/ushifter modules using simple *, /, <<
 * externalize ram_memory.v module, use spram.sv and eJ32_if.sv for Lattice iCE40 FPGA
-* create a dictionary ROM from eJsv32.hex sourcing from original ej32i.mif (see source/README for details)
+* create a dictionary ROM from eJsv32.hex, 8K bytes, sourcing from original ej32i.mif (see source/README for details)
 * add ~/test/dict_setup.sv, use $fload to install memory map (i.e. eJsv32.hex)
 * add top module ~/test/outer_tb.sv to drive memory block, dict_setup, and inner interpreter eJ32
 * add eJ32.vh, use enum for opcodes replacing list of parameters
@@ -28,18 +28,23 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   + use common tasks and macros to reduce verbosity
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
-* modulization
-  + CTL- fishbone (TOS, ss_op, rs_op on bus)
-  + DC - decoder (state machine)
-  + AU - arithmetic unit (ALU and data stack)
-  + BR - branching unit (program counter and return stack)
-  + LS - load/store unit (memory and buffer IO)
+  
+### Modulization (and bump version to v2)
+  > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
+  |module|desc|components|LUTs|note|err|
+  |--|--|--|--|--|--|
+  |CTL|fishbone|TOS, ss_op, rs_op on bus||not synthsized||
+  |RAM|memory|128K SPRAM|53|8-bit bus||
+  |DC|decoder unit|state machines|215||divider patch|
+  |AU|arithmetic unit|ALU and data stack|3895|1285 with ss[1]|EBR multi-write|
+  |BR|branching unit|program counter and return stack|4652|478 with rs[1]||
+  |LS|load/store unit|memory and buffer IO|363|||
 
 ### Installation
-* Install Lattice Radiant 3.0+ (with Free license from Lattice)
+* Install Lattice Radiant 3.0+ (with Free license from Lattice, comes with ModelSim 32-bit)
 * clone this [repository](git@github.com:chochain/eJsv32.git) to your local drive
 * Open eJsv32.rdf project from within Radiant
-* Synthesis and simulate (with vsim)
+* Compile, Synthesis if you must, and simulate (with ModelSim)
 
 ### Memory Map
 <code>
@@ -53,7 +58,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
 * targeting only Lattice iCE40 FPGA for now
 * Data and return stacks
   * 32-deep only
-  * using LUTs instead of EBR memory (i.e. expensive 7K)
+  * using LUTs instead of EBR memory (i.e. expensive ~7K)
 * Estimated total 10K LUTs (with data and return stacks)
 * No Map or Route provided
 * No serial interface (i.e. UART, SPI, ..)
@@ -61,26 +66,30 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   * output sent to output buffer
 
 ### Results - Staging for future development
-* The 10K LUTs image does not fit in iCE40 (5K), but vsim works OK.
+* The 10K LUTs image does not fit in iCE40 (5K), but ModelSim works OK.
   + can be reduced to 3K LUTs with EBR memory,
   + can be further reduced to 2K LUTs with hardware divider.
-* vsim COLD start - completed
-  + 97K cycles, ~/docs/eJ32_trace.txt
-* vsim Dr. Ting's 6 embeded test cases - completed
-  + 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
-  + 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
+* ModelSsim COLD start - completed
+  + v1 - 10K cycles, ~/docs/eJ32_trace.txt
+  + v2 - 10K cycles, ~/docs/eJ32_trace_20231223.txt
+* ModelSim Dr. Ting's 6 embeded test cases - completed
+  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
+  + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
+  + v2 - 520K+ cycles ??, ~/docs/eJ32_trace_full_20240104.txt
 
 ### TODO
-* read Project-F, https://github.com/projf/projf-explore
-  + Verilator + SDL2, https://projectf.io/posts/verilog-sim-verilator-sdl/
-* learn Verilator
-  + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
-* study SpinalHDL
 * Consider Pipeline design
   + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
+
+### Reference
+* Project-F, https://github.com/projf/projf-explore
+  + Verilator + SDL2, https://projectf.io/posts/verilog-sim-verilator-sdl/
+* Verilator
+  + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
+* SpinalHDL
 
 ### Revision History
 * 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
 * 20220209 - Chochain Lee: rename to eJ32 for Lattice and future versions
 * 20230216 - Chochain Lee: consolidate ALU modules, tiddy macro tasks
-* 20231216 - Chochain Lee: fishbone modulization to
+* 20231216 - Chochain Lee: fishbone modulization => v2.0
