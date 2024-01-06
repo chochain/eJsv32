@@ -34,7 +34,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
-  |CTL|fishbone|TOS, ss_op, rs_op on bus||not synthsized||
+  |CTL|control bus|TOS, code, phase||not synthsized||
   |RAM|memory|128K SPRAM|53|8-bit bus||
   |DC|decoder unit|state machines|215||divider patch|
   |AU|arithmetic unit|ALU and data stack|3895|1285 with ss[1]|EBR multi-write|
