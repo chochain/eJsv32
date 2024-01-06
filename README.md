@@ -12,7 +12,10 @@ Responding to the invitation from Don Golding of CORE-I FPGA project [AI & Robot
 
 I appreciate that Dr. Ting took me in his last projects and considered me one of his student. Though a trained software engineer, who have never worked on any FPGA before, I felt overwhelmingly obligated to at least carry his last work to a point that future developers can benefit from the work of his life's effort.
 
-My goal is to make eJ32 as an example and learning tool for designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not. Here what I've done.
+My goal is to make the learning journey of building eJ32 as an example of designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not.
+
+### Status
+Currently, eJ32 has not been synthesized on the targeted ICE40 for the lack of knowledge of my part. For a nice fully functional Forth CPU, *J1a*, check [here](https://https://www.excamera.com/sphinx/article-j1a-swapforth.html). Anyway, here're what I've done for eJ32 so far.
 
 ### Adaptations of eJsv32k
 * keep Dr. Ting's original code in ~/orig/eJsv32k
@@ -35,7 +38,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||not synthsized||
-  |RAM|memory|128K SPRAM|53|8-bit bus||
+  |RAM|memory|128K RAM|53|8-bit, single port||
   |DC|decoder unit|state machines|215||divider patch|
   |AU|arithmetic unit|ALU and data stack|3895|1285 with ss[1]|EBR multi-write|
   |BR|branching unit|program counter and return stack|4652|478 with rs[1]||
@@ -79,10 +82,14 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   + v2 - 520K+ cycles ??, ~/docs/eJ32_trace_full_20240104.txt
 
 ### TODO
+* Use EBR for data and return stacks
+* A dedicate divider unit
+* Check Timing
 * Consider Pipeline design
   + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
 
 ### Reference
+* IceStorm, open source synthesis, https://clifford.at/icestorm
 * Project-F, https://github.com/projf/projf-explore
   + Verilator + SDL2, https://projectf.io/posts/verilog-sim-verilator-sdl/
 * Verilator
