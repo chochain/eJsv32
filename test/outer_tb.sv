@@ -61,7 +61,7 @@ module outer_tb #(
 
     task verify_obuf;
         $display("\ndump obuf: 0x%04x", OBUF);
-        dump(OBUF, 'h200);
+        dump(OBUF, 'h600);
     endtask: verify_obuf
 
     task activate;
@@ -71,8 +71,8 @@ module outer_tb #(
     endtask: activate
 
     task trace;
+        automatic `U3 ph = `CTL.phase;
         automatic `U5 rp = `BR.rp;
-        automatic `U3 ph = `AU.phase;
         automatic `U8 xx;
         automatic opcode_t code;
         if (!$cast(code, `CTL.code)) begin
@@ -112,7 +112,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(500) @(posedge `CTL.clk) trace();
+        repeat(500000) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
