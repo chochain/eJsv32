@@ -31,6 +31,7 @@ My goal is to make eJ32 as an example and learning tool for designing and implem
   
 ### Modulization (and bump version to v2)
   > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
+  
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|fishbone|TOS, ss_op, rs_op on bus||not synthsized||
