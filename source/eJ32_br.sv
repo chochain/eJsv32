@@ -53,7 +53,6 @@ module EJ32_BR #(
 
     // data stack
     task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
-    task PUSH(input `DU d); TOS(d);              endtask;    // `S(sPUSH) in AU
     task RPUSH(input `DU d); r_n = d; `R(sPUSH); endtask;
     // branching
     // Note: address is memory offset (instead of Java class file reference)
@@ -101,11 +100,11 @@ module EJ32_BR #(
         INIT();
         case (code)
         // return stack => TOS
-        iload:     PUSH(rs[rp - data]);    // CC: not tested
-        iload_0:   PUSH(rs[rp]);           // CC: not tested
-        iload_1:   PUSH(rs[rp - 1]);       // CC: not tested
-        iload_2:   PUSH(rs[rp - 2]);       // CC: not tested
-        iload_3:   PUSH(rs[rp - 3]);       // CC: not tested
+        iload:     TOS(rs[rp - data]);    // CC: not tested
+        iload_0:   TOS(rs[rp]);           // CC: not tested
+        iload_1:   TOS(rs[rp - 1]);       // CC: not tested
+        iload_2:   TOS(rs[rp - 2]);       // CC: not tested
+        iload_3:   TOS(rs[rp - 3]);       // CC: not tested
         istore_0:  begin r_n = t; `R(sMOVE); end  // local var, CC: not tested
         //
         // conditional branching ops
@@ -128,7 +127,7 @@ module EJ32_BR #(
             0: SETA(`X8A(data)); // set addr higher byte
             1: JMP(a_d);         // merge addr lower byte
             endcase
-        jsr:     if (phase==2) begin JMP(`XDA(t_d)); PUSH(`XAD(p) + 2); end
+        jsr:     if (phase==2) begin JMP(`XDA(t_d)); TOS(`XAD(p) + 2); end
         ret:     JMP(`XDA(r));
         jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
         invokevirtual:
@@ -146,8 +145,8 @@ module EJ32_BR #(
                   JMP(a_d);
                end
             endcase
-        dupr:  PUSH(r);
-        popr:  begin PUSH(r); `R(sPOP); end
+        dupr:  TOS(r);
+        popr:  begin TOS(r); `R(sPOP); end
         pushr: RPUSH(t);
         endcase
     end
