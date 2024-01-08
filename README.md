@@ -31,10 +31,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + use common tasks and macros to reduce verbosity
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
+* fix divider, add one extra cycle for TOS update before next instruction
   
 ### Modulization (and bump version to v2)
   > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
-  
+
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||not synthsized||
@@ -75,11 +76,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + can be further reduced to 2K LUTs with hardware divider.
 * ModelSsim COLD start - completed
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
-  + v2 - 10K cycles, ~/docs/eJ32_trace_20231223.txt
+  + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
 * ModelSim Dr. Ting's 6 embeded test cases - completed
   + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
   + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
-  + v2 - 520K+ cycles ??, ~/docs/eJ32_trace_full_20240104.txt
+  + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240108.txt
 
 ### TODO
 * Use EBR for data and return stacks
