@@ -24,7 +24,6 @@ module EJ32_BR #(
     // instruction
     `IU  a;                     ///> instrunction address
     `U3  phase;                 ///> FSM phase (aka state)
-    `DU  rs[RS_DEPTH];          ///> return stack, 3K LUTs, TODO: use EBR memory
     `DU  r;                     ///> top of RS
     `U5  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
@@ -47,13 +46,41 @@ module EJ32_BR #(
     `DU t;                      ///> shadow TOS
     `U1 t_x, t_z, t_neg;        ///> TOS controls
     `DU t_d;                    ///> 4-byte merged data
-    // return stack
-    `U5 rp1;                    ///> return stack pointer
-    `U1 r_x;                    ///> return stack control
+    /// BRAM control
+    `U1 rs_ren;
+    `U1 rs_wen;
+    `U5 rp_w;
+    `U5 rp_r;
 
+    bram_dp #() rs(             ///> return stack using EBR
+        .wr_clk_i(~ctl.clk),    ///> leads half a cycle 
+        .rd_clk_i(~ctl.clk),
+        .rst_i(ctl.rst),
+        .wr_clk_en_i(1'b1),
+        .rd_clk_en_i(1'b1),
+        .rd_en_i(rs_ren),
+        .wr_en_i(rs_wen),
+        .wr_data_i(r_n),
+        .wr_addr_i({1'b0, rp_w}),
+        .rd_addr_i({1'b0, rp_r}),
+        .rd_data_o(r)            ///> read back into r
+    );
     // data stack
     task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
-    task RPUSH(input `DU d); r_n = d; `R(sPUSH); endtask;
+    task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
+    task RPUSH(input `DU d); 
+         rs_wen = 1'b1; 
+         r_n    = d;
+         rp_w   = rp + 1;
+         rs_op  = sPUSH;
+    endtask: RPUSH
+    task RMOVE(input `DU d);
+         rs_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
+         rs_wen = 1'b1;
+         r_n    = d;
+         rp_w   = rp;
+         rs_op  = sMOVE;
+    endtask: RMOVE
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
@@ -65,11 +92,6 @@ module EJ32_BR #(
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
-    ///
-    /// wires to reduce verbosity
-    ///
-    assign r      = rs[rp];                   ///> return stack, TODO: EBR
-    assign rp1    = rp + 1;
     ///
     /// IO signals wires
     ///
@@ -94,18 +116,22 @@ module EJ32_BR #(
         t_x     = 1'b0;
         r_n     = {DSZ{1'b0}};  /// return stack
         rs_op   = sNOP;
+        rs_ren  = 1'b1;
+        rs_wen  = 1'b0;
+        rp_w    = rp + 1;
+        rp_r    = rp;
     endtask: INIT
 
     always_comb begin
         INIT();
         case (code)
         // return stack => TOS
-        iload:     TOS(rs[rp - data]);    // CC: not tested
-        iload_0:   TOS(rs[rp]);           // CC: not tested
-        iload_1:   TOS(rs[rp - 1]);       // CC: not tested
-        iload_2:   TOS(rs[rp - 2]);       // CC: not tested
-        iload_3:   TOS(rs[rp - 3]);       // CC: not tested
-        istore_0:  begin r_n = t; `R(sMOVE); end  // local var, CC: not tested
+        iload:     RLOAD(rp - data);    // CC: not tested, multi-cycle needed?
+        iload_0:   RLOAD(rp);           // CC: not tested
+        iload_1:   RLOAD(rp - 1);       // CC: not tested
+        iload_2:   RLOAD(rp - 2);       // CC: not tested
+        iload_3:   RLOAD(rp - 3);       // CC: not tested
+        istore_0:  RMOVE(t);            // local var, CC: not tested
         //
         // conditional branching ops
         //
@@ -141,7 +167,7 @@ module EJ32_BR #(
             0: SETA(`X8A(data));
             1: if (r == 0) `R(sPOP);
                else begin
-                  r_n = r - 1; `R(sMOVE);
+                  RMOVE(r - 1);
                   JMP(a_d);
                end
             endcase
@@ -164,9 +190,8 @@ module EJ32_BR #(
 
             // return stack
             case (rs_op)
-            sMOVE: rs[rp] <= r_n;
-            sPOP:  rp     <= rp - 1;
-            sPUSH: begin rs[rp1] <= r_n; rp <= rp + 1; end
+            sPOP:  rp <= rp - 1;
+            sPUSH: rp <= rp + 1;
             endcase
         end
     end
