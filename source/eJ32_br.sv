@@ -152,13 +152,13 @@ module EJ32_BR #(
         endcase
     end
 
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+    always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             a    <= {ASZ{1'b0}};     /// init address
             asel <= 1'b0;            /// cold start by decoder
             rp   <= '0;
         end
-        else if (ctl.clk && br_en) begin
+        else if (br_en) begin
             asel <= asel_n;
             if (t_x) ctl.t <= t_n;
             if (a_x) a     <= a_n;
