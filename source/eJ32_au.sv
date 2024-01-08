@@ -200,46 +200,28 @@ module EJ32_AU #(
             sp <= '0;
         end
         else if (au_en) begin
-            if (div_en && !div_bsy) div_patch();
-            else begin
-               if (t_x) ctl.t <= t_n;
-               // data stack
-               case (ss_op)
-                 sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
-                 sPOP:  sp <= sp - 1;
-                 sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
-               endcase
-            end
-        end
+            if (t_x) ctl.t <= t_n;
+            // data stack
+            case (ss_op)
+                sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
+                sPOP:  sp <= sp - 1;
+                sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
+            endcase // case (ss_op)
+            ///
+            /// verify divider
+            ///
+            if (div_en && !div_bsy) div_check();
+         end
     end
 
-    task div_patch();
+    task div_check();
         automatic `U8 op  = code==idiv ? "/" : "%";
-        automatic `DU q_r = code==idiv ? div_q : div_r;
         case (phase)
         1: begin             // done div_int
-            $display("DIV %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-            assert(div_q == (s / t) && div_r == (s % t));
-            /*
-            assert(t_n != q_r) else begin
-                $display("AU_PATCH.1 t_x=%x t_n=%8x->%8x", t_x, t_n, q_r);
-                ctl.t <= q_r;
+            assert(div_q == (s / t) && div_r == (s % t)) else begin
+                $display("AU.1.ERR %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
             end
-            if (data == 'hcc && ss_op == sPOP) begin
-                $display("AU_PATCH.1 sp=%x forced -1", sp);
-                sp <= sp - 1;
-            end
-            */
         end
         endcase
-        // regular path
-        begin
-            if (t_x) ctl.t <= t_n;
-            case (ss_op)
-            sMOVE: ss[sp] <= t;
-            sPOP:  sp <= sp - 1;
-            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
-            endcase
-        end
-    endtask: div_patch
+    endtask: div_check
 endmodule: EJ32_AU
