@@ -163,7 +163,7 @@ module EJ32_DC (
         iand:    `AU1;
         ior:     `AU1;
         ixor:    `AU1;
-        iinc:    begin `ABL1; WAIT2(); end
+        iinc:    begin `AL1; WAIT2(); end
         // BR conditional branching
         ifeq:      BRAN();
         ifne:      BRAN();
