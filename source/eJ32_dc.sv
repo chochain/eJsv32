@@ -88,13 +88,15 @@ module EJ32_DC (
         case (phase)
         0: if (div_bsy) HOLD(1);
            else begin             // CC: this branch works OK
-              $display("DIV.0 phase_n=%d, div_bsy=%x, code_x=%x, p_x=%x",
-                       phase_n, div_bsy, code_x, p_x);
+               assert(phase_n==0 && div_bsy==1'b0 && code_x==1'b1 && p_x==1'b1) else begin
+                   $display("DIV.0.ERR phase_n=%d->0, div_bsy=%x->0, code_x=%x->1, p_x=%x->1",
+                            phase_n, div_bsy, code_x, p_x);
+               end
            end
         1: if (div_bsy) HOLD(1);
            else begin             // CC: but don't know why this branch skipped? see patch below
-              $display("DIV.1 div_bsy=%x", div_bsy);
-              HOLD(0);
+               $display("DIV.1 div_bsy=%x", div_bsy);
+               HOLD(0);
            end
         endcase
     endtask: DIV
@@ -223,14 +225,8 @@ module EJ32_DC (
     ///
     task div_patch();
        case (phase)
-/*         
-       0: begin   // wait extra cycle for ss[sp] update
-          $display("DC_PATCH.0 phase_n=%d->0", phase_n);
-          code <= code_n;
-       end
-*/
        1: begin
-          $display("DIV_FIX.1 phase_n=%d->0, div_bsy=%x, code_x=%x, p_x=%x",
+          $display("DIV_FIX.1 phase_n=%d->0, div_bsy=%x->0, code_x=%x->0, p_x=%x->0",
                    phase_n, div_bsy, code_x, p_x);
           phase <= 0;
        end
