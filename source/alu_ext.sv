@@ -61,11 +61,11 @@ module div_int #(parameter DSZ=32) (
     ///
     /// wires to reduce verbosity
     ///
-    assign pos = r1 >= {1'b0, y};
-    assign ry  = r1 - y;
+    assign pos = r1 >= {1'b0, r};
+    assign ry  = r1 - r;
     ///
     /// wire output port
-    assign z   = y==0;
+    assign z   = r==0;
       
     always_comb begin
         if (pos) {r_n, q_n} = {ry[DSZ-1:0], q, 1'b1}; // 65-bit ops
@@ -75,8 +75,8 @@ module div_int #(parameter DSZ=32) (
     always_ff @(posedge clk) begin
         if (rst) begin
             i    <= ~0;                // cycle counter 31->0
+            r    <= y;                 // keep y's copy, b/c ss[sp] update in 1st cycle
             busy <= 1'b1;
-            q    <= 0;
             {r1, q}  <= {{DSZ{1'b0}}, x, 1'b0};   // 65-bit shifter
         end
         else if (busy) begin
