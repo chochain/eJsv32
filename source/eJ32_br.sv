@@ -51,8 +51,10 @@ module EJ32_BR #(
     `U1 rs_wen;
     `U5 rp_w;
     `U5 rp_r;
-
-    bram_dp #() rs(             ///> return stack using EBR
+    ///
+    /// return stack (using embedded block memory)
+    ///
+    bram_dp #() rs(
         .wr_clk_i(~ctl.clk),    ///> leads half a cycle 
         .rd_clk_i(~ctl.clk),
         .rst_i(ctl.rst),
@@ -65,7 +67,7 @@ module EJ32_BR #(
         .rd_addr_i({1'b0, rp_r}),
         .rd_data_o(r)            ///> read back into r
     );
-    // data stack
+    // return stack ops
     task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
     task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
     task RPUSH(input `DU d); 

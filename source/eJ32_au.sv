@@ -19,8 +19,8 @@ module EJ32_AU #(
     /// @defgroup Registers
     /// @{
     stack_op ss_op;             ///> stack opcode
-    `DU ss[SS_DEPTH];           ///> data stack, 3K LUTs, TODO: use EBR memory
     `DU t_n;                    ///> next TOS
+    `DU s_n;                    ///> next NOS
     /// @}
     /// @defgroup Wires
     /// @{
@@ -29,7 +29,14 @@ module EJ32_AU #(
     `DU t, s;                   ///> shadow TOS, NOS
     `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
-    `U5 sp, sp1;                ///> data stack pointers, sp1 = sp + 1
+    `U5 sp;                     ///> data stack pointer
+    /// @}
+    /// @defgroup EBR control
+    /// @{
+    `U1 ss_ren;
+    `U1 ss_wen;
+    `U5 sp_w;
+    `U5 sp_r;
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -68,11 +75,41 @@ module EJ32_AU #(
     .bits(t[4:0]),
     .r(iushr_o)
     );
+    ///
+    /// data stack (using embedded block memory)
+    ///
+    bram_dp #() ss(
+        .wr_clk_i(~ctl.clk),    ///> leads half a cycle 
+        .rd_clk_i(~ctl.clk),
+        .rst_i(ctl.rst),
+        .wr_clk_en_i(1'b1),
+        .rd_clk_en_i(1'b1),
+        .rd_en_i(ss_ren),
+        .wr_en_i(ss_wen),
+        .wr_data_i(s_n),
+        .wr_addr_i({1'b0, sp_w}),
+        .rd_addr_i({1'b0, sp_r}),
+        .rd_data_o(s)            ///> read back into NOS
+    );
     // data stack
     task TOS(input `DU v);  t_n = v; `SET(t_x); endtask
     task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask
-    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask
     task POP();             TOS(s); `S(sPOP);   endtask
+    task PUSH(input `DU v);
+        ss_wen = 1'b1;
+        s_n    = t;
+        sp_w   = sp + 1;
+        ss_op  = sPUSH;
+        TOS(v);
+    endtask: PUSH
+    task MOVE(input `DU v);
+        ss_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
+        ss_wen = 1'b1;
+        s_n    = t;
+        sp_w   = sp;
+        ss_op  = sMOVE;
+        TOS(v);
+    endtask: MOVE
     task IBRAN();
         case (phase)
         0: ALU(s - t);
@@ -91,9 +128,7 @@ module EJ32_AU #(
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;                  ///> shadow TOS from control bus
-    assign s      = ss[sp];                 ///> data stack, TODO: EBR
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
-    assign sp1    = sp + 1;
     assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     /// wired to output
     assign div_bsy_o = div_bsy;
@@ -103,8 +138,13 @@ module EJ32_AU #(
     ///
     task INIT();
         t_n   = {DSZ{1'b0}};  /// TOS
+        s_n   = {DSZ{1'b0}};  /// NOS
         t_x   = 1'b0;
         ss_op = sNOP;         /// data stack
+        ss_ren= 1'b1;
+        ss_wen= 1'b0;
+        sp_w  = sp + 1;
+        sp_r  = sp;
         ///
         /// external module control flags
         ///
@@ -149,13 +189,13 @@ module EJ32_AU #(
         pop2:      POP();
         dup:       `S(sPUSH);
         dup_x1:    if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
-        dup_x2:    PUSH(ss[sp - 1]);
+        dup_x2:    /* PUSH(ss[sp - 1]); */ // CC: not tested, skip for now
         dup2:                              // CC: logic changed since a_n is 16-bit only 
             case (phase)
             0: PUSH(s);
             2: PUSH(s);
             endcase
-        swap:      begin TOS(s); `S(sMOVE); end        
+        swap:      begin MOVE(s); end
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
@@ -203,10 +243,9 @@ module EJ32_AU #(
             if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
-                sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
-                sPOP:  sp <= sp - 1;
-                sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
-            endcase // case (ss_op)
+            sPOP:  sp <= sp - 1;
+            sPUSH: sp <= sp + 1;
+            endcase
             ///
             /// verify divider
             ///
