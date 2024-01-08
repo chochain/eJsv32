@@ -51,12 +51,12 @@ module outer_tb #(
 
     task verify_tib;
         $display("\ndump tib: 0x%04x", TIB);
-        dump(TIB, 'h200);
+        dump(TIB, 'h120);
     endtask: verify_tib;
 
     task verify_dict;
         $display("\ndump dict: 0x%04x", dict.ctx);
-        dump(dict.ctx, 'h80);
+        dump(dict.ctx, 'h120);
     endtask: verify_dict;
 
     task verify_obuf;
@@ -112,7 +112,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(500000) @(posedge `CTL.clk) trace();
+        repeat(520000) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
