@@ -80,6 +80,7 @@ module EJ32_AU #(
         endcase
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask
+    task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v); endtask
     task STOR(int n);
        if (phase==0) `S(sPOP);
        else if (phase==n) POP();
@@ -93,7 +94,7 @@ module EJ32_AU #(
     assign s      = ss[sp];                 ///> data stack, TODO: EBR
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
     assign sp1    = sp + 1;
-    assign div_en = (code==idiv || code==irem);
+    assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     /// wired to output
     assign div_bsy_o = div_bsy;
     assign s_o    = s;
@@ -159,8 +160,8 @@ module EJ32_AU #(
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
         imul:      ALU(mul_v[DSZ-1:0]);
-        idiv:      if (!div_bsy) ALU(div_q);
-        irem:      if (!div_bsy) ALU(div_r);
+        idiv:      DIV(div_q);
+        irem:      DIV(div_r);
         ineg:      ALU(0 - t);
         ishl:      ALU(isht_o);
         ishr:      begin ALU(isht_o); `SET(shr_f); end
@@ -194,42 +195,51 @@ module EJ32_AU #(
     ///
     /// data stacks
     ///
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+    always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             sp <= '0;
         end
-        else if (ctl.clk && au_en) begin
-            if (t_x) ctl.t <= t_n;
-            // data stack
-            case (ss_op)
-            sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
-            sPOP:  sp <= sp - 1;
-            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
-            endcase
-            ///
-            /// validate divider
-            ///
-            if (div_en) div_check();
+        else if (au_en) begin
+            if (div_en && !div_bsy) div_patch();
+            else begin
+               if (t_x) ctl.t <= t_n;
+               // data stack
+               case (ss_op)
+                 sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
+                 sPOP:  sp <= sp - 1;
+                 sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
+               endcase
+            end
         end
     end
 
-    task div_check();
-        automatic `U8 op = code==idiv ? "/" : "%";
-        if (phase==1 && !div_bsy) begin             // done div_int
-            $display("OK %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-            assert(div_q == (s / t));
-            assert(div_r == (s % t));
+    task div_patch();
+        automatic `U8 op  = code==idiv ? "/" : "%";
+        automatic `DU q_r = code==idiv ? div_q : div_r;
+        case (phase)
+        1: begin             // done div_int
+            $display("DIV %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+            assert(div_q == (s / t) && div_r == (s % t));
+            /*
+            assert(t_n != q_r) else begin
+                $display("AU_PATCH.1 t_x=%x t_n=%8x->%8x", t_x, t_n, q_r);
+                ctl.t <= q_r;
+            end
+            if (data == 'hcc && ss_op == sPOP) begin
+                $display("AU_PATCH.1 sp=%x forced -1", sp);
+                sp <= sp - 1;
+            end
+            */
         end
-        /*
-                $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-                assert(ss_op == sPOP) else begin
-                    $write(", sp=%d, sp1=%d forced -1", sp, sp1);
-                    sp <= sp - 1;
-                end
-                assert(t_n == (t_n==(idiv ? div_q : div_r))) else begin
-                    $write(", t_x=%d t_n=%8x =q/r", t_x, t_n);
-                    ctl.t <= code==idiv ? div_q : div_r;
-                end
-         */
-    endtask: div_check
+        endcase
+        // regular path
+        begin
+            if (t_x) ctl.t <= t_n;
+            case (ss_op)
+            sMOVE: ss[sp] <= t;
+            sPOP:  sp <= sp - 1;
+            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
+            endcase
+        end
+    endtask: div_patch
 endmodule: EJ32_AU
