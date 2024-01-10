@@ -14,7 +14,6 @@ module EJ32_BR #(
     input    `U1 br_en,         ///> branching unit active
     input    `IU p,             ///> instruction pointer
     input    `U8 data,          ///> data from memory bus
-    input    `DU s,             ///> NOS from stack unit
     output   `IU br_p_o,        ///> target instruction pointer
     output   `U1 br_psel
     );
