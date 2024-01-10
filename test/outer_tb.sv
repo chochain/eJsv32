@@ -85,7 +85,7 @@ module outer_tb #(
              ej32.p, `LS.a,
              `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
              `BR.rp, `BR.r,
-             `AU.sp, `AU.s, `AU.t,
+             `AU.sp, `AU.ss_op==sPOP ? `AU.s : `AU.s_n, `AU.t,
              code, ph, ej32.div_bsy_o ? "." : "_", code.name);
         case (code)
         invokevirtual: if (ph==2) begin
@@ -112,7 +112,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(520000) @(posedge `CTL.clk) trace();
+        repeat(1000) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words
