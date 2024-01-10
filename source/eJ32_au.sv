@@ -20,7 +20,7 @@ module EJ32_AU #(
     /// @{
     stack_op ss_op;             ///> stack opcode
     `DU t_n;                    ///> next TOS
-    `DU s_n;                    ///> next NOS
+    `DU s_n;
     /// @}
     /// @defgroup Wires
     /// @{
@@ -86,28 +86,29 @@ module EJ32_AU #(
         .rd_clk_en_i(1'b1),
         .rd_en_i(ss_ren),
         .wr_en_i(ss_wen),
-        .wr_data_i(s_n),
+        .wr_data_i(t),
         .wr_addr_i({1'b0, sp_w}),
         .rd_addr_i({1'b0, sp_r}),
-        .rd_data_o(s)            ///> read back into NOS
+        .rd_data_o(s_n)        ///> read back into NOS
     );
     // data stack
-    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask
-    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask
-    task POP();             TOS(s); `S(sPOP);   endtask
-    task PUSH(input `DU v);
+    task TOS(input `DU v); t_n = v; `SET(t_x); endtask
+    task ALU(input `DU v); TOS(v); sp_r = sp + 1; `S(sPOP);   endtask
+    task POP(); TOS(s); sp_r = sp - 1; `S(sPOP); endtask
+    task DUP();
         ss_wen = 1'b1;
-        s_n    = t;
         sp_w   = sp + 1;
-        ss_op  = sPUSH;
+        `S(sPUSH);
+    endtask: DUP
+    task PUSH(input `DU v);
+        DUP();
         TOS(v);
     endtask: PUSH
     task MOVE(input `DU v);
         ss_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
         ss_wen = 1'b1;
-        s_n    = t;
         sp_w   = sp;
-        ss_op  = sMOVE;
+        `S(sMOVE);
         TOS(v);
     endtask: MOVE
     task IBRAN();
@@ -119,7 +120,7 @@ module EJ32_AU #(
     task ZBRAN(); if (phase==1) POP(); endtask
     task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v); endtask
     task STOR(int n);
-       if (phase==0) `S(sPOP);
+       if (phase==0) begin `S(sPOP); end
        else if (phase==n) POP();
     endtask: STOR
     ///
@@ -137,8 +138,6 @@ module EJ32_AU #(
     /// combinational
     ///
     task INIT();
-        t_n   = {DSZ{1'b0}};  /// TOS
-        s_n   = {DSZ{1'b0}};  /// NOS
         t_x   = 1'b0;
         ss_op = sNOP;         /// data stack
         ss_ren= 1'b1;
@@ -174,11 +173,11 @@ module EJ32_AU #(
             1: TOS(t_d);
             endcase
         // rs => TOS
-        iload:     `S(sPUSH);       // CC: not tested
-        iload_0:   `S(sPUSH);       // CC: not tested
-        iload_1:   `S(sPUSH);       // CC: not tested
-        iload_2:   `S(sPUSH);       // CC: not tested
-        iload_3:   `S(sPUSH);       // CC: not tested
+        iload:     DUP();       // CC: not tested
+        iload_0:   DUP();       // CC: not tested
+        iload_1:   DUP();       // CC: not tested
+        iload_2:   DUP();       // CC: not tested
+        iload_3:   DUP();       // CC: not tested
         // LS ops (TOS => memory bus)
         istore_0:  POP();
         iastore:   STOR(4);
@@ -187,13 +186,15 @@ module EJ32_AU #(
         // stack ops
         pop:       POP();
         pop2:      POP();
-        dup:       `S(sPUSH);
-        dup_x1:    if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
-        dup_x2:    /* PUSH(ss[sp - 1]); */ // CC: not tested, skip for now
-        dup2:                              // CC: logic changed since a_n is 16-bit only 
+        dup:       DUP();
+        dup_x1:    if (phase==0) PUSH(s_n); // CC: logic changed since a_n is 16-bit only 
+        /* dup_x2:  PUSH(ss[sp - 1]); */    // CC: not tested, skip for now
+        dup2:                               // CC: logic changed since a_n is 16-bit only 
             case (phase)
-            0: PUSH(s);
-            2: PUSH(s);
+              0: begin PUSH(s); $display("DUP2.0"); end
+              1: begin TOS(s); $display("DUP2.1"); end
+              2: begin PUSH(s_n); $display("DUP2.2"); end
+              3: begin TOS(s); $display("DUP2.3"); end
             endcase
         swap:      begin MOVE(s); end
         // arithmetic ops
@@ -222,13 +223,13 @@ module EJ32_AU #(
         if_icmplt: IBRAN();
         if_icmpgt: IBRAN();
         // BR unconditional branching
-        jsr:       if (phase==2) `S(sPUSH);
+        jsr:       if (phase==2) DUP();
         // eForth VM specific
-        dupr:      `S(sPUSH);
-        popr:      `S(sPUSH);
+        dupr:      DUP();
+        popr:      DUP();
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
-        get:       if (phase==0) `S(sPUSH);
+        get:       if (phase==0) DUP();
         put:       if (phase==1) POP();
         endcase
     end // always_comb
@@ -240,6 +241,7 @@ module EJ32_AU #(
             sp <= '0;
         end
         else if (au_en) begin
+            s <= s_n;
             if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
