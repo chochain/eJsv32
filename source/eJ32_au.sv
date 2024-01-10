@@ -119,10 +119,7 @@ module EJ32_AU #(
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask
     task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v); endtask
-    task STOR(int n);
-       if (phase==0) begin `S(sPOP); end
-       else if (phase==n) POP();
-    endtask: STOR
+    task STOR(int n); if (phase==(n-1) || phase==n) POP(); endtask
     ///
     /// wires to reduce verbosity
     ///
@@ -133,7 +130,7 @@ module EJ32_AU #(
     assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     /// wired to output
     assign div_bsy_o = div_bsy;
-    assign s_o    = s;
+    assign s_o    = s_n;
     ///
     /// combinational
     ///
@@ -191,10 +188,10 @@ module EJ32_AU #(
         /* dup_x2:  PUSH(ss[sp - 1]); */    // CC: not tested, skip for now
         dup2:                               // CC: logic changed since a_n is 16-bit only 
             case (phase)
-              0: begin PUSH(s); $display("DUP2.0"); end
-              1: begin TOS(s); $display("DUP2.1"); end
-              2: begin PUSH(s_n); $display("DUP2.2"); end
-              3: begin TOS(s); $display("DUP2.3"); end
+            0: PUSH(s);
+            1: TOS(s);
+            2: PUSH(s);
+            3: TOS(s);
             endcase
         swap:      begin MOVE(s); end
         // arithmetic ops
