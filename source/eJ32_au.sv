@@ -37,6 +37,8 @@ module EJ32_AU #(
     `U1 ss_wen;
     `U5 sp_w;
     `U5 sp_r;
+    `U1 s_x;
+    `U1 sp_err;
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -93,21 +95,15 @@ module EJ32_AU #(
     );
     // data stack
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask
-    task ALU(input `DU v); TOS(v); sp_r = sp + 1; `S(sPOP);   endtask
-    task POP(); TOS(s); sp_r = sp - 1; `S(sPOP); endtask
-    task DUP();
-        ss_wen = 1'b1;
-        sp_w   = sp + 1;
-        `S(sPUSH);
-    endtask: DUP
-    task PUSH(input `DU v);
-        DUP();
-        TOS(v);
-    endtask: PUSH
+    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask
+    task POP(); ALU(s); endtask                     ///> replace TOS with NOS
+    task DUP(); ss_wen = 1'b1; `S(sPUSH); endtask                  ///> default sp_w = sp + 1
+    task PUSH(input `DU v); DUP(); sp_r = sp - 1; TOS(v); endtask  ///> default sp_r = sp
     task MOVE(input `DU v);
-        ss_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
+        ss_ren = 1'b0;         ///> no read to prevent ERB R/W conflict
         ss_wen = 1'b1;
         sp_w   = sp;
+        s_x    = 1'b0;         ///> s_o <= t
         `S(sMOVE);
         TOS(v);
     endtask: MOVE
@@ -119,7 +115,7 @@ module EJ32_AU #(
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask
     task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v); endtask
-    task STOR(int n); if (phase==(n-1) || phase==n) POP(); endtask
+    task STOR(int n); if (phase==n || phase==(n+1)) POP(); endtask
     ///
     /// wires to reduce verbosity
     ///
@@ -130,7 +126,8 @@ module EJ32_AU #(
     assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     /// wired to output
     assign div_bsy_o = div_bsy;
-    assign s_o    = s_n;
+    assign s_o    = (s_x) ? s_n : t;
+    assign sp_err = sp_w == sp_r;
     ///
     /// combinational
     ///
@@ -141,6 +138,7 @@ module EJ32_AU #(
         ss_wen= 1'b0;
         sp_w  = sp + 1;
         sp_r  = sp;
+        s_x   = 1'b1;         /// use ss return
         ///
         /// external module control flags
         ///
@@ -184,16 +182,16 @@ module EJ32_AU #(
         pop:       POP();
         pop2:      POP();
         dup:       DUP();
-        dup_x1:    if (phase==0) PUSH(s_n); // CC: logic changed since a_n is 16-bit only 
-        /* dup_x2:  PUSH(ss[sp - 1]); */    // CC: not tested, skip for now
-        dup2:                               // CC: logic changed since a_n is 16-bit only 
+        dup_x1:    if (phase==0) PUSH(s); // CC: logic changed since a_n is 16-bit only 
+        /* dup_x2:  PUSH(ss[sp - 1]); */  // CC: not tested, skip for now
+        dup2:                             // CC: logic changed since a_n is 16-bit only 
             case (phase)
-            0: PUSH(s);
+            0: DUP();
             1: TOS(s);
-            2: PUSH(s);
+            2: DUP();
             3: TOS(s);
             endcase
-        swap:      begin MOVE(s); end
+        swap:      MOVE(s);
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
@@ -222,8 +220,8 @@ module EJ32_AU #(
         // BR unconditional branching
         jsr:       if (phase==2) DUP();
         // eForth VM specific
-        dupr:      DUP();
-        popr:      DUP();
+        dupr:      begin DUP(); ss_ren = 1'b0; sp_w = sp; s_x = 1'b0; end
+        popr:      begin DUP(); ss_ren = 1'b0; sp_w = sp; s_x = 1'b0; end
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
         get:       if (phase==0) DUP();
@@ -238,7 +236,7 @@ module EJ32_AU #(
             sp <= '0;
         end
         else if (au_en) begin
-            s <= s_n;
+            s <= s_x ? s_n : t;
             if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
