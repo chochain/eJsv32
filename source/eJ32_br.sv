@@ -115,7 +115,6 @@ module EJ32_BR #(
         a_x     = 1'b0;
         t_n     = {DSZ{1'b0}};  /// TOS
         t_x     = 1'b0;
-        r_n     = {DSZ{1'b0}};  /// return stack
         rs_op   = sNOP;
         rs_ren  = 1'b1;
         rs_wen  = 1'b0;
