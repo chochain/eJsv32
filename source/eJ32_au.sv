@@ -93,19 +93,19 @@ module EJ32_AU #(
         .rd_addr_i({1'b0, sp_r}),
         .rd_data_o(s_n)        ///> read back into NOS
     );
-    // data stack
-    task TOS(input `DU v); t_n = v; `SET(t_x); endtask
-    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> drop NOS
-    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
-    task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> default sp_w = sp + 1
-    task PUSH(input `DU v); LOAD(); TOS(v); s_x = 1'b0; endtask      ///> s <= t
+    // data stack tasks (as macros)
+    task TOS(input `DU v); t_n = v; `SET(t_x); endtask               ///> update TOS
     task NOS(input stack_op op);                                     ///> update NOS
         ss_ren = 1'b0;         ///> no read to prevent ERB R/W conflict
         ss_wen = 1'b1;
-        sp_w   = sp;           ///> update NOS
-        s_x    = 1'b0;         ///> s_o <= t
+        sp_w   = sp;           ///> update NOS (and read in next cycle)
+        s_x    = 1'b0;         ///> s <= t (update s directly in current cycle)
         `S(op);
     endtask: NOS
+    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> drop NOS
+    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
+    task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> sp_r = sp, sp_w = sp + 1
+    task PUSH(input `DU v); LOAD(); TOS(v); s_x = 1'b0; endtask      ///> s <= t
     task IBRAN();
         case (phase)
         0: ALU(s - t);
@@ -113,7 +113,9 @@ module EJ32_AU #(
         endcase
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask
-    task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v); endtask
+    task DIV(input `DU v); 
+        if (phase==1 && !div_bsy) ALU(v);
+    endtask: DIV
     task STOR(int n); if (phase==n || phase==(n+1)) POP(); endtask
     ///
     /// wires to reduce verbosity
@@ -126,7 +128,7 @@ module EJ32_AU #(
     /// wired to output
     assign div_bsy_o = div_bsy;
     assign s_o    = (s_x) ? s_n : t;
-    assign sp_err = sp_w == sp_r;
+    assign sp_err = sp_w == sp_r;           ///> EBR R/W conflict check
     ///
     /// combinational
     ///
