@@ -95,18 +95,17 @@ module EJ32_AU #(
     );
     // data stack
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask
-    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask
-    task POP(); ALU(s); endtask                     ///> replace TOS with NOS
-    task DUP(); ss_wen = 1'b1; `S(sPUSH); endtask                  ///> default sp_w = sp + 1
-    task PUSH(input `DU v); DUP(); sp_r = sp - 1; TOS(v); endtask  ///> default sp_r = sp
-    task MOVE(input `DU v);
+    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> drop NOS
+    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
+    task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> default sp_w = sp + 1
+    task PUSH(input `DU v); LOAD(); TOS(v); s_x = 1'b0; endtask      ///> s <= t
+    task NOS(input stack_op op);                                     ///> update NOS
         ss_ren = 1'b0;         ///> no read to prevent ERB R/W conflict
         ss_wen = 1'b1;
-        sp_w   = sp;
+        sp_w   = sp;           ///> update NOS
         s_x    = 1'b0;         ///> s_o <= t
-        `S(sMOVE);
-        TOS(v);
-    endtask: MOVE
+        `S(op);
+    endtask: NOS
     task IBRAN();
         case (phase)
         0: ALU(s - t);
@@ -168,11 +167,11 @@ module EJ32_AU #(
             1: TOS(t_d);
             endcase
         // rs => TOS
-        iload:     DUP();       // CC: not tested
-        iload_0:   DUP();       // CC: not tested
-        iload_1:   DUP();       // CC: not tested
-        iload_2:   DUP();       // CC: not tested
-        iload_3:   DUP();       // CC: not tested
+        iload:     LOAD();       // CC: not tested
+        iload_0:   LOAD();       // CC: not tested
+        iload_1:   LOAD();       // CC: not tested
+        iload_2:   LOAD();       // CC: not tested
+        iload_3:   LOAD();       // CC: not tested
         // LS ops (TOS => memory bus)
         istore_0:  POP();
         iastore:   STOR(4);
@@ -181,17 +180,15 @@ module EJ32_AU #(
         // stack ops
         pop:       POP();
         pop2:      POP();
-        dup:       DUP();
+        dup:       PUSH(t);
         dup_x1:    if (phase==0) PUSH(s); // CC: logic changed since a_n is 16-bit only 
         /* dup_x2:  PUSH(ss[sp - 1]); */  // CC: not tested, skip for now
         dup2:                             // CC: logic changed since a_n is 16-bit only 
             case (phase)
-            0: DUP();
-            1: TOS(s);
-            2: DUP();
-            3: TOS(s);
+            0: PUSH(s);
+            2: PUSH(s);
             endcase
-        swap:      MOVE(s);
+        swap:      begin NOS(sMOVE); TOS(s); end
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
@@ -218,13 +215,13 @@ module EJ32_AU #(
         if_icmplt: IBRAN();
         if_icmpgt: IBRAN();
         // BR unconditional branching
-        jsr:       if (phase==2) DUP();
+        jsr:       if (phase==2) LOAD();
         // eForth VM specific
-        dupr:      begin DUP(); ss_ren = 1'b0; sp_w = sp; s_x = 1'b0; end
-        popr:      begin DUP(); ss_ren = 1'b0; sp_w = sp; s_x = 1'b0; end
+        dupr:      NOS(sPUSH);            ///> load from return stack
+        popr:      NOS(sPUSH);            ///> load from return stack
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
-        get:       if (phase==0) DUP();
+        get:       if (phase==0) LOAD();
         put:       if (phase==1) POP();
         endcase
     end // always_comb
