@@ -95,17 +95,21 @@ module EJ32_AU #(
     );
     // data stack tasks (as macros)
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask               ///> update TOS
-    task NOS(input stack_op op);                                     ///> update NOS
-        ss_ren = 1'b0;         ///> no read to prevent ERB R/W conflict
+    task NOS();                ///> update NOS
         ss_wen = 1'b1;
+        sp_r   = sp - 1;
         sp_w   = sp;           ///> update NOS (and read in next cycle)
         s_x    = 1'b0;         ///> s <= t (update s directly in current cycle)
-        `S(op);
     endtask: NOS
-    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> drop NOS
-    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
+    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> t <= v, drop NOS
     task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> sp_r = sp, sp_w = sp + 1
-    task PUSH(input `DU v); LOAD(); TOS(v); s_x = 1'b0; endtask      ///> s <= t
+    task PUSH(input `DU v);
+        TOS(v);                
+        ss_wen = 1'b1;         ///> default sp_r = sp; sp_w = sp + 1 (i.e. s <= ss[sp + 1])
+        s_x    = 1'b0;         ///> current cycle: s <= t (s_o no need to wait one extra cycle)
+        `S(sPUSH);
+    endtask: PUSH
+    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
     task IBRAN();
         case (phase)
         0: ALU(s - t);
@@ -113,7 +117,7 @@ module EJ32_AU #(
         endcase
     endtask: IBRAN
     task ZBRAN(); if (phase==1) POP(); endtask
-    task DIV(input `DU v); 
+    task DIV(input `DU v);
         if (phase==1 && !div_bsy) ALU(v);
     endtask: DIV
     task STOR(int n); if (phase==n || phase==(n+1)) POP(); endtask
@@ -190,7 +194,7 @@ module EJ32_AU #(
             0: PUSH(s);
             2: PUSH(s);
             endcase
-        swap:      begin NOS(sMOVE); TOS(s); end
+        swap:      begin NOS(); TOS(s); end    ///> s <= t, t <= s (in one cycle)
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
@@ -219,8 +223,8 @@ module EJ32_AU #(
         // BR unconditional branching
         jsr:       if (phase==2) LOAD();
         // eForth VM specific
-        dupr:      NOS(sPUSH);            ///> load from return stack
-        popr:      NOS(sPUSH);            ///> load from return stack
+        dupr:      begin NOS(); `S(sPUSH); end        ///> load from return stack
+        popr:      begin NOS(); `S(sPUSH); end        ///> load from return stack
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
         get:       if (phase==0) LOAD();
