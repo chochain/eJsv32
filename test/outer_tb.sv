@@ -51,12 +51,12 @@ module outer_tb #(
 
     task verify_tib;
         $display("\ndump tib: 0x%04x", TIB);
-        dump(TIB, 'h200);
+        dump(TIB, 'h120);
     endtask: verify_tib;
 
     task verify_dict;
         $display("\ndump dict: 0x%04x", dict.ctx);
-        dump(dict.ctx, 'h80);
+        dump(dict.ctx, 'h120);
     endtask: verify_dict;
 
     task verify_obuf;
@@ -73,6 +73,7 @@ module outer_tb #(
     task trace;
         automatic `U3 ph = `CTL.phase;
         automatic `U5 rp = `BR.rp;
+        automatic `U8 d8 = `DBUS.vo; // `DBUS.we ? `DBUS.vi : `DBUS.vo;
         automatic `U8 xx;
         automatic opcode_t code;
         if (!$cast(code, `CTL.code)) begin
@@ -83,7 +84,7 @@ module outer_tb #(
              "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d%s%-16s",
              $time/10, 
              ej32.p, `LS.a,
-             `BR.asel ? xx : ej32.data, `BR.asel ? ej32.data : xx,
+             `BR.asel ? xx : d8, `BR.asel ? d8 : xx,
              `BR.rp, `BR.r,
              `AU.sp, `AU.s, `AU.t,
              code, ph, ej32.div_bsy_o ? "." : "_", code.name);
@@ -112,7 +113,7 @@ module outer_tb #(
         verify_tib();         // validate input buffer content
 
         activate();           // activate eJsv32
-        repeat(500000) @(posedge `CTL.clk) trace();
+        repeat(23000) @(posedge `CTL.clk) trace();
         
         `CTL.reset();         // disable eJsv32
         verify_dict();        // validate output dictionary words

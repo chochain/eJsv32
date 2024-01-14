@@ -19,8 +19,8 @@ module EJ32_AU #(
     /// @defgroup Registers
     /// @{
     stack_op ss_op;             ///> stack opcode
-    `DU ss[SS_DEPTH];           ///> data stack, 3K LUTs, TODO: use EBR memory
     `DU t_n;                    ///> next TOS
+    `DU s_n;
     /// @}
     /// @defgroup Wires
     /// @{
@@ -29,7 +29,16 @@ module EJ32_AU #(
     `DU t, s;                   ///> shadow TOS, NOS
     `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
-    `U5 sp, sp1;                ///> data stack pointers, sp1 = sp + 1
+    `U5 sp;                     ///> data stack pointer
+    /// @}
+    /// @defgroup EBR control
+    /// @{
+    `U1 ss_ren;
+    `U1 ss_wen;
+    `U5 sp_w;
+    `U5 sp_r;
+    `U1 s_x;
+    `U1 sp_err;
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -68,42 +77,64 @@ module EJ32_AU #(
     .bits(t[4:0]),
     .r(iushr_o)
     );
-    // data stack
-    task TOS(input `DU v);  t_n = v; `SET(t_x); endtask
-    task ALU(input `DU v);  TOS(v); `S(sPOP);   endtask
-    task PUSH(input `DU v); TOS(v); `S(sPUSH);  endtask
-    task POP();             TOS(s); `S(sPOP);   endtask
-    task IBRAN();
+    ///
+    /// data stack (using embedded block memory)
+    ///
+    bram_dp #() ss(
+        .wr_clk_i(~ctl.clk),    ///> leads half a cycle 
+        .rd_clk_i(~ctl.clk),
+        .rst_i(ctl.rst),
+        .wr_clk_en_i(1'b1),
+        .rd_clk_en_i(1'b1),
+        .rd_en_i(ss_ren),
+        .wr_en_i(ss_wen),
+        .wr_data_i(t),
+        .wr_addr_i({1'b0, sp_w}),
+        .rd_addr_i({1'b0, sp_r}),
+        .rd_data_o(s_n)        ///> read back into NOS
+    );
+    // data stack tasks (as macros)
+    task TOS(input `DU v); t_n = v; `SET(t_x); endtask               ///> update TOS
+    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> t <= v, drop NOS
+    task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> sp_r = sp, sp_w = sp + 1
+    task PUSH(input `DU v);
+        TOS(v);                
+        ss_wen = 1'b1;         ///> default sp_r = sp; sp_w = sp + 1 (i.e. s <= ss[sp + 1])
+        s_x    = 1'b0;         ///> current cycle: s <= t (s_o no need to wait one extra cycle)
+        `S(sPUSH);
+    endtask: PUSH
+    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
+    task IBRAN();              ///> conditional branch
         case (phase)
         0: ALU(s - t);
         1: POP();
         endcase
     endtask: IBRAN
-    task ZBRAN(); if (phase==1) POP(); endtask
-    task STOR(int n);
-       if (phase==0) `S(sPOP);
-       else if (phase==n) POP();
-    endtask: STOR
+    task ZBRAN();          if (phase==1) POP();                 endtask
+    task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v);    endtask
+    task STOR(int n);      if (phase==n || phase==(n+1)) POP(); endtask
     ///
     /// wires to reduce verbosity
     ///
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;                  ///> shadow TOS from control bus
-    assign s      = ss[sp];                 ///> data stack, TODO: EBR
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
-    assign sp1    = sp + 1;
-    assign div_en = (code==idiv || code==irem);
+    assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     /// wired to output
     assign div_bsy_o = div_bsy;
-    assign s_o    = s;
+    assign s_o    = (s_x) ? s_n : t;
     ///
     /// combinational
     ///
     task INIT();
-        t_n   = {DSZ{1'b0}};  /// TOS
         t_x   = 1'b0;
         ss_op = sNOP;         /// data stack
+        ss_ren= 1'b1;
+        ss_wen= 1'b0;
+        sp_w  = sp + 1;
+        sp_r  = sp;
+        s_x   = 1'b1;         /// use ss return
         ///
         /// external module control flags
         ///
@@ -133,11 +164,11 @@ module EJ32_AU #(
             1: TOS(t_d);
             endcase
         // rs => TOS
-        iload:     `S(sPUSH);       // CC: not tested
-        iload_0:   `S(sPUSH);       // CC: not tested
-        iload_1:   `S(sPUSH);       // CC: not tested
-        iload_2:   `S(sPUSH);       // CC: not tested
-        iload_3:   `S(sPUSH);       // CC: not tested
+        iload:     LOAD();       // CC: not tested
+        iload_0:   LOAD();       // CC: not tested
+        iload_1:   LOAD();       // CC: not tested
+        iload_2:   LOAD();       // CC: not tested
+        iload_3:   LOAD();       // CC: not tested
         // LS ops (TOS => memory bus)
         istore_0:  POP();
         iastore:   STOR(4);
@@ -146,21 +177,27 @@ module EJ32_AU #(
         // stack ops
         pop:       POP();
         pop2:      POP();
-        dup:       `S(sPUSH);
-        dup_x1:    if (phase==0) PUSH(s);  // CC: logic changed since a_n is 16-bit only
-        dup_x2:    PUSH(ss[sp - 1]);
-        dup2:                              // CC: logic changed since a_n is 16-bit only 
+        dup:       PUSH(t);
+        dup_x1:    if (phase==0) PUSH(s); // CC: logic changed since a_n is 16-bit only 
+        /* dup_x2:  PUSH(ss[sp - 1]); */  // CC: not tested, skip for now
+        dup2:                             // CC: logic changed since a_n is 16-bit only 
             case (phase)
             0: PUSH(s);
             2: PUSH(s);
             endcase
-        swap:      begin TOS(s); `S(sMOVE); end        
+        swap:      begin           ///> s <= t, t <= s (in one cycle), ss_op = sNOP
+            TOS(s);
+            ss_wen = 1'b1;
+            sp_r   = sp - 1;
+            sp_w   = sp;           ///> update NOS (and read in next cycle)
+            s_x    = 1'b0;         ///> s <= t (update s directly in current cycle)
+        end
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
         imul:      ALU(mul_v[DSZ-1:0]);
-        idiv:      if (!div_bsy) ALU(div_q);
-        irem:      if (!div_bsy) ALU(div_r);
+        idiv:      DIV(div_q);
+        irem:      DIV(div_r);
         ineg:      ALU(0 - t);
         ishl:      ALU(isht_o);
         ishr:      begin ALU(isht_o); `SET(shr_f); end
@@ -181,55 +218,46 @@ module EJ32_AU #(
         if_icmplt: IBRAN();
         if_icmpgt: IBRAN();
         // BR unconditional branching
-        jsr:       if (phase==2) `S(sPUSH);
+        jsr:       if (phase==2) LOAD();
         // eForth VM specific
-        dupr:      `S(sPUSH);
-        popr:      `S(sPUSH);
+        dupr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
+        popr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
-        get:       if (phase==0) `S(sPUSH);
+        get:       if (phase==0) LOAD();
         put:       if (phase==1) POP();
         endcase
     end // always_comb
     ///
     /// data stacks
     ///
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+    always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             sp <= '0;
         end
-        else if (ctl.clk && au_en) begin
+        else if (au_en) begin
+            s <= s_x ? s_n : t;
             if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
-            sMOVE: ss[sp] <= t;  // CC: comment this out to fix sythesizer EBR multi-write error
             sPOP:  sp <= sp - 1;
-            sPUSH: begin ss[sp1] <= t; sp <= sp + 1; end
+            sPUSH: sp <= sp + 1;
             endcase
             ///
-            /// validate divider
+            /// verify divider
             ///
-            if (div_en) div_check();
-        end
+            if (div_en && !div_bsy) div_check();
+         end
     end
 
     task div_check();
-        automatic `U8 op = code==idiv ? "/" : "%";
-        if (phase==1 && !div_bsy) begin             // done div_int
-            $display("OK %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-            assert(div_q == (s / t));
-            assert(div_r == (s % t));
+        automatic `U8 op  = code==idiv ? "/" : "%";
+        case (phase)
+        1: begin             // done div_int
+            assert(div_q == (s / t) && div_r == (s % t)) else begin
+                $display("AU.1.ERR %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+            end
         end
-        /*
-                $write("ERR: %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-                assert(ss_op == sPOP) else begin
-                    $write(", sp=%d, sp1=%d forced -1", sp, sp1);
-                    sp <= sp - 1;
-                end
-                assert(t_n == (t_n==(idiv ? div_q : div_r))) else begin
-                    $write(", t_x=%d t_n=%8x =q/r", t_x, t_n);
-                    ctl.t <= code==idiv ? div_q : div_r;
-                end
-         */
+        endcase
     endtask: div_check
 endmodule: EJ32_AU

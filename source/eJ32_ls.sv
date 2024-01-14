@@ -162,7 +162,7 @@ module EJ32_LS #(
         endcase
     end // always_comb
 
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+    always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             a     <= {ASZ{1'b0}}; ///> clear address
             asel  <= 1'b0;        ///> note: cold start by decoder
@@ -170,7 +170,7 @@ module EJ32_LS #(
             ibuf  <= TIB;
             obuf  <= OBUF;
         end
-        else if (ctl.clk && ls_en) begin
+        else if (ls_en) begin
             asel <= asel_n;
             if (t_x)     ctl.t    <= t_n;
             if (a_x)     a        <= a_n;

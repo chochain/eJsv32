@@ -86,12 +86,17 @@ module EJ32_DC (
     task DIV();  
         `AU1;
         case (phase)
-        0: HOLD(1);
+        0: if (div_bsy) HOLD(1);
+           else begin             // CC: this branch works OK
+               assert(phase_n==0 && div_bsy==1'b0 && code_x==1'b1 && p_x==1'b1) else begin
+                   $display("DIV.0.ERR phase_n=%d->0, div_bsy=%x->0, code_x=%x->1, p_x=%x->1",
+                            phase_n, div_bsy, code_x, p_x);
+               end
+           end
         1: if (div_bsy) HOLD(1);
-           else begin           // divider done
-              phase_n = 0;      // CC: why this branch been skipped?
-              code_x  = 1'b1;
-              p_x     = 1'b1;
+           else begin             // CC: but don't know why this branch skipped? see patch below
+               $display("DIV.1 div_bsy=%x", div_bsy);
+               HOLD(0);
            end
         endcase
     endtask: DIV
@@ -158,7 +163,7 @@ module EJ32_DC (
         iand:    `AU1;
         ior:     `AU1;
         ixor:    `AU1;
-        iinc:    begin `ABL1; WAIT2(); end
+        iinc:    begin `AL1; WAIT2(); end
         // BR conditional branching
         ifeq:      BRAN();
         ifne:      BRAN();
@@ -191,7 +196,7 @@ module EJ32_DC (
     ///
     assign ctl.phase = phase;
     assign ctl.code  = code;
-    assign p_inc     = p_x || (phase==1 && !div_bsy);   // CC: patch, why DIV skip branch?
+    assign p_inc     = p_x || (phase==0 && !div_bsy);   // CC: patch, why DIV skip branch?
     ///
     /// instruction unit
     ///
@@ -203,11 +208,11 @@ module EJ32_DC (
         end
     end
 
-    always_ff @(posedge ctl.clk, posedge ctl.rst) begin
+    always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             phase <= 3'b0;
         end
-        else if (ctl.clk) begin
+        else begin
             if ((code==idiv||code==irem) && !div_bsy) div_patch();  // CC: why?
             else begin
                 if (code_x) code <= code_n;
@@ -219,9 +224,17 @@ module EJ32_DC (
     /// CC: do not know why DIV is skipping the branch
     ///
     task div_patch();
-        if (phase==1) begin
-           code  <= code_n;
-           phase <= 0;
-        end
+       case (phase)
+       1: begin
+          $display("DIV_FIX.1 phase_n=%d->0, div_bsy=%x->0, code_x=%x->0, p_x=%x->0",
+                   phase_n, div_bsy, code_x, p_x);
+          phase <= 0;
+       end
+       default: begin
+          /// no patch
+          if (code_x) code <= code_n;
+          phase <= phase_n;
+       end
+       endcase
     endtask: div_patch
 endmodule: EJ32_DC
