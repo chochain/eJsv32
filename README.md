@@ -35,12 +35,13 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
   
 ### Modulization (and bump version to v2)
-  > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
+  ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||not synthsized||
-  |RAM|memory|128K RAM|53|8-bit, single port||
+  |ROM|memory|3.4K bytes eForth image|in progress|8-bit, single-port|7 EBR blocks|
+  |RAM|memory|128K bytes onboard RAM|53|8-bit, single port||
   |DC|decoder unit|state machines|233||divider patch|
   |AU|arithmetic unit|ALU and data stack|1556|2 EBR blocks||
   |BR|branching unit|program counter and return stack|447|2 EBR blocks||
@@ -52,13 +53,13 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * Open eJsv32.rdf project from within Radiant
 * Compile, Synthesis if you really want to, and simulate (with ModelSim)
 
-### Memory Map
-<code>
-* Dictionary         0x0000
-* Input (TIB)        0x1000
-* Output buffer      0x1400
-* Total              128K bytes
-</code>
+### Memory Map (128K bytes)
+
+  |section|starting address|note|
+  |--|--|--|
+  |eForth image|0x0000|loaded from ROM|
+  |Input buffer|0x1000|no RX unit yet, loaded from ROM|
+  |Output buffer|0x1400|no TX unit yet|
 
 ### Limitations
 * targeting only Lattice iCE40UP FPGA for now
@@ -69,7 +70,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * No Map or Route provided
 * Data and return stacks
   * 64-deep
-  * use iCE40 EBR memory
+  * use iCE40 EBR, embedded block memory, pseudo dual-port, Lattice generated netlist, with negative edged clock
 * eForth image
   * not stored in ROM (iCE40 EBR)
   * loaded from file into RAM during simulation
@@ -88,7 +89,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### TODO
 * learn to Map
 * learn to Place & Route
-* Consider Pipeline design
+* Consider Pipelined design
   + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
 
 ### Reference
