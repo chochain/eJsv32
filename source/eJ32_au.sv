@@ -223,8 +223,8 @@ module EJ32_AU #(
         // BR unconditional branching
         jsr:       if (phase==2) LOAD();
         // eForth VM specific
-        dupr:      begin NOS(); `S(sPUSH); end        ///> load from return stack
-        popr:      begin NOS(); `S(sPUSH); end        ///> load from return stack
+        dupr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
+        popr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
         pushr:     POP();
         ldi:       if (phase==0) PUSH(`X8D(data));
         get:       if (phase==0) LOAD();
