@@ -1,4 +1,4 @@
-## eJ32 JavaForthMachine
+## eJ32 - a Forth CPU on FPGA that runs Java opcodes
 
 A reincarnation of eP32, a 32-bit CPU by Dr. Ting. However, deviating from the long linage of eForth, it uses Java Bytecode as the internal instruction set and hence the name **J**. After developing CPU for decades, Dr. Ting, in a write up for [eJsv32 manual](https://chochain.github.io/eJsv32/docs/JVM_manual.pdf), he concluded the following
 
