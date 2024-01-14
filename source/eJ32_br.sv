@@ -24,7 +24,7 @@ module EJ32_BR #(
     `IU  a;                     ///> instrunction address
     `U3  phase;                 ///> FSM phase (aka state)
     `DU  r;                     ///> top of RS
-    `U5  rp;                    ///> return stack pointers
+    `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
     // IO
     /// @}
@@ -48,8 +48,8 @@ module EJ32_BR #(
     /// BRAM control
     `U1 rs_ren;
     `U1 rs_wen;
-    `U5 rp_w;
-    `U5 rp_r;
+    `SU rp_r;
+    `SU rp_w;
     ///
     /// return stack (using embedded block memory)
     ///
@@ -62,8 +62,8 @@ module EJ32_BR #(
         .rd_en_i(rs_ren),
         .wr_en_i(rs_wen),
         .wr_data_i(r_n),
-        .wr_addr_i({1'b0, rp_w}),
-        .rd_addr_i({1'b0, rp_r}),
+        .wr_addr_i(rp_w),
+        .rd_addr_i(rp_r),
         .rd_data_o(r)            ///> read back into r
     );
     // return stack ops
