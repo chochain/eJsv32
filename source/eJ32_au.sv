@@ -6,8 +6,7 @@
 `define S(op) ss_op=op
 
 module EJ32_AU #(
-    parameter SS_DEPTH = 32,    ///> 32 deep data stack
-    parameter DSZ      = 32     ///> 32-bit data width
+    parameter DSZ = 32          ///> 32-bit data width
     ) (
     EJ32_CTL ctl,
     input    `U1 au_en,         ///> arithmetic unit enable

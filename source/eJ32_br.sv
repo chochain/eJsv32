@@ -6,9 +6,8 @@
 `define R(op) rs_op=op
 
 module EJ32_BR #(
-    parameter RS_DEPTH = 32,    ///> 32 deep return stack
-    parameter DSZ      = 32,    ///> 32-bit data width
-    parameter ASZ      = 17     ///> 128K address space
+    parameter DSZ = 32,         ///> 32-bit data width
+    parameter ASZ = 17          ///> 128K address space
     ) (
     EJ32_CTL ctl,               ///> eJ32 control bus
     input    `U1 br_en,         ///> branching unit active
