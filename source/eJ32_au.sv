@@ -6,8 +6,7 @@
 `define S(op) ss_op=op
 
 module EJ32_AU #(
-    parameter SS_DEPTH = 32,    ///> 32 deep data stack
-    parameter DSZ      = 32     ///> 32-bit data width
+    parameter DSZ = 32          ///> 32-bit data width
     ) (
     EJ32_CTL ctl,
     input    `U1 au_en,         ///> arithmetic unit enable
@@ -29,16 +28,15 @@ module EJ32_AU #(
     `DU t, s;                   ///> shadow TOS, NOS
     `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
-    `U5 sp;                     ///> data stack pointer
+    `SU sp;                     ///> data stack pointer
     /// @}
     /// @defgroup EBR control
     /// @{
     `U1 ss_ren;
     `U1 ss_wen;
-    `U5 sp_w;
-    `U5 sp_r;
+    `SU sp_r;
+    `SU sp_w;
     `U1 s_x;
-    `U1 sp_err;
     /// @}
     /// @defgroup ALU pre-calc wires
     /// @{
@@ -89,8 +87,8 @@ module EJ32_AU #(
         .rd_en_i(ss_ren),
         .wr_en_i(ss_wen),
         .wr_data_i(t),
-        .wr_addr_i({1'b0, sp_w}),
-        .rd_addr_i({1'b0, sp_r}),
+        .wr_addr_i(sp_w),
+        .rd_addr_i(sp_r),
         .rd_data_o(s_n)        ///> read back into NOS
     );
     // data stack tasks (as macros)

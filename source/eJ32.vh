@@ -6,14 +6,14 @@ package ej32_pkg;
 //
 // Universal data type
 //
-`define U1 logic
-`define U2 logic[1:0]
-`define U3 logic[2:0]
-`define U5 logic[4:0]
-`define U8 logic[7:0]
-`define IU logic[16:0]
-`define DU logic[31:0]
-`define DU2 logic[63:0]
+`define U1 logic                   /* 1-bit flag          */
+`define U2 logic[1:0]              /* stack opcode        */
+`define U3 logic[2:0]              /* phase               */
+`define U8 logic[7:0]              /* 8-bit data (memory) */
+`define IU logic[16:0]             /* instruction address */
+`define SU logic[5:0]              /* stack pointers      */
+`define DU logic[31:0]             /* data unit           */
+`define DU2 logic[63:0]            /* double data (mul)   */
 //
 // data conversion macros
 //

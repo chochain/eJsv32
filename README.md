@@ -1,4 +1,4 @@
-## eJ32 JavaForthMachine
+## eJ32 - a Forth CPU on FPGA that runs Java opcodes
 
 A reincarnation of eP32, a 32-bit CPU by Dr. Ting. However, deviating from the long linage of eForth, it uses Java Bytecode as the internal instruction set and hence the name **J**. After developing CPU for decades, Dr. Ting, in a write up for [eJsv32 manual](https://chochain.github.io/eJsv32/docs/JVM_manual.pdf), he concluded the following
 
@@ -32,19 +32,28 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
 * fix divider, add one extra cycle for TOS update before next instruction
+* modulization into a 2-bus design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
   
 ### Modulization (and bump version to v2)
-  > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
+  ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||not synthsized||
-  |RAM|memory|128K RAM|53|8-bit, single port||
+  |ROM|memory|3.4K bytes eForth image|in progress|8-bit, single-port|7 EBR blocks|
+  |RAM|memory|128K bytes onboard RAM|53|8-bit, single port||
   |DC|decoder unit|state machines|233||divider patch|
   |AU|arithmetic unit|ALU and data stack|1556|2 EBR blocks||
   |BR|branching unit|program counter and return stack|447|2 EBR blocks||
   |LS|load/store unit|memory and buffer IO|363|||
+
+### Bus Design
+  ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
+  TODO:
+  * combine IU (instruction unit, in eJ32.sv) and BR
+  * break IF (instruction fetch) off LS
+  * break RR (t Register Read), WB (t, s Write Back) off AU
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice, comes with ModelSim 32-bit)
@@ -52,13 +61,13 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * Open eJsv32.rdf project from within Radiant
 * Compile, Synthesis if you really want to, and simulate (with ModelSim)
 
-### Memory Map
-<code>
-* Dictionary         0x0000
-* Input (TIB)        0x1000
-* Output buffer      0x1400
-* Total              128K bytes
-</code>
+### Memory Map (128K bytes)
+
+  |section|starting address|note|
+  |--|--|--|
+  |eForth image|0x0000|loaded from ROM|
+  |Input buffer|0x1000|no RX unit yet, loaded from ROM|
+  |Output buffer|0x1400|no TX unit yet|
 
 ### Limitations
 * targeting only Lattice iCE40UP FPGA for now
@@ -69,7 +78,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * No Map or Route provided
 * Data and return stacks
   * 64-deep
-  * use iCE40 EBR memory
+  * use iCE40 EBR, embedded block memory, pseudo dual-port, Lattice generated netlist, with negative edged clock
 * eForth image
   * not stored in ROM (iCE40 EBR)
   * loaded from file into RAM during simulation
@@ -88,8 +97,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### TODO
 * learn to Map
 * learn to Place & Route
-* Consider Pipeline design
-  + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
+* Consider making s (NOS) a register (to reduce contention)
+* Consider Pipelined design
+  + Note: Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
+  + build hardwired control table
+  + learn how to resolve Hazards
 
 ### Reference
 * IceStorm, open source synthesis, https://clifford.at/icestorm

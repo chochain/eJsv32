@@ -12,8 +12,8 @@ module EJ32 #(
     parameter OBUF = 'h1400,    ///> output buffer ptr
     parameter DSZ  = 32,        ///> 32-bit data width
     parameter ASZ  = 17,        ///> 17-bit (128Kb) address width
-    parameter SS_DEPTH = 32,    ///> data stack depth
-    parameter RS_DEPTH = 32     ///> return stack depth
+    parameter SS_DEPTH = 64,    ///> data stack depth (v2 - hardcoded in ERB netlist)
+    parameter RS_DEPTH = 64     ///> return stack depth (v2 - hardcoded in ERB netlist)
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
     `IU  p, p_n;                ///> program counter
@@ -32,10 +32,10 @@ module EJ32 #(
     /// EJ32 core
     ///
     EJ32_CTL    ctl();                           ///> ej32 control bus
-    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);     ///> decoder
-    EJ32_AU     #(SS_DEPTH, DSZ)       au(.s_o(s), .*);
-    EJ32_BR     #(RS_DEPTH, DSZ, ASZ)  br(.*);
-    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);
+    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);     ///> decoder unit
+    EJ32_AU     #(DSZ)       au(.s_o(s), .*);    ///> arithmetic unit
+    EJ32_BR     #(DSZ, ASZ)  br(.*);             ///> branching unit
+    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);   ///> load/store unit
     ///
     /// Instruction Unit
     ///

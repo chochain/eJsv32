@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<RadiantModule architecture="iCE40UP" date="2023 12 20 19:40:21" device="iCE40UP5K" generator="ipgen" library="module" module="ram_dp" name="bram_dp" package="SG48" source_format="Verilog" speed="High-Performance_1.2V" vendor="latticesemi.com" version="1.1.2">
+ <Package>
+  <File modified="2023 12 20 19:40:21" name="rtl/bram_dp_bb.v" type="black_box_verilog"/>
+  <File modified="2023 12 20 19:40:21" name="bram_dp.cfg" type="cfg"/>
+  <File modified="2023 12 20 19:40:21" name="misc/bram_dp_tmpl.v" type="template_verilog"/>
+  <File modified="2023 12 20 19:40:21" name="misc/bram_dp_tmpl.vhd" type="template_vhdl"/>
+  <File modified="2023 12 20 19:40:21" name="rtl/bram_dp.v" type="top_level_verilog"/>
+  <File modified="2023 12 20 19:40:21" name="constraints/bram_dp.ldc" type="timing_constraints"/>
+  <File modified="2023 12 20 19:40:21" name="testbench/dut_params.v" type="dependency_file"/>
+  <File modified="2023 12 20 19:40:21" name="testbench/dut_inst.v" type="dependency_file"/>
+  <File modified="2023 12 20 19:40:21" name="component.xml" type="IP-XACT_component"/>
+  <File modified="2023 12 20 19:40:21" name="design.xml" type="IP-XACT_design"/>
+  <File modified="2021 05 31 18:46:34" name="testbench/clk_rst_gen.v" type="testbench_verilog"/>
+  <File modified="2021 05 31 18:46:34" name="testbench/mem_model.v" type="testbench_verilog"/>
+  <File modified="2021 05 31 18:46:34" name="testbench/pdp_master.v" type="testbench_verilog"/>
+  <File modified="2021 05 31 18:47:24" name="testbench/tb_top.v" type="testbench_verilog"/>
+ </Package>
+</RadiantModule>

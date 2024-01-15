@@ -9,7 +9,8 @@
 `include "../source/eJ32.vh"
 import ej32_pkg::*;
 
-`define DX logic[DSZ:0]        /* 1-bit wider */
+`define DX logic[DSZ:0]        /* 1-bit wider  */
+`define U5 logic[4:0]          /* 32-bit shift */
 
 module shifter #(
     parameter DSZ = 32
