@@ -32,6 +32,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
 * fix divider, add one extra cycle for TOS update before next instruction
+* modulization into a 2-bus design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
   
 ### Modulization (and bump version to v2)
@@ -46,6 +47,13 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   |AU|arithmetic unit|ALU and data stack|1556|2 EBR blocks||
   |BR|branching unit|program counter and return stack|447|2 EBR blocks||
   |LS|load/store unit|memory and buffer IO|363|||
+
+### Bus Design
+  ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
+  TODO:
+  * combine IU (instruction unit, in eJ32.sv) and BR
+  * break IF (instruction fetch) off LS
+  * break RR (t Register Read), WB (t, s Write Back) off AU
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice, comes with ModelSim 32-bit)
@@ -89,8 +97,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### TODO
 * learn to Map
 * learn to Place & Route
+* Consider making s (NOS) a register (to reduce contention)
 * Consider Pipelined design
-  + Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
+  + Note: Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
+  + build hardwired control table
+  + learn how to resolve Hazards
 
 ### Reference
 * IceStorm, open source synthesis, https://clifford.at/icestorm
