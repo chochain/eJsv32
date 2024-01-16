@@ -14,6 +14,7 @@ import ej32_pkg::*;
 
 module EJ32_DC (
        EJ32_CTL ctl,
+       input  `U1 dc_en,        // decoder unit enable
        input  `U8 data,         // byte return from memory bus
        input  `U1 div_bsy,      // AU divider busy
        output `U1 au_en,        // enable AU
