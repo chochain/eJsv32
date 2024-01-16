@@ -12,6 +12,7 @@ module EJ32_LS #(
     EJ32_CTL ctl,               ///> ej32 control bus
     mb8_io   b8_if,             ///> 8-bit memory bus
     input    `U1 ls_en,
+    input    `U1 rom_en,        ///> ROM copying stage
     input    `IU p,
     input    `DU s              ///> NOS
     );
@@ -72,8 +73,8 @@ module EJ32_LS #(
     /// memory bus interface
     ///
     always_comb begin
-        if (dwe) b8_if.put_u8(addr, d8x4[dsel]);   ///> write to SRAM
-        else     b8_if.get_u8(addr);               ///> read from SRAM
+        if (dwe||rom_en) b8_if.put_u8(addr, d8x4[dsel]);    ///> write to SRAM
+        else             b8_if.get_u8(addr);                ///> read from SRAM
     end
     ///
     /// combinational
@@ -86,7 +87,7 @@ module EJ32_LS #(
         asel_n    = 1'b0;         /// address default to program counter
         dsel_x    = 1'b0;         /// data bus
         dsel_n    = 3;
-        dwe       = 1'b0;         /// data write
+        dwe       = 1'b0;         /// default data write flag
         ibuf_x    = 1'b0;
         obuf_x    = 1'b0;
     endtask: INIT
