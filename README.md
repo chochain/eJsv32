@@ -101,9 +101,27 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt.gz (before modulization)
   + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240117.txt.gz (after modulization)
 
+### Statistics
+For the 6 test cases Dr. Ting gave, they take ~520K cycles.
+
+  |units|instructions (in K)|total cycles(in K)|note|
+  |--|--|--|--|
+  |AU ony|108|173|idiv,irem takes 14K cycles|
+  |BR only|10|20|jreturn|
+  |LS only|24|112|[b|i|s]aload|
+  |AU + BR|50|145||
+  |AU + LS|14|69||
+
+So, within the total cycles. [details here]((https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
+* AU takes about 1/3, mostly 1-cycle except bipush(2),pop2(2),dup2(4)
+* BR takes about 1/3, all 3-cycle except jreturn 2-cycle.
+* LS takes about 1/3, all multi-cycles (avg. 5/instructions)
+
 ### TODO
 * learn to Map
 * learn to Place & Route
+* Consider i-cache + branch prediction to reduce branching delay
+* Consider 32-bit and/or d-cache to reduce load/store delay
 * Consider Pipelined design (see bus design above)
   + Note: Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
   + build hardwired control table
