@@ -23,11 +23,13 @@ module outer_tb #(
     ///
     /// dictionary tracer
     ///
+    `IU cold, ctx, tib, obuf;   ///> eForth user variables
+   
     typedef struct {
         `IU nfa;                ///> name field address
         `IU pfa;                ///> parameter field address
     } t_p2n;
-    `U8   rom[ROM_SZ];          ///> fake initial ROM
+    `U8   ram[ROM_SZ];          ///> fake initial ROM
     `U8   p2n_sz;               ///> size of lookup table
     t_p2n p2n[P2N_SZ];          ///> lookup table
    
@@ -35,11 +37,11 @@ module outer_tb #(
         automatic `IU a = ctx;
         automatic integer i;
         for (i=0; a && i<P2N_SZ; i++) begin
-            automatic `U8 len = rom[a] & 'h1f;
+            automatic `U8 len = ram[a] & 'h1f;
             $display("nfa=%x, pfa=%x", a, a + len + 1);
             p2n[i].nfa = a;
             p2n[i].pfa = a + len + 'h1;
-            a = {rom[a-2], rom[a-1]};
+            a = {ram[a-2], ram[a-1]};
         end
         p2n_sz = i;
     endtask: build_p2n
@@ -53,16 +55,16 @@ module outer_tb #(
     endfunction: to_name
 
     task to_s(`IU nfa);
-        automatic `U8 len = rom[nfa] & 'h1f;
+        automatic `U8 len = ram[nfa] & 'h1f;
         for (int i=1; i<=len; i++) begin
-            $write("%c", rom[nfa+i]);
+            $write("%c", ram[nfa+i]);
         end
     endtask: to_s
 
     task words;
         for (int i=0; i<p2n_sz; i++) begin
             automatic `IU a = p2n[i].nfa;
-            $write("%c%4x: ", rom[a] & 'h80 ? "*" : " ", a + (rom[a] & 'h1f) + 'h1);
+            $write("%c%4x: ", ram[a] & 'h80 ? "*" : " ", a + (ram[a] & 'h1f) + 'h1);
             to_s(a);
             $display("");
         end
@@ -72,7 +74,7 @@ module outer_tb #(
     ///
     localparam DOT = 'h2e;      ///> '.'
     task peek(input `IU ax, input `U2 opt);
-        automatic `U8 data = rom[ax];          // 1 cycle delay
+        automatic `U8 data = ram[ax];          // 1 cycle delay
         case (opt)
         'h1: $write("%02x", data);
         'h2: $write("%c", data < 'h20 ? DOT : data);
@@ -104,40 +106,42 @@ module outer_tb #(
     ///
     /// debugging
     ///
-    task copy_obuf(input `IU ax, input `IU len);
+    task ram_copy(input `IU ax, input `IU len);
         automatic `IU a0 = ax & ~'hf;
-        for (integer a1=a0; a1 < (a0 + len + 'h10); a1 += 'h10) begin
+        for (integer a1=a0; a1 <= (a0 + len + 'h10); a1++) begin
             repeat(1) @(posedge `CTL.clk) begin
-                rom[a1] = ej32.data;
+                `DBUS.get_u8(a1);
+                if (a1 > a0) ram[a1-1] = `DBUS.vo; ///> 1-cycle delay
             end
         end
-    endtask: copy_obuf
+    endtask: ram_copy
     ///
     /// eJ32 execution tracer
     ///
-    `IU ra2nfa[32];                  ///> return address to nfa lookup table
+    `IU ra2nfa[32];                   ///> return address to nfa lookup table
    
     task pre_check();
-        automatic `IU cold= { rom['h01], rom['h02] }; // cold start address
-        automatic `IU ctx = { rom['h50], rom['h51] }; // eForth current context
-        automatic `IU tib = { rom['h6e], rom['h6f] }; // eForth terminal input buffer 
+        cold = { ram['h01], ram['h02] };   // cold start address
+        ctx  = { ram['h50], ram['h51] };   // eForth current context
+        tib  = { ram['h6e], ram['h6f] };   // eForth terminal input buffer 
+        obuf = { ram['h72], ram['h73] };   // eForth output buffer 
 
-        dump("user", 0,  'h120);                      // verify eForth variables, and
-        dump("dict", ctx-'h100, 'h120);               // primitive words
-        dump("tib",  tib, 'h120);                     // verify input buffer content
-        build_p2n(ctx);                               // construct pfa=>nfa lookup table
-        words();                                      // walk word list
+        dump("user", 0,  'h120);           // verify eForth variables, and
+        dump("dict", ctx-'h100, 'h120);    // primitive words
+        dump("tib",  tib,'h120);           // verify input buffer content
+        build_p2n(ctx);                    // construct pfa=>nfa lookup table
+        words();                           // walk word list
        
         $display("eForth cold starting at: %x", cold);
     endtask: pre_check
 
     task post_check();
-        automatic `IU ctx = { rom['h50], rom['h51] };  // eForth current context
-        automatic `IU obuf= { rom['h72], rom['h73] };
-       
         `CTL.reset();
-        dump("dict", ctx, 'h120);    // verify user defined words
-        dump("obuf", obuf,'h600);    // verify output buffer content
+       ram_copy(ctx, 'h120);        // post copy RAM content for verification
+       dump("dict", ctx, 'h120);
+       
+       ram_copy(obuf, 'h600);
+       dump("obuf", obuf,'h600);    // verify output buffer content
     endtask: post_check
    
     task trace;
@@ -192,7 +196,7 @@ module outer_tb #(
         ///
         activate();                    // activate eJsv32
         repeat(ROM_SZ) @(posedge `CTL.clk) begin
-            rom[`DBUS.ai] = `DBUS.vi;  // capture a local copy
+            ram[`DBUS.ai] = `DBUS.vi;  // capture a local copy
             if (`DBUS.ai < 'h10) begin
                $display("%4x:%2x ", `DBUS.ai, `DBUS.vi);
             end
@@ -204,11 +208,11 @@ module outer_tb #(
         ///
         /// simulate eJ32
         ///
-//        repeat(1024) @(posedge `CTL.clk) trace();
+        repeat(23000) @(posedge `CTL.clk) trace();
         ///
         /// verify user words and output buffer
         ///
-//        post_check();
+        post_check();
 
         #20 $finish;
     end
