@@ -112,10 +112,10 @@ For the 6 test cases Dr. Ting gave, they take ~520K cycles.
   |AU + BR|50|145||
   |AU + LS|14|69||
 
-So, within the total cycles. [details here]((https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
-* AU takes about 1/3, mostly 1-cycle except bipush(2),pop2(2),dup2(4)
-* BR takes about 1/3, all 3-cycle except jreturn 2-cycle.
-* LS takes about 1/3, all multi-cycles (avg. 5/instructions)
+So, within the total cycles. [details here](https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
+* Arithmetic takes about 1/3, mostly 1-cycle except bipush(2), pop2(2), dup2(4)
+* Branching  takes about 1/3, all 3-cycle except jreturn 2-cycle.
+* Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
 * learn to Map
