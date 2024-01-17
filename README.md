@@ -1,6 +1,6 @@
 ## eJ32 - a Forth CPU on FPGA that runs Java opcodes
 
-A reincarnation of eP32, a 32-bit CPU by Dr. Ting. However, deviating from the long linage of eForth, it uses Java Bytecode as the internal instruction set and hence the name **J**. After developing CPU for decades, Dr. Ting, in a write up for [eJsv32 manual](https://chochain.github.io/eJsv32/docs/JVM_manual.pdf), he concluded the following
+A reincarnation of eP32, a 32-bit CPU by Dr. Ting. However, deviating from the long linage of eForth, it uses Java Bytecode as the internal instruction set and hence the name **J**. After developing CPUs for decades, Dr. Ting, in a write up for [eJsv32 manual](https://chochain.github.io/eJsv32/docs/JVM_manual.pdf), he concluded the following
 
 >
 > *Which instruction set will be the best and to survive to the next century? Looking around, I can see only one universal computer instruction set, and it is now gradually prevailing. It is Java.*
@@ -10,7 +10,7 @@ Responding to the invitation from Don Golding of CORE-I FPGA project [AI & Robot
 
 > ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_arch.png)
 
-I appreciate that Dr. Ting took me in his last projects and considered me one of his student. Though a trained software engineer, who have never worked on any FPGA before, I felt overwhelmingly obligated to at least carry his last work to a point that future developers can benefit from the work of his life's effort.
+I appreciate that Dr. Ting took me in his last projects and considered me one of his student. Though a trained software engineer, who have never worked on any FPGA before, I felt overwhelmingly obligated to at least carry his last work to a point that future developers can benefit from the gems of his life's effort.
 
 My goal is to make the learning journey of building eJ32 as an example of designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not.
 
@@ -35,25 +35,31 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * modulization into a 2-bus design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
   
-### Modulization (and bump version to v2)
+### Modulization, to v2
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
   |module|desc|components|LUTs|note|err|
   |--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||not synthsized||
-  |ROM|memory|3.4K bytes eForth image|in progress|8-bit, single-port|7 EBR blocks|
-  |RAM|memory|128K bytes onboard RAM|53|8-bit, single port||
+  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|65|8-bit, single-port|16 EBR blocks|
+  |RAM|memory|128K bytes onboard RAM|48|8-bit, single port||
   |DC|decoder unit|state machines|233||divider patch|
-  |AU|arithmetic unit|ALU and data stack|1556|2 EBR blocks||
-  |BR|branching unit|program counter and return stack|447|2 EBR blocks||
-  |LS|load/store unit|memory and buffer IO|363|||
+  |AU|arithmetic unit|ALU and data stack|1792|2 EBR blocks||
+  |BR|branching unit|program counter and return stack|518|2 EBR blocks||
+  |LS|load/store unit|memory and buffer IO|369|||
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
+  
   TODO:
   * combine IU (instruction unit, in eJ32.sv) and BR
+  * add s (NOS) register
   * break IF (instruction fetch) off LS
   * break RR (t Register Read), WB (t, s Write Back) off AU
+  * study pipelining hazards 
+    + structure - RR-WB, BR-IU
+    + data - p_inc, divz, s
+    + control - p (and exception)
 
 ### Installation
 * Install Lattice Radiant 3.0+ (with Free license from Lattice, comes with ModelSim 32-bit)
@@ -97,11 +103,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### TODO
 * learn to Map
 * learn to Place & Route
-* Consider making s (NOS) a register (to reduce contention)
-* Consider Pipelined design
+* Consider Pipelined design (see bus design above)
   + Note: Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
   + build hardwired control table
   + learn how to resolve Hazards
+  + learn [CSR + Hyper Pipelining](http://www.euroforth.org/ef15/papers/strauch.pdf)
 
 ### Reference
 * IceStorm, open source synthesis, https://clifford.at/icestorm
@@ -110,10 +116,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * Verilator
   + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
 * SpinalHDL
+* RISC-V Pipeline design https://passlab.github.io/CSE564/notes/lecture09_RISCV_Impl_pipeline.pdf
 
 ### Revision History
 * 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
 * 20220209 - Chochain: rename to eJ32 for Lattice and future versions
 * 20230216 - Chochain: consolidate ALU modules, tiddy macro tasks
-* 20231216 - Chochain: fishbone modulization => v2.0
+* 20231216 - Chochain: modulization => v2.0
 * 20240108 - Chochain: use EBR for data/return stacks and eForth image
