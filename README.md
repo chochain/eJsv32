@@ -56,7 +56,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   * add s (NOS) register
   * break IF (instruction fetch) off LS
   * break RR (t Register Read), WB (t, s Write Back) off AU
-  * study pipelining hazards
+  * study pipelining hazards 
     + structure - RR-WB, BR-IU
     + data - p_inc, divz, s
     + control - p (and exception)
@@ -116,6 +116,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * Verilator
   + part-1~4 https://itsembedded.com/dhd/verilator_1/ ...
 * SpinalHDL
+* RISC-V Pipeline design https://passlab.github.io/CSE564/notes/lecture09_RISCV_Impl_pipeline.pdf
 
 ### Revision History
 * 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
