@@ -108,7 +108,7 @@ For the 6 test cases Dr. Ting gave, they take ~520K cycles.
   |--|--|--|--|
   |AU ony|108|173|idiv,irem takes 14K cycles|
   |BR only|10|20|jreturn|
-  |LS only|24|112|[b|i|s]aload|
+  |LS only|24|112|b/i/saload|
   |AU + BR|50|145||
   |AU + LS|14|69||
 
