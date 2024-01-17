@@ -93,13 +93,13 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Results - Staging for future development
 * The design works OK on ModelSim
   + ~2.9K LUTs which should fit in iCE40 (3K or 5K), still ironing out some synthesis error
-* ModelSsim COLD start - completed
+* ModelSim COLD start - completed
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
 * ModelSim Dr. Ting's 6 embeded test cases - completed
-  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
-  + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
-  + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240108.txt
+  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (Dr. Ting's modified)
+  + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt.gz (before modulization)
+  + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240117.txt.gz (after modulization)
 
 ### TODO
 * learn to Map
