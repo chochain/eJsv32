@@ -14,14 +14,14 @@ module EJ32_ROM (
     ///
     /// 8K EBR ROM (for eForth image 3.4K and TIB at 'h1000)
     ///
-    brom rom(
-             .rd_clk_i(clk),
-             .rst_i(rst),
-             .rd_en_i(~rst),
-             .rd_clk_en_i(1'b1),
-             .rd_addr_i(rom_a[12:0]),
-             .rd_data_o(d_o)
-             );
+    brom8k rom(
+        .rd_clk_i(clk),
+        .rst_i(rst),
+        .rd_en_i(~rst),
+        .rd_clk_en_i(1'b1),
+        .rd_addr_i(rom_a[12:0]),
+        .rd_data_o(d_o)
+    );
 
-   assign rom_d = d_o;
+    assign rom_d = d_o;
 endmodule: EJ32_ROM
