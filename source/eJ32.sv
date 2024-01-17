@@ -14,7 +14,7 @@ module EJ32 #(
     parameter ASZ  = 17,        ///> 17-bit (128Kb) address width
     parameter SS_DEPTH = 64,    ///> data stack depth (v2 - hardcoded in ERB netlist)
     parameter RS_DEPTH = 64,    ///> return stack depth (v2 - hardcoded in ERB netlist)
-    parameter ROM_SZ   = 'h1400,///> ROM hosted eForth image size in bytes
+    parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
@@ -80,17 +80,4 @@ module EJ32 #(
         else if (rom_en) COPY_ROM();             ///> copy eForth image from ROM into RAM
         else p_n <= p + {{ASZ-1{1'b0}}, p_inc};  ///> advance instruction address
     end
-    ///
-    /// debugging
-    ///
-    localparam DOT = 'h2e;      ///> '.'
-    task fetch(input `IU ax, input `U2 opt);
-        repeat(1) @(posedge ctl.clk) begin
-            case (opt)
-            'h1: $write("%02x", data);
-            'h2: $write("%c", data < 'h20 ? DOT : data);
-            endcase
-            b8_if.get_u8(ax);
-        end
-    endtask: fetch
 endmodule: EJ32
