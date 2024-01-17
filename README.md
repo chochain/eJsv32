@@ -34,6 +34,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * fix divider, add one extra cycle for TOS update before next instruction
 * modulization into a 2-bus design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
+* use EBR as ROM which is populated from hex image file (contains 3.4K eForth + 1K test cases)
   
 ### Modulization, to v2
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
@@ -78,20 +79,20 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Limitations
 * targeting only Lattice iCE40UP FPGA for now
 * No serial interface (i.e. UART, SPI, ..)
-  * fixed validation cases hardcoded in TIB
-  * output sent to output buffer
+  * fixed validation cases hardcoded in TIB (at 'h1000)
+  * output writes into output buffer byte-by-byte (starting at 'h1400)
 * 33-cycle soft divider (iCE40 has no hardware divider)
 * No Map or Route provided
 * Data and return stacks
   * 64-deep
   * use iCE40 EBR, embedded block memory, pseudo dual-port, Lattice generated netlist, with negative edged clock
-* eForth image
-  * not stored in ROM (iCE40 EBR)
-  * loaded from file into RAM during simulation
+* eForth image (3.4K)
+  * use iCE40 EBR as ROM
+  * loaded from ROM into RAM during at start-up (8K cycles)
 
 ### Results - Staging for future development
 * The design works OK on ModelSim
-  + ~2.6K LUTs should fit in iCE40 (3K or 5K), but some synthesis error still
+  + ~2.9K LUTs which should fit in iCE40 (3K or 5K), still ironing out some synthesis error
 * ModelSsim COLD start - completed
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
