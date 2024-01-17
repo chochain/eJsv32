@@ -143,5 +143,53 @@ typedef enum `U8 {  ///> JVM opcodes
 typedef enum `U2 { tEQ  = 2'b0, tGT   = 2'b01, tGE  = 2'b10, tLT  = 2'b11 } tos_sign /*verilator public*/;
 typedef enum `U2 { sNOP = 2'b0, sPUSH = 2'b01, sMOVE= 2'b10, sPOP = 2'b11 } stack_op /*verilator public*/;
 
+/* opcode cycles per Dr. Ting's 520K-cycle test cases
+  count opcode        c  en
+  ----- ------------- -  --
+  68623 ifeq          4  AB
+  64944 saload        4  L
+  48800 dup2          4  A
+  43092 iaload        6  L
+  36954 iastore       6  AL
+  36330 goto          4  AB
+  30978 invokevirtual 4  AB 
+  30218 bipush        2  A
+  26875 ldi           5  AL
+  24557 dup           1  A
+  20716 jreturn       2  B
+  12300 pop           1  A
+  11450 iand          1  A
+   9306 swap          1  A
+   7000 irem          35 A
+   7000 idiv          35 A
+   5685 isub          1  A
+   5660 ixor          1  A
+   5632 iconst_2      1  A
+   4260 baload        3  L
+   3945 donext        4  AB
+   2877 iadd          1  A
+   2758 put           2  AL
+   1539 bastore       3  AL
+   1320 iconst_1      1  A
+   1158 pushr         1  AB
+    936 if_icmpgt     4  AB
+    840 iflt          4  AB
+    819 get           3  AL
+    778 popr          1  AB
+    684 if_icmplt     4  AB
+    661 iconst_m1     1  A
+    490 iconst_0      1  A
+    286 pop2          2  A
+    258 dupr          1  AB
+    132 sastore       4  AL
+     64 iconst_3      1  A
+     48 if_icmpeq     4  AB
+     22 imul          1  A
+      2 iconst_4      1  A
+      1 nop           1
+      1 ishr          1  A
+      1 ior           1  A
+*/   
+
 endpackage: ej32_pkg
 `endif // EJ32_EJ32_VH

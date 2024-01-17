@@ -34,6 +34,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * fix divider, add one extra cycle for TOS update before next instruction
 * modulization into a 2-bus design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
+* use EBR as ROM which is populated from hex image file (contains 3.4K eForth + 1K test cases)
   
 ### Modulization, to v2
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
@@ -78,31 +79,49 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Limitations
 * targeting only Lattice iCE40UP FPGA for now
 * No serial interface (i.e. UART, SPI, ..)
-  * fixed validation cases hardcoded in TIB
-  * output sent to output buffer
+  * fixed validation cases hardcoded in TIB (at 'h1000)
+  * output writes into output buffer byte-by-byte (starting at 'h1400)
 * 33-cycle soft divider (iCE40 has no hardware divider)
 * No Map or Route provided
 * Data and return stacks
   * 64-deep
   * use iCE40 EBR, embedded block memory, pseudo dual-port, Lattice generated netlist, with negative edged clock
-* eForth image
-  * not stored in ROM (iCE40 EBR)
-  * loaded from file into RAM during simulation
+* eForth image (3.4K)
+  * use iCE40 EBR as ROM
+  * loaded from ROM into RAM during at start-up (8K cycles)
 
 ### Results - Staging for future development
 * The design works OK on ModelSim
-  + ~2.6K LUTs should fit in iCE40 (3K or 5K), but some synthesis error still
-* ModelSsim COLD start - completed
+  + ~2.9K LUTs which should fit in iCE40 (3K or 5K), still ironing out some synthesis error
+* ModelSim COLD start - completed
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
 * ModelSim Dr. Ting's 6 embeded test cases - completed
-  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt
-  + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt
-  + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240108.txt
+  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (Dr. Ting's modified)
+  + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt.gz (before modulization)
+  + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240117.txt.gz (after modulization)
+
+### Statistics
+For the 6 test cases Dr. Ting gave, they take ~520K cycles.
+
+  |units|instructions (in K)|total cycles(in K)|note|
+  |--|--|--|--|
+  |AU ony|108|173|idiv,irem takes 14K cycles|
+  |BR only|10|20|jreturn|
+  |LS only|24|112|b/i/saload|
+  |AU + BR|50|145||
+  |AU + LS|14|69||
+
+So, within the total cycles. [details here]((https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
+* AU takes about 1/3, mostly 1-cycle except bipush(2),pop2(2),dup2(4)
+* BR takes about 1/3, all 3-cycle except jreturn 2-cycle.
+* LS takes about 1/3, all multi-cycles (avg. 5/instructions)
 
 ### TODO
 * learn to Map
 * learn to Place & Route
+* Consider i-cache + branch prediction to reduce branching delay
+* Consider 32-bit and/or d-cache to reduce load/store delay
 * Consider Pipelined design (see bus design above)
   + Note: Pure combinatory module (no clock) returns in 1 cycle but lengthen the path which slows down the max frequency. Pipeline does the opposite.
   + build hardwired control table
