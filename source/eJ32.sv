@@ -28,6 +28,8 @@ module EJ32 #(
     `U1  div_bsy_o;             ///> AU divider busy flag
     `IU  br_p_o;                ///> BR branching target
     `U1  br_psel;               ///> BR branching target select
+    `DU  au_t_o, br_t_o, ls_t_o;///> TOS from modules for arbitration
+    `U1  au_t_x, br_t_x, ls_t_x;
     ///
     /// EJ32 buses
     ///
@@ -64,6 +66,17 @@ module EJ32 #(
             dc_en  <= 1'b1;                      ///> activate decoder
        end
     endtask: COPY_ROM
+   
+    task UPDATE_TOS();                           ///> TOS update arbitration
+        automatic `U3 sel = { au_t_x, br_t_x, ls_t_x };
+        case (sel)
+        3'b000: begin end // OK, ctl.t stays the same
+        3'b100: ctl.t <= au_t_o;
+        3'b010: ctl.t <= br_t_o;
+        3'b001: ctl.t <= ls_t_o;
+        default: $display("TOS Arbiter ERR t_x=%x", sel);
+        endcase
+    endtask: UPDATE_TOS
     ///
     /// Instruction Unit
     ///
@@ -78,6 +91,9 @@ module EJ32 #(
             rom_wait  <= ROM_WAIT;               ///> wait 3-cycles for ROM to be read ready
         end
         else if (rom_en) COPY_ROM();             ///> copy eForth image from ROM into RAM
-        else p_n <= p + {{ASZ-1{1'b0}}, p_inc};  ///> advance instruction address
+        else begin
+            UPDATE_TOS();
+            p_n <= p + {{ASZ-1{1'b0}}, p_inc};   ///> advance instruction address
+        end
     end
 endmodule: EJ32
