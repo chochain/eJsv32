@@ -14,7 +14,9 @@ module EJ32_BR #(
     input    `IU p,             ///> instruction pointer
     input    `U8 data,          ///> data from memory bus
     output   `IU br_p_o,        ///> target instruction pointer
-    output   `U1 br_psel
+    output   `U1 br_psel,
+    output   `DU br_t_o,        ///> TOS for arbitration
+    output   `U1 br_t_x 
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -105,6 +107,8 @@ module EJ32_BR #(
     /// output ports
     assign br_p_o = a;
     assign br_psel= asel;
+    assign br_t_o = t_n;
+    assign br_t_x = t_x;
     ///
     /// combinational
     ///
@@ -184,8 +188,7 @@ module EJ32_BR #(
         end
         else if (br_en) begin
             asel <= asel_n;
-            if (t_x) ctl.t <= t_n;
-            if (a_x) a     <= a_n;
+            if (a_x) a <= a_n;
 
             // return stack
             case (rs_op)

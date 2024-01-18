@@ -14,7 +14,9 @@ module EJ32_LS #(
     input    `U1 ls_en,
     input    `U1 rom_en,        ///> ROM copying stage
     input    `IU p,
-    input    `DU s              ///> NOS
+    input    `DU s,             ///> NOS
+    output   `DU ls_t_o,        ///> TOS uplink for arbitration
+    output   `U1 ls_t_x
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -69,6 +71,11 @@ module EJ32_LS #(
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
     assign d8x4   = {t[31:24],t[23:16],t[15:8],t[7:0]}; ///> 4-to-1 mux (Big-Endian)
+    ///
+    /// output port
+    ///
+    assign ls_t_o = t_n;
+    assign ls_t_x = t_x;
     ///
     /// memory bus interface
     ///
@@ -161,23 +168,22 @@ module EJ32_LS #(
             1: begin DW(3);     `SET(obuf_x); end
             endcase
         endcase
-    end // always_comb
+    end
 
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
-            a     <= {ASZ{1'b0}}; ///> clear address
-            asel  <= 1'b0;        ///> note: cold start by decoder
+            a     <= {ASZ{1'b0}};   ///> clear address
+            asel  <= 1'b0;          ///> note: cold start by decoder
             dsel  <= 3;
             ibuf  <= TIB;
             obuf  <= OBUF;
         end
         else if (ls_en) begin
             asel <= asel_n;
-            if (t_x)     ctl.t    <= t_n;
-            if (a_x)     a        <= a_n;
-            if (dsel_x)  dsel     <= dsel_n;
-            if (ibuf_x)  ibuf     <= ibuf + 1;
-            if (obuf_x)  obuf     <= obuf + 1;
+            if (a_x)     a    <= a_n;
+            if (dsel_x)  dsel <= dsel_n;
+            if (ibuf_x)  ibuf <= ibuf + 1;
+            if (obuf_x)  obuf <= obuf + 1;
         end
     end
 endmodule: EJ32_LS

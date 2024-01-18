@@ -12,7 +12,9 @@ module EJ32_AU #(
     input    `U1 au_en,         ///> arithmetic unit enable
     input    `U8 data,          ///> 8-bit data from memory bus
     output   `U1 div_bsy_o,
-    output   `DU s_o
+    output   `DU s_o,
+    output   `DU au_t_o,        ///> output for arbitation
+    output   `U1 au_t_x
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -122,6 +124,8 @@ module EJ32_AU #(
     /// wired to output
     assign div_bsy_o = div_bsy;
     assign s_o    = (s_x) ? s_n : t;
+    assign au_t_o = t_n;
+    assign au_t_x = t_x;
     ///
     /// combinational
     ///
@@ -235,7 +239,6 @@ module EJ32_AU #(
         end
         else if (au_en) begin
             s <= s_x ? s_n : t;
-            if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
             sPOP:  sp <= sp - 1;
