@@ -39,15 +39,15 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Modulization, to v2
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
-  |module|desc|components|LUTs|note|err|
+  |module|desc|components|LUTs|LUTs(min)|note|err|
   |--|--|--|--|--|--|
-  |CTL|control bus|TOS, code, phase||not synthsized||
-  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|65|8-bit, single-port|16 EBR blocks|
-  |RAM|memory|128K bytes onboard RAM|48|8-bit, single port||
-  |DC|decoder unit|state machines|233||divider patch|
-  |AU|arithmetic unit|ALU and data stack|1792|2 EBR blocks||
-  |BR|branching unit|program counter and return stack|518|2 EBR blocks||
-  |LS|load/store unit|memory and buffer IO|369|||
+  |CTL|control bus|TOS, code, phase|||not synthsized||
+  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|65|54|8-bit, single-port|16 EBR blocks|
+  |RAM|memory|128K bytes onboard RAM|48|51|8-bit, single port||
+  |AU|arithmetic unit|ALU and data stack|1792|1755|2 EBR blocks||
+  |BR|branching unit|program counter and return stack|518|333|2 EBR blocks||
+  |DC|decoder unit|state machines|233|211||divider patch|
+  |LS|load/store unit|memory and buffer IO|369|201|||
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
@@ -97,7 +97,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
 * ModelSim Dr. Ting's 6 embeded test cases - completed
-  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (Dr. Ting's modified)
+  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (from Dr. Ting's)
   + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt.gz (before modulization)
   + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240117.txt.gz (after modulization)
 
