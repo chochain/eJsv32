@@ -42,15 +42,14 @@ module EJ32_BR #(
     `U1 asel;                   ///> address select
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
+    `IU d2a;                    ///> expand 8-bit data to address
     // data stack
     `DU t;                      ///> shadow TOS
     `U1 t_x, t_z, t_neg;        ///> TOS controls
     `DU t_d;                    ///> 4-byte merged data
     /// BRAM control
-    `U1 rs_ren;
-    `U1 rs_wen;
-    `SU rp_r;
-    `SU rp_w;
+    `U1 rs_ren, rs_wen;         ///> return stack R/W enables
+    `SU rp_r, rp_w;             ///> return stack R/W pointer
     ///
     /// return stack (using embedded block memory)
     ///
@@ -68,7 +67,7 @@ module EJ32_BR #(
         .rd_data_o(r)            ///> read back into r
     );
     // return stack ops
-    task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
+    task TOS(input `DU d); t_n = d; `SET(t_x); endtask
     task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
     task RPUSH(input `DU d); 
          rs_wen = 1'b1; 
@@ -86,11 +85,11 @@ module EJ32_BR #(
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input `IU i); a_n = i; `SET(a_x);    endtask;  // build addr ptr
-    task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask;  // jmp and clear a
+    task SETA(input `IU i); a_n = i; `SET(a_x);    endtask  // build addr ptr
+    task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask  // jmp and clear a
     task BRAN(input `U1 f);
         case (phase)
-        0: SETA(`X8A(data));
+        0: SETA(d2a);
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
@@ -100,15 +99,16 @@ module EJ32_BR #(
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = t == 0;                   ///> zero flag
-    assign t_neg  = t[DSZ-1];                 ///> negative flag
-    assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into t
-    assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
+    assign t_z    = t == 0;               ///> zero flag
+    assign t_neg  = t[DSZ-1];             ///> negative flag
+    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into t
+    assign a_d    = {a[ASZ-9:0], data};   ///> merge lowest byte into addr
     /// output ports
-    assign br_p_o = a;
-    assign br_psel= asel;
+    assign br_p_o = a_n;
+    assign br_psel= asel_n;
     assign br_t_o = t_n;
     assign br_t_x = t_x;
+    assign d2a    = `X8A(data);
     ///
     /// combinational
     ///
@@ -123,6 +123,7 @@ module EJ32_BR #(
         rs_wen  = 1'b0;
         rp_w    = rp + 1;
         rp_r    = rp;
+        r_n     = {DSZ{1'b0}};
     endtask: INIT
 
     always_comb begin
@@ -153,7 +154,7 @@ module EJ32_BR #(
         //
         goto:
             case (phase)
-            0: SETA(`X8A(data)); // set addr higher byte
+            0: SETA(d2a);        // set addr higher byte
             1: JMP(a_d);         // merge addr lower byte
             endcase
         jsr:     if (phase==2) begin JMP(`XDA(t_d)); TOS(`XAD(p) + 2); end
@@ -161,13 +162,13 @@ module EJ32_BR #(
         jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
         invokevirtual:
             case (phase)
-            0: begin SETA(`X8A(data)); RPUSH(`XAD(p) + 2); end
+            0: begin SETA(d2a); RPUSH(`XAD(p) + 2); end
             1: begin JMP(a_d); end
             endcase
         // eForth VM specific ops
         donext:
             case (phase)
-            0: SETA(`X8A(data));
+            0: SETA(d2a);
             1: if (r == 0) `R(sPOP);
                else begin
                   RMOVE(r - 1);
@@ -183,7 +184,7 @@ module EJ32_BR #(
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             a    <= {ASZ{1'b0}};     /// init address
-            asel <= 1'b0;            /// cold start by decoder
+            asel <= 1'b0;
             rp   <= '0;
         end
         else if (br_en) begin
