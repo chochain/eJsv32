@@ -42,8 +42,7 @@ module EJ32 #(
     /// memory blocks
     ///
     spram8_128k smem(b8_if.slave, ~clk);         ///> SPRAM, (neg edged)
-    EJ32_ROM    rom(                             ///> ROM, eForth image
-        .clk(~clk), .rst(rst), .*);
+    EJ32_ROM    rom(.clk(~clk), .*);             ///> ROM, eForth image (neg edged)
     ///
     /// EJ32 core modules
     ///

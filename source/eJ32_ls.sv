@@ -73,7 +73,7 @@ module EJ32_LS #(
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
     assign t_d    = {ctl.t[DSZ-9:0], data};   ///> merge lowest byte into TOS
     ///
-    /// output port
+    /// wired to outputs
     ///
     assign ls_t_o = t_n;
     assign ls_t_x = t_x;
