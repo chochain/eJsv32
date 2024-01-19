@@ -53,6 +53,7 @@ module EJ32_LS #(
     // conversion holder
     `IU t2a, s2a;               ///> TOS/NOS to address holder
     `DU d2t;                    ///> 8-bit to 32-bit holder
+    `U8 d8x4[4];                ///> 4-to-1 mux (Big-Endian)
     /// @}
 
     task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask   ///> update TOS
@@ -70,6 +71,7 @@ module EJ32_LS #(
     assign d2t    = `X8D(data);               ///> convert 8-bit data to 32-bit
     assign addr   = asel ? a : p;             ///> b8_if memory access address
     assign data   = b8_if.vo;                 ///> shadow data on memory bus
+    assign d8x4   = {t[31:24],t[23:16],t[15:8],t[7:0]};  ///> 4-to-1 mux (Big-Endian)
     ///
     /// address, data shifter
     ///
@@ -84,8 +86,6 @@ module EJ32_LS #(
     /// memory bus interface
     ///
     always_comb begin
-        automatic `U8 d8x4[4] =                             ///> 4-to-1 mux (Big-Endian)
-            {t[31:24],t[23:16],t[15:8],t[7:0]};
         if (dwe||rom_en) b8_if.put_u8(addr, d8x4[dsel]);    ///> write to SRAM
         else             b8_if.get_u8(addr);                ///> read from SRAM
     end
@@ -188,8 +188,8 @@ module EJ32_LS #(
             asel <= asel_n;
             if (a_x)     a    <= a_n;
             if (dsel_x)  dsel <= dsel_n;
-            if (ibuf_x)  ibuf <= ibuf + 1;
-            if (obuf_x)  obuf <= obuf + 1;
+            if (ibuf_x)  ibuf <= ibuf + 'h1;
+            if (obuf_x)  obuf <= obuf + 'h1;
         end
     end
 endmodule: EJ32_LS
