@@ -55,10 +55,10 @@ module EJ32_LS #(
     `DU d2t;                    ///> 8-bit to 32-bit holder
     /// @}
 
-    task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask;   ///> update TOS
-    task SETA(input `IU i); a_n = i; `SET(a_x);   endtask;   ///> build addr ptr
-    task MEM(input `IU i); SETA(i); `SET(asel_n); endtask;   ///> fetch from memory, data returns next cycle
-    task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask;   ///> data write n-th byte
+    task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask   ///> update TOS
+    task SETA(input `IU i); a_n = i; `SET(a_x);   endtask   ///> build addr ptr
+    task MEM(input `IU i); SETA(i); `SET(asel_n); endtask   ///> fetch from memory, data returns next cycle
+    task DW(input `U3 n); dsel_n = n; `SET(dwe); `SET(dsel_x); endtask   ///> data write n-th byte
     ///
     /// wires to reduce verbosity
     ///
