@@ -39,10 +39,10 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Modulization, to v2
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
-  |module|desc|components|LUTs|LUTs(min)|max.freq(MHz)|note|err|
+  |module|desc|components|LUTs|LUTs<br/>(47 inst.)|max.freq<br/>(MHz)|note|err|
   |--|--|--|--|--|--|--|--|
   |CTL|control bus|TOS, code, phase||||not synthsized||
-  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49|49|166.5|8-bit, single-port|16 EBR blocks|
+  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49|49|166.5|8-bit, single-port<br/>16 EBR blocks||
   |RAM|memory|128K bytes onboard RAM|48|48|2392.3|8-bit, single port||
   |AU|arithmetic unit|ALU and data stack|1826|1755|18.0|2 EBR blocks||
   |BR|branching unit|program counter and return stack|439|333|12.0|2 EBR blocks||
