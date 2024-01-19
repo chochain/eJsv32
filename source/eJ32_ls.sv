@@ -42,15 +42,15 @@ module EJ32_LS #(
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
     // data stack
-    `DU t;                      ///> shadow TOS
-    `U1 t_x;
+    `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
+    `IU t2a, s2a;               ///> shadow TOS, NOS
+    `DU d2t;                    ///> 8-bit to 32-bit converter
     // memory & IO buffers
     `IU addr;                   ///> b8_if.ai driver
     `U8 data;                   ///> b8_if.vo shadow
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
-    `U8 d8x4[4];                ///> 4-to-1 byte mux
     /// @}
 
     task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask;   ///> update TOS
@@ -62,15 +62,16 @@ module EJ32_LS #(
     ///
     assign code   = ctl.code;                 ///> input from ej32 control
     assign phase  = ctl.phase;
-    assign t      = ctl.t;
+    assign t2a    = `XDA(ctl.t);              ///> convert TOS to address
+    assign s2a    = `XDA(s);                  ///> convert NOS to address
+    assign d2t    = `X8D(data);               ///> convert 8-bit data to 32-bit
     assign addr   = asel ? a : p;             ///> b8_if memory access address
     assign data   = b8_if.vo;                 ///> shadow data on memory bus
     ///
     /// address, data shifter
     ///
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
-    assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into TOS
-    assign d8x4   = {t[31:24],t[23:16],t[15:8],t[7:0]}; ///> 4-to-1 mux (Big-Endian)
+    assign t_d    = {ctl.t[DSZ-9:0], data};   ///> merge lowest byte into TOS
     ///
     /// output port
     ///
@@ -80,6 +81,9 @@ module EJ32_LS #(
     /// memory bus interface
     ///
     always_comb begin
+        automatic `DU t = ctl.t;
+        automatic `U8 d8x4[4] =                             ///> 4-to-1 mux (Big-Endian)
+                         {t[31:24],t[23:16],t[15:8],t[7:0]};
         if (dwe||rom_en) b8_if.put_u8(addr, d8x4[dsel]);    ///> write to SRAM
         else             b8_if.get_u8(addr);                ///> read from SRAM
     end
@@ -104,26 +108,26 @@ module EJ32_LS #(
         case (code)
         iaload:
             case (phase)
-            0: MEM(`XDA(t));
-            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            0: MEM(t2a);
+            1: begin MEM(a + 1); TOS(d2t); end
             2: begin MEM(a + 1); TOS(t_d); end
             3: begin MEM(a + 1); TOS(t_d); end
             4: TOS(t_d);
             endcase
         baload:
             case (phase)
-            0: MEM(`XDA(t));
+            0: MEM(t2a);
             1: TOS(`X8D(data));
             endcase
         saload:
             case (phase)
-            0: MEM(`XDA(t));
-            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            0: MEM(t2a);
+            1: begin MEM(a + 1); TOS(d2t); end
             2: TOS(t_d);
             endcase
         iastore:
             case (phase)
-            0: begin MEM(`XDA(s)); `SET(dsel_x); dsel_n = 0; end
+            0: begin MEM(s2a); `SET(dsel_x); dsel_n = 0; end
             1: begin MEM(a + 1); DW(1); end
             2: begin MEM(a + 1); DW(2); end
             3: begin MEM(a + 1); DW(3); end
@@ -131,24 +135,24 @@ module EJ32_LS #(
             endcase
         bastore:
             case (phase)
-            0: MEM(`XDA(s));
+            0: MEM(s2a);
             1: DW(3);                          // CC: reset a?
             endcase
         sastore:
             case (phase)                       // CC: logic changed from Dr. Ting's
-            0: begin MEM(`XDA(s)); `SET(dsel_x); dsel_n = 2; end
+            0: begin MEM(s2a); `SET(dsel_x); dsel_n = 2; end
             1: begin MEM(a + 1); DW(3); end
             2: DW(3);
             endcase
         iinc:
             case (phase)                       // CC: logic changed from Dr. Ting's
-            0: MEM(`XDA(s));
+            0: MEM(s2a);
             1: `SET(asel_n);
             2: begin TOS(s); DW(0); end
             endcase
         jsr:
             case (phase)
-            0: MEM(`XDA(t));
+            0: MEM(t2a);
             1: begin MEM(a + 1); TOS(`X8D(data)); end
             endcase
         ldi: 
