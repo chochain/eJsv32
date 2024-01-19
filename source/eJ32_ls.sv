@@ -42,15 +42,17 @@ module EJ32_LS #(
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
     // data stack
+    `DU t;
     `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
-    `IU t2a, s2a;               ///> shadow TOS, NOS
-    `DU d2t;                    ///> 8-bit to 32-bit converter
     // memory & IO buffers
     `IU addr;                   ///> b8_if.ai driver
     `U8 data;                   ///> b8_if.vo shadow
     `U1 dwe, dsel_x;            ///> data/addr bus controls
     `U1 ibuf_x, obuf_x;         ///> input/output buffer controls
+    // conversion holder
+    `IU t2a, s2a;               ///> TOS/NOS to address holder
+    `DU d2t;                    ///> 8-bit to 32-bit holder
     /// @}
 
     task TOS(input `DU d);  t_n = d; `SET(t_x);   endtask;   ///> update TOS
@@ -62,7 +64,8 @@ module EJ32_LS #(
     ///
     assign code   = ctl.code;                 ///> input from ej32 control
     assign phase  = ctl.phase;
-    assign t2a    = `XDA(ctl.t);              ///> convert TOS to address
+    assign t      = ctl.t;
+    assign t2a    = `XDA(t);                  ///> convert TOS to address
     assign s2a    = `XDA(s);                  ///> convert NOS to address
     assign d2t    = `X8D(data);               ///> convert 8-bit data to 32-bit
     assign addr   = asel ? a : p;             ///> b8_if memory access address
@@ -71,7 +74,7 @@ module EJ32_LS #(
     /// address, data shifter
     ///
     assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
-    assign t_d    = {ctl.t[DSZ-9:0], data};   ///> merge lowest byte into TOS
+    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into TOS
     ///
     /// wired to outputs
     ///
@@ -81,9 +84,8 @@ module EJ32_LS #(
     /// memory bus interface
     ///
     always_comb begin
-        automatic `DU t = ctl.t;
         automatic `U8 d8x4[4] =                             ///> 4-to-1 mux (Big-Endian)
-                         {t[31:24],t[23:16],t[15:8],t[7:0]};
+            {t[31:24],t[23:16],t[15:8],t[7:0]};
         if (dwe||rom_en) b8_if.put_u8(addr, d8x4[dsel]);    ///> write to SRAM
         else             b8_if.get_u8(addr);                ///> read from SRAM
     end
