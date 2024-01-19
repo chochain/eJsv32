@@ -59,6 +59,7 @@ interface mb8_io;
     function void get_u8(input `IU ax);
         we = 1'b0;
         ai = ax;
+        vi = 8'b0;
         // return vo
     endfunction: get_u8
 endinterface : mb8_io
