@@ -23,6 +23,7 @@ module outer_tb #(
     ///
     /// dictionary tracer
     ///
+    `U1 clk, rst;               ///> clock driver
     `IU cold, ctx, tib, obuf;   ///> eForth user variables
    
     typedef struct {
@@ -109,7 +110,7 @@ module outer_tb #(
     task ram_copy(input `IU ax, input `IU len);
         automatic `IU a0 = ax & ~'hf;
         for (integer a1=a0; a1 <= (a0 + len + 'h10); a1++) begin
-            repeat(1) @(posedge `CTL.clk) begin
+            repeat(1) @(posedge clk) begin
                 `DBUS.get_u8(a1);
                 if (a1 > a0) ram[a1-1] = `DBUS.vo; ///> 1-cycle delay
             end
@@ -136,12 +137,10 @@ module outer_tb #(
     endtask: pre_check
 
     task post_check();
-        `CTL.reset();
-       ram_copy(ctx, 'h120);        // post copy RAM content for verification
-       dump("dict", ctx, 'h120);
-       
-       ram_copy(obuf, 'h600);
-       dump("obuf", obuf,'h600);    // verify output buffer content
+        ram_copy(ctx, 'h120);        // post copy RAM content for verification
+        dump("dict", ctx, 'h120);
+        ram_copy(obuf, 'h600);
+        dump("obuf", obuf,'h600);    // verify output buffer content
     endtask: post_check
    
     task trace;
@@ -183,19 +182,21 @@ module outer_tb #(
     ///
     task activate;
         `DBUS.get_u8(0);
-        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b1;
-        repeat(1) @(posedge `CTL.clk) `CTL.rst = 1'b0;
+        repeat(1) @(posedge clk) rst = 1'b1;
+        repeat(1) @(posedge clk) rst = 1'b0;
     endtask: activate
 
-    always #5 `CTL.clk_tick();
+    always #5 clk = ~clk;
 
     initial begin
+        clk = 1'b0;
+        rst = 1'b1;
         `CTL.reset();                  // initialize control interface
         ///
         /// load ROM and TIB into RAM
         ///
         activate();                    // activate eJsv32
-        repeat(ROM_SZ) @(posedge `CTL.clk) begin
+        repeat(ROM_SZ) @(posedge clk) begin
             ram[`DBUS.ai] = `DBUS.vi;  // capture a local copy
             if (`DBUS.ai < 'h10) begin
                $display("%4x:%2x ", `DBUS.ai, `DBUS.vi);
@@ -208,10 +209,12 @@ module outer_tb #(
         ///
         /// simulate eJ32
         ///
-        repeat(23000) @(posedge `CTL.clk) trace();
+        repeat(23000) @(posedge clk) trace();
         ///
         /// verify user words and output buffer
         ///
+        rst = 1'b1;
+        `CTL.reset();
         post_check();
 
         #20 $finish;
