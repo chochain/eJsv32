@@ -17,18 +17,17 @@ module EJ32 #(
     parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
     ) (
-    input `U1 clk,
-    input `U1 rst
+    input `U1 clk, rst /*synthesis syn_force_pads=1 syn_noprune=1*/
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
     `U1  dc_en, rom_en;
-    `U8  rom_wait;              ///> ROM wait cycles for EBR to stablize read
     `IU  p, p_n;                ///> program counter
+    `U8  rom_wait;              ///> ROM wait cycles for EBR to stablize read
     `IU  rom_a;                 ///> ROM address pointer
     `U8  rom_d, data;           ///> data return from memory bus
-    `DU  s;                     ///> NOS
     `U1  p_inc;                 ///> program counter advance flag
     `U1  div_bsy_o;             ///> AU divider busy flag
+    `DU  s_o;                   ///> NOS (AU -> LS)
     `IU  br_p_o;                ///> BR branching target
     `U1  br_psel;               ///> BR branching target select
     `DU  au_t_o, br_t_o, ls_t_o;///> TOS from modules for arbitration
@@ -46,15 +45,17 @@ module EJ32 #(
     ///
     /// EJ32 core modules
     ///
-    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);     ///> decoder unit
-    EJ32_AU     #(DSZ)       au(.s_o(s), .*);    ///> arithmetic unit
-    EJ32_BR     #(DSZ, ASZ)  br(.*);             ///> branching unit
-    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.*);   ///> load/store unit
+    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);              ///> decoder unit
+    EJ32_AU     #(DSZ)       au(.*);                      ///> arithmetic unit
+    EJ32_BR     #(DSZ, ASZ)  br(.*);                      ///> branching unit
+    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.s(s_o), .*);   ///> load/store unit
     ///
     /// eForth image loader from ROM into RAM
     ///
     task COPY_ROM();
         if (rom_wait > 0) begin
+            p_n    <= 'h0;
+            rom_a  <= 'h0;
             rom_wait <= rom_wait - 1;
         end
         else if (rom_a < ROM_SZ) begin           ///> copy ROM into RAM byte-by-byte
@@ -89,7 +90,7 @@ module EJ32 #(
     HSOSC #(.CLKHF_DIV("b01")) clock(            // 48MHz divide by 2
     .CLKHFEN(1'b1),                              // Enable the output  
     .CLKHFPU(1'b1),                              // Power up the oscillator  
-    .CLKHF(clk0)                                 // Oscillator output  
+    .CLKHF(clk)                                  // Oscillator output  
     );
 */   
     assign ctl.clk = clk;                        ///> clock driver
