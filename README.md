@@ -41,13 +41,14 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 
   |module|desc|components|LUTs/freq<br/>area|LUTs/freq<br/>timing|LUTs<br/>(47op)|note|err|
   |--|--|--|--|--|--|--|--|
-  |CTL|control bus|TOS, code, phase||||not synthsized||
+  |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
   |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>166.5|17<br/>272.9|49|8-bit<br/>16 EBR blocks||
   |RAM|memory|128K bytes onboard RAM|48<br/>2392.3|49<br/>2392.3|48|8-bit<br/>pseudo-dual port||
   |AU|arithmetic unit|ALU and data stack|1826<br/>18.0|1726<br/>21.3|1755|2 EBR blocks||
   |BR|branching unit|program counter and return stack|447<br/>12.0|436<br/>12.0|333|2 EBR blocks||
   |DC|decoder unit|state machines|237<br/>32.4|253<br/>33.9|211||divider patch|
   |LS|load/store unit|memory and buffer IO|350<br/>54.0|392<br/>47.4|201|54.0|||
+  |eJ32|top module||NA|NA|NA||segment fault|
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
