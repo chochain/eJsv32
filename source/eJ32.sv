@@ -16,6 +16,9 @@ module EJ32 #(
     parameter RS_DEPTH = 64,    ///> return stack depth (v2 - hardcoded in ERB netlist)
     parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
+    ) (
+    input `U1 clk,
+    input `U1 rst
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
     `U1  dc_en, rom_en;
@@ -38,9 +41,8 @@ module EJ32 #(
     ///
     /// memory blocks
     ///
-    spram8_128k smem(b8_if.slave, ~ctl.clk);     ///> SPRAM, (neg edged)
-    EJ32_ROM    rom(                             ///> ROM, eForth image
-        .clk(~ctl.clk), .rst(ctl.rst), .*);
+    spram8_128k smem(b8_if.slave, ~clk);         ///> SPRAM, (neg edged)
+    EJ32_ROM    rom(.clk(~clk), .*);             ///> ROM, eForth image (neg edged)
     ///
     /// EJ32 core modules
     ///
@@ -59,15 +61,17 @@ module EJ32 #(
             p_n    <= rom_a - 1;                 ///> RAM is 1-cycle behind
             rom_a  <= rom_a + 1;
             ctl.t  <= {{ASZ-8{1'b0}}, rom_d};
-       end
-       else begin
+        end
+        else begin
             p_n    <= COLD;                      ///> switch on DC, cold start address
             rom_en <= 1'b0;                      ///> disable ROM
             dc_en  <= 1'b1;                      ///> activate decoder
-       end
+        end
     endtask: COPY_ROM
-   
-    task UPDATE_TOS();                           ///> TOS update arbitration
+    ///
+    /// TOS update arbitrator
+    ///
+    task UPDATE_TOS();
         automatic `U3 sel = { au_t_x, br_t_x, ls_t_x };
         case (sel)
         3'b000: begin end // OK, ctl.t stays the same
@@ -80,11 +84,21 @@ module EJ32 #(
     ///
     /// Instruction Unit
     ///
+/* iCE40up5k high speed clock (48MHz) in built-in library
+    `U1 clk0;
+    HSOSC #(.CLKHF_DIV("b01")) clock(            // 48MHz divide by 2
+    .CLKHFEN(1'b1),                              // Enable the output  
+    .CLKHFPU(1'b1),                              // Power up the oscillator  
+    .CLKHF(clk0)                                 // Oscillator output  
+    );
+*/   
+    assign ctl.clk = clk;                        ///> clock driver
+    assign ctl.rst = rst;
     assign p       = br_psel ? br_p_o : p_n;     ///> branch target
     assign data    = b8_if.vo;                   ///> data fetched from SRAM (1-cycle)
 
-    always_ff @(posedge ctl.clk) begin
-        if (ctl.rst) begin
+    always_ff @(posedge clk) begin
+        if (rst) begin
             rom_a     <= 0;                      ///> ROM address pointer
             dc_en     <= 1'b0;
             rom_en    <= 1'b1;
@@ -92,7 +106,7 @@ module EJ32 #(
         end
         else if (rom_en) COPY_ROM();             ///> copy eForth image from ROM into RAM
         else begin
-            UPDATE_TOS();
+            UPDATE_TOS();                        ///> arbitrate TOS update
             p_n <= p + {{ASZ-1{1'b0}}, p_inc};   ///> advance instruction address
         end
     end

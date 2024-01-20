@@ -15,16 +15,10 @@ interface EJ32_CTL;
    `DU  t;                     // TOS, on bus
    
    function void reset();
-       clk   = 1'b1;           // memory fetch at neg edge
-       rst   = 1'b1;
        code  = nop;
        phase = 3'b0;
        t     = 0;
    endfunction: reset
-   
-   function void clk_tick();
-       clk   = ~clk;
-   endfunction: clk_tick
 endinterface: EJ32_CTL
 
 interface mb32_io(input `U1 clk);
@@ -33,13 +27,18 @@ interface mb32_io(input `U1 clk);
     `U1  we;
     `DU  vi;
     `DU  vo;
-    
+
+`ifdef VERILATOR   
+    modport master(output we, bmsk, ai, vi);
+    modport slave(input we, bmsk, ai, vi, output vo);
+`else
     clocking io_clk @(posedge clk);
         default input #1 output #1;
     endclocking // ioMaster
 
     modport master(clocking io_clk, output we, bmsk, ai, vi);
     modport slave(clocking io_clk, input we, bmsk, ai, vi, output vo);
+`endif
 endinterface: mb32_io
 
 interface mb8_io;
@@ -60,6 +59,7 @@ interface mb8_io;
     function void get_u8(input `IU ax);
         we = 1'b0;
         ai = ax;
+        vi = 8'b0;
         // return vo
     endfunction: get_u8
 endinterface : mb8_io
