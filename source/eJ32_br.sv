@@ -103,12 +103,14 @@ module EJ32_BR #(
     assign t_neg  = t[DSZ-1];             ///> negative flag
     assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into t
     assign a_d    = {a[ASZ-9:0], data};   ///> merge lowest byte into addr
-    /// output ports
+    assign d2a    = `X8A(data);
+    ///
+    /// wired to output
+    ///
     assign br_p_o = a;
     assign br_psel= asel;
     assign br_t_o = t_n;
     assign br_t_x = t_x;
-    assign d2a    = `X8A(data);
     ///
     /// combinational
     ///
