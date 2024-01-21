@@ -23,8 +23,7 @@ module EJ32_BR #(
     /// @{
     // instruction
     `IU  a;                     ///> instrunction address
-    `U3  phase;                 ///> FSM phase (aka state)
-    `DU  r;                     ///> top of RS
+    `DU  r, r0;                 ///> top of RS and shadow
     `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
     // IO
@@ -39,6 +38,7 @@ module EJ32_BR #(
     /// @{
     // instruction
     opcode_t code;              ///> shadow ctl.code
+    `U3 phase;                  ///> FSM phase (aka state)
     `U1 asel;                   ///> address select
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
@@ -61,10 +61,10 @@ module EJ32_BR #(
         .rd_clk_en_i(1'b1),
         .rd_en_i(rs_ren),
         .wr_en_i(rs_wen),
-        .wr_data_i(r_n),
+        .wr_data_i(r_n),        ///> push into return stack
         .wr_addr_i(rp_w),
         .rd_addr_i(rp_r),
-        .rd_data_o(r)            ///> read back into r
+        .rd_data_o(r)           ///> read back into r
     );
     // return stack ops
     task TOS(input `DU d); t_n = d; `SET(t_x); endtask
@@ -160,8 +160,8 @@ module EJ32_BR #(
             1: JMP(a_d);         // merge addr lower byte
             endcase
         jsr:     if (phase==2) begin JMP(`XDA(t_d)); TOS(`XAD(p) + 2); end
-        ret:     JMP(`XDA(r));
-        jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
+        ret:     JMP(`XDA(r));                                    // CC: wait for r
+        jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end  // CC: wait for r
         invokevirtual:
             case (phase)
             0: begin SETA(d2a); RPUSH(`XAD(p) + 2); end
@@ -171,14 +171,14 @@ module EJ32_BR #(
         donext:
             case (phase)
             0: SETA(d2a);
-            1: if (r == 0) `R(sPOP);
+            1: if (r0 == 0) `R(sPOP);          // 12=>22MHz with r0
                else begin
-                  RMOVE(r - 1);
+                  RMOVE(r0 - 1);               // 12=>22MHz with r0
                   JMP(a_d);
                end
             endcase
-        dupr:  TOS(r);
-        popr:  begin TOS(r); `R(sPOP); end
+        dupr:  TOS(r);                         // CC: wait for r
+        popr:  begin TOS(r); `R(sPOP); end     // CC: wait for r
         pushr: RPUSH(t);
         endcase
     end
@@ -188,9 +188,11 @@ module EJ32_BR #(
             a    <= {ASZ{1'b0}};     /// init address
             asel <= 1'b0;
             rp   <= '0;
+            r0   <= {DSZ{1'b0}};
         end
         else if (br_en) begin
             asel <= asel_n;
+            r0   <= r;               ///> shadow r to shorten critical path
             if (a_x) a <= a_n;
 
             // return stack
