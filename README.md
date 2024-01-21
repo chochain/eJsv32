@@ -55,6 +55,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
   
   TODO:
+  * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
   * combine IU (instruction unit, in eJ32.sv) and BR
   * BR add R (top of return stack) register to help EBR slow path
   * AU add S (NOS) register to help EBR slow path
