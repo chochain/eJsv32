@@ -23,7 +23,7 @@ module EJ32_BR #(
     /// @{
     // instruction
     `IU  a;                     ///> instrunction address
-    `DU  r, r_1;                ///> top of RS and shadow r - 1
+    `DU  r;                     ///> top of RS
     `U1  rz;                    ///> precalc r==0 flag
     `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
@@ -71,16 +71,15 @@ module EJ32_BR #(
     task TOS(input `DU d); t_n = d; `SET(t_x); endtask
     task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
     task RPUSH(input `DU d); 
-         rs_wen = 1'b1; 
+         rs_wen = 1'b1;         ///> rp_w = rp + 1, default
          r_n    = d;
-         rp_w   = rp + 1;
          rs_op  = sPUSH;
     endtask: RPUSH
     task RMOVE(input `DU d);
          rs_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
          rs_wen = 1'b1;
          r_n    = d;
-         rp_w   = rp;
+         rp_w   = rp;           ///> write to top of stack
          rs_op  = sMOVE;
     endtask: RMOVE
     // branching
@@ -172,7 +171,7 @@ module EJ32_BR #(
         donext:
             case (phase)
             0: SETA(d2a);
-            1: if (rz) `R(sPOP);      // 12=>26.7MHz with rz
+            1: if (rz) `R(sPOP);      // 12.0=>31.0MHz with rz
                else begin
                   RMOVE(r - 1);
                   JMP(a_d);
@@ -192,7 +191,7 @@ module EJ32_BR #(
         end
         else if (br_en) begin
             asel <= asel_n;
-            rz   <= r == 0;
+            rz   <= r == 0;          /// precalc r==0 flag on critical path
             if (a_x) a <= a_n;
 
             // return stack
