@@ -32,29 +32,33 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + removed phaseload, aselload which are always 1'b1
   + add many $display for tracing (and my own understanding)
 * fix divider, add one extra cycle for TOS update before next instruction
-* modulization into a 2-bus design
+* modulize into a 2-bus hierachical design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
 * use EBR as ROM which is populated from hex image file (contains 3.4K eForth + 1K test cases)
   
-### Modulization, to v2
+### Modulization, flat->hierarchical (v2)
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
-  |module|desc|components|LUTs|note|err|
-  |--|--|--|--|--|--|
-  |CTL|control bus|TOS, code, phase||not synthsized||
-  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|65|8-bit, single-port|16 EBR blocks|
-  |RAM|memory|128K bytes onboard RAM|48|8-bit, single port||
-  |DC|decoder unit|state machines|233||divider patch|
-  |AU|arithmetic unit|ALU and data stack|1792|2 EBR blocks||
-  |BR|branching unit|program counter and return stack|518|2 EBR blocks||
-  |LS|load/store unit|memory and buffer IO|369|||
+  |module|desc|components|LUTs/freq<br/>area|LUTs/freq<br/>timing|LUTs<br/>(47op)|note|err|
+  |--|--|--|--|--|--|--|--|
+  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>166.5|17<br/>272.9|49|8-bit<br/>16 EBR blocks||
+  |RAM|memory|128K bytes onboard RAM|48<br/>2392.3|49<br/>2392.3|48|8-bit<br/>pseudo-dual port||
+  |AU|arithmetic unit|ALU and data stack|1826<br/>18.0|1726<br/>21.3|1755|2 EBR blocks||
+  |BR|branching unit|program counter and return stack|446<br/>22.0|444<br/>22.7|333|2 EBR blocks||
+  |DC|decoder unit|state machines|237<br/>32.4|253<br/>33.9|211||divider patch|
+  |LS|load/store unit|memory and buffer IO|350<br/>54.0|392<br/>47.4|201|54.0|||
+  |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
+  |||||||||
+  |eJ32|top module||NA|NA|NA||segment fault|
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
   
   TODO:
+  * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
   * combine IU (instruction unit, in eJ32.sv) and BR
-  * add s (NOS) register
+  * BR add R (top of return stack) register to help EBR slow path
+  * AU add S (NOS) register to help EBR slow path
   * break IF (instruction fetch) off LS
   * break RR (t Register Read), WB (t, s Write Back) off AU
   * study pipelining hazards 
@@ -97,7 +101,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
 * ModelSim Dr. Ting's 6 embeded test cases - completed
-  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (Dr. Ting's modified)
+  + v1 - 600K+ cycles OK, ~/docs/eJ32_trace_full_20220414.txt.gz (from Dr. Ting's)
   + v1 - 520K+ cycles OK, ~/docs/eJ32_trace_full_20231223.txt.gz (before modulization)
   + v2 - 520K+ cycles OK, ~/docs/eJ32v2_trace_full_20240117.txt.gz (after modulization)
 
@@ -112,10 +116,11 @@ For the 6 test cases Dr. Ting gave, they take ~520K cycles.
   |AU + BR|50|145||
   |AU + LS|14|69||
 
-So, within the total cycles. [details here]((https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
-* AU takes about 1/3, mostly 1-cycle except bipush(2),pop2(2),dup2(4)
-* BR takes about 1/3, all 3-cycle except jreturn 2-cycle.
-* LS takes about 1/3, all multi-cycles (avg. 5/instructions)
+So, within the total cycles. [details here](https://chochain.github.io/eJsv32/docs/opcode_freq_v2.ods)
+* Only 47 total opcodes are used.
+* Arithmetic takes about 1/3, mostly 1-cycle except bipush(2), pop2(2), dup2(4)
+* Branching  takes about 1/3, all 3-cycle except jreturn 2-cycle.
+* Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
 * learn to Map
@@ -141,5 +146,5 @@ So, within the total cycles. [details here]((https://chochain.github.io/eJsv32/d
 * 20220110 - Chen-hanson Ting: eJsv32k.v in Quartus II SystemVerilog-2005
 * 20220209 - Chochain: rename to eJ32 for Lattice and future versions
 * 20230216 - Chochain: consolidate ALU modules, tiddy macro tasks
-* 20231216 - Chochain: modulization => v2.0
+* 20231216 - Chochain: modulization flat to hierarchical (v2.0)
 * 20240108 - Chochain: use EBR for data/return stacks and eForth image

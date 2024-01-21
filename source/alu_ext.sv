@@ -87,7 +87,7 @@ module div_int #(parameter DSZ=32) (
             end
             else r1  <= r_n;           // next digit
             q <= q_n;
-            i <= i - 1;                // cycle counter
+            i <= i - 'h1;              // cycle counter
         end
     end
 endmodule: div_int

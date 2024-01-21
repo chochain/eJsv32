@@ -14,15 +14,16 @@ module EJ32_BR #(
     input    `IU p,             ///> instruction pointer
     input    `U8 data,          ///> data from memory bus
     output   `IU br_p_o,        ///> target instruction pointer
-    output   `U1 br_psel
+    output   `U1 br_psel,
+    output   `DU br_t_o,        ///> TOS for arbitration
+    output   `U1 br_t_x 
     );
     import ej32_pkg::*;
     /// @defgroup Registers
     /// @{
     // instruction
     `IU  a;                     ///> instrunction address
-    `U3  phase;                 ///> FSM phase (aka state)
-    `DU  r;                     ///> top of RS
+    `DU  r, r0;                 ///> top of RS and shadow
     `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
     // IO
@@ -37,18 +38,18 @@ module EJ32_BR #(
     /// @{
     // instruction
     opcode_t code;              ///> shadow ctl.code
+    `U3 phase;                  ///> FSM phase (aka state)
     `U1 asel;                   ///> address select
     `U1 a_x;                    ///> address controls
     `IU a_d;                    ///> 2-byte merged address
+    `IU d2a;                    ///> expand 8-bit data to address
     // data stack
     `DU t;                      ///> shadow TOS
     `U1 t_x, t_z, t_neg;        ///> TOS controls
     `DU t_d;                    ///> 4-byte merged data
     /// BRAM control
-    `U1 rs_ren;
-    `U1 rs_wen;
-    `SU rp_r;
-    `SU rp_w;
+    `U1 rs_ren, rs_wen;         ///> return stack R/W enables
+    `SU rp_r, rp_w;             ///> return stack R/W pointer
     ///
     /// return stack (using embedded block memory)
     ///
@@ -60,13 +61,13 @@ module EJ32_BR #(
         .rd_clk_en_i(1'b1),
         .rd_en_i(rs_ren),
         .wr_en_i(rs_wen),
-        .wr_data_i(r_n),
+        .wr_data_i(r_n),        ///> push into return stack
         .wr_addr_i(rp_w),
         .rd_addr_i(rp_r),
-        .rd_data_o(r)            ///> read back into r
+        .rd_data_o(r)           ///> read back into r
     );
     // return stack ops
-    task TOS(input `DU d);  t_n = d;  `SET(t_x); endtask;
+    task TOS(input `DU d); t_n = d; `SET(t_x); endtask
     task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
     task RPUSH(input `DU d); 
          rs_wen = 1'b1; 
@@ -84,11 +85,11 @@ module EJ32_BR #(
     // branching
     // Note: address is memory offset (instead of Java class file reference)
     //
-    task SETA(input `IU i); a_n = i; `SET(a_x);    endtask;  // build addr ptr
-    task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask;  // jmp and clear a
+    task SETA(input `IU i); a_n = i; `SET(a_x);    endtask  // build addr ptr
+    task JMP(input `IU i);  SETA(i); `SET(asel_n); endtask  // jmp and clear a
     task BRAN(input `U1 f);
         case (phase)
-        0: SETA(`X8A(data));
+        0: SETA(d2a);
         1: if (f) JMP(a_d);
         endcase
     endtask: BRAN
@@ -98,13 +99,18 @@ module EJ32_BR #(
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = t == 0;                   ///> zero flag
-    assign t_neg  = t[DSZ-1];                 ///> negative flag
-    assign t_d    = {t[DSZ-9:0], data};       ///> merge lowest byte into t
-    assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
-    /// output ports
+    assign t_z    = t == 0;               ///> zero flag
+    assign t_neg  = t[DSZ-1];             ///> negative flag
+    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into t
+    assign a_d    = {a[ASZ-9:0], data};   ///> merge lowest byte into addr
+    assign d2a    = `X8A(data);
+    ///
+    /// wired to output
+    ///
     assign br_p_o = a;
     assign br_psel= asel;
+    assign br_t_o = t_n;
+    assign br_t_x = t_x;
     ///
     /// combinational
     ///
@@ -119,6 +125,7 @@ module EJ32_BR #(
         rs_wen  = 1'b0;
         rp_w    = rp + 1;
         rp_r    = rp;
+        r_n     = {DSZ{1'b0}};
     endtask: INIT
 
     always_comb begin
@@ -149,29 +156,29 @@ module EJ32_BR #(
         //
         goto:
             case (phase)
-            0: SETA(`X8A(data)); // set addr higher byte
+            0: SETA(d2a);        // set addr higher byte
             1: JMP(a_d);         // merge addr lower byte
             endcase
         jsr:     if (phase==2) begin JMP(`XDA(t_d)); TOS(`XAD(p) + 2); end
-        ret:     JMP(`XDA(r));
-        jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end
+        ret:     JMP(`XDA(r));                                    // CC: wait for r
+        jreturn: if (phase==0) begin `R(sPOP); JMP(`XDA(r)); end  // CC: wait for r
         invokevirtual:
             case (phase)
-            0: begin SETA(`X8A(data)); RPUSH(`XAD(p) + 2); end
+            0: begin SETA(d2a); RPUSH(`XAD(p) + 2); end
             1: begin JMP(a_d); end
             endcase
         // eForth VM specific ops
         donext:
             case (phase)
-            0: SETA(`X8A(data));
-            1: if (r == 0) `R(sPOP);
+            0: SETA(d2a);
+            1: if (r0 == 0) `R(sPOP);          // 12=>22MHz with r0
                else begin
-                  RMOVE(r - 1);
+                  RMOVE(r0 - 1);               // 12=>22MHz with r0
                   JMP(a_d);
                end
             endcase
-        dupr:  TOS(r);
-        popr:  begin TOS(r); `R(sPOP); end
+        dupr:  TOS(r);                         // CC: wait for r
+        popr:  begin TOS(r); `R(sPOP); end     // CC: wait for r
         pushr: RPUSH(t);
         endcase
     end
@@ -179,13 +186,14 @@ module EJ32_BR #(
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
             a    <= {ASZ{1'b0}};     /// init address
-            asel <= 1'b0;            /// cold start by decoder
+            asel <= 1'b0;
             rp   <= '0;
+            r0   <= {DSZ{1'b0}};
         end
         else if (br_en) begin
             asel <= asel_n;
-            if (t_x) ctl.t <= t_n;
-            if (a_x) a     <= a_n;
+            r0   <= r;               ///> shadow r to shorten critical path
+            if (a_x) a <= a_n;
 
             // return stack
             case (rs_op)

@@ -12,7 +12,9 @@ module EJ32_AU #(
     input    `U1 au_en,         ///> arithmetic unit enable
     input    `U8 data,          ///> 8-bit data from memory bus
     output   `U1 div_bsy_o,
-    output   `DU s_o
+    output   `DU s_o,
+    output   `DU au_t_o,        ///> output for arbitation
+    output   `U1 au_t_x
     );
     import ej32_pkg::*;
     /// @defgroup Registers
@@ -28,6 +30,7 @@ module EJ32_AU #(
     `DU t, s;                   ///> shadow TOS, NOS
     `U1 t_x;                    ///> TOS update flag
     `DU t_d;                    ///> 4-byte merged data
+    `DU d2t;                    ///> convert 8-bit data to 32-bit
     `SU sp;                     ///> data stack pointer
     /// @}
     /// @defgroup EBR control
@@ -119,13 +122,19 @@ module EJ32_AU #(
     assign t      = ctl.t;                  ///> shadow TOS from control bus
     assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
     assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
+    assign d2t    = `X8D(data);
+    ///
     /// wired to output
+    ///
     assign div_bsy_o = div_bsy;
     assign s_o    = (s_x) ? s_n : t;
+    assign au_t_o = t_n;
+    assign au_t_x = t_x;
     ///
     /// combinational
     ///
     task INIT();
+        t_n   = t;
         t_x   = 1'b0;
         ss_op = sNOP;         /// data stack
         ss_ren= 1'b1;
@@ -155,10 +164,10 @@ module EJ32_AU #(
         iconst_4:    PUSH(4);
         iconst_5:    PUSH(5);
         // data => TOS
-        bipush: if (phase==0) PUSH(`X8D(data));
+        bipush: if (phase==0) PUSH(d2t);
         sipush:                     // CC: not tested
             case (phase)
-            0: PUSH(`X8D(data));
+            0: PUSH(d2t);
             1: TOS(t_d);
             endcase
         // rs => TOS
@@ -203,7 +212,7 @@ module EJ32_AU #(
         iand:      ALU(s & t);
         ior:       ALU(s | t);
         ixor:      ALU(s ^ t);
-        iinc:      if (phase==1) ALU(t + `X8D(data));
+        iinc:      if (phase==1) ALU(t + d2t);
         // BR conditional branching (feeds AU/TOS result to BR)
         ifeq:      ZBRAN();
         ifne:      ZBRAN();
@@ -221,7 +230,7 @@ module EJ32_AU #(
         dupr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
         popr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
         pushr:     POP();
-        ldi:       if (phase==0) PUSH(`X8D(data));
+        ldi:       if (phase==0) PUSH(d2t);
         get:       if (phase==0) LOAD();
         put:       if (phase==1) POP();
         endcase
@@ -235,7 +244,6 @@ module EJ32_AU #(
         end
         else if (au_en) begin
             s <= s_x ? s_n : t;
-            if (t_x) ctl.t <= t_n;
             // data stack
             case (ss_op)
             sPOP:  sp <= sp - 1;
