@@ -23,7 +23,8 @@ module EJ32_BR #(
     /// @{
     // instruction
     `IU  a;                     ///> instrunction address
-    `DU  r, r0;                 ///> top of RS and shadow
+    `DU  r, r_1;                ///> top of RS and shadow r - 1
+    `U1  rz;                    ///> precalc r==0 flag
     `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
     // IO
@@ -171,9 +172,9 @@ module EJ32_BR #(
         donext:
             case (phase)
             0: SETA(d2a);
-            1: if (r0 == 0) `R(sPOP);          // 12=>22MHz with r0
+            1: if (rz) `R(sPOP);      // 12=>26.7MHz with rz
                else begin
-                  RMOVE(r0 - 1);               // 12=>22MHz with r0
+                  RMOVE(r - 1);
                   JMP(a_d);
                end
             endcase
@@ -188,11 +189,10 @@ module EJ32_BR #(
             a    <= {ASZ{1'b0}};     /// init address
             asel <= 1'b0;
             rp   <= '0;
-            r0   <= {DSZ{1'b0}};
         end
         else if (br_en) begin
             asel <= asel_n;
-            r0   <= r;               ///> shadow r to shorten critical path
+            rz   <= r == 0;
             if (a_x) a <= a_n;
 
             // return stack
