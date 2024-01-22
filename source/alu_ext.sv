@@ -54,23 +54,18 @@ module div_int #(parameter DSZ=32) (
     output `DU  r          // remainder
     );
     logic [$clog2(DSZ)-1:0] i;        // iteration counter
-    `DX r_n;               // accumulators (1 bit wider) 
-    `DX r1;
-    `DX ry;       
+    `DX r_n, r1;           // accumulators (1 bit wider) 
     `DU q_n;               // intermediate quotient
-    `U1 pos;
-    ///
-    /// wires to reduce verbosity
-    ///
-    assign pos = r1 >= {1'b0, r};
-    assign ry  = r1 - r;
     ///
     /// wire output port
-    assign z   = r==0;
+    assign z = r==0;
       
     always_comb begin
-        if (pos) {r_n, q_n} = {ry[DSZ-1:0], q, 1'b1}; // 65-bit ops
-        else     {r_n, q_n} = {r1[DSZ-1:0], q, 1'b0};
+        automatic `U1 pos = r1 >= {1'b0, r};
+        automatic `DX ry  = r1 - r;
+        { r_n, q_n } = pos
+                       ? { ry[DSZ-1:0], q, 1'b1 }
+                       : { r1[DSZ-1:0], q, 1'b0 };
     end
 
     always_ff @(posedge clk) begin
