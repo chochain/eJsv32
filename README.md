@@ -56,6 +56,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   
   TODO:
   * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
+  * tune AU for 24MHz (i.g. set_multicycle_path on divider, immd register)
   * combine IU (instruction unit, in eJ32.sv) and BR
   * BR add R (top of return stack) register to help EBR slow path
   * AU add S (NOS) register to help EBR slow path
