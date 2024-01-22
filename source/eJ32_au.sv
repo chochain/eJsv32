@@ -47,7 +47,7 @@ module EJ32_AU #(
     `U1  shr_f;
     `DU2 mul_v;
     `U1  div_en, div_bsy;
-    `DU  div_q, div_r, div_v;
+    `DU  div_q, div_r;
     `U1  div_z;
     ///
     /// extended ALU units
@@ -111,14 +111,9 @@ module EJ32_AU #(
         1: POP();
         endcase
     endtask: IBRAN
-    task ZBRAN();     if (phase==1) POP();                 endtask
-    task STOR(int n); if (phase==n || phase==(n+1)) POP(); endtask
-    task DIV(input `DU v);     // if (phase==1 && !div_bsy) ALU(v);    endtask
-        case (phase)
-        0: TOS(div_v);                         ///> set TOS
-        1: begin sp_r = sp - 1; `S(sPOP); end  ///> drop NOS
-        endcase
-    endtask: DIV
+    task ZBRAN();          if (phase==1) POP();                 endtask
+    task STOR(int n);      if (phase==n || phase==(n+1)) POP(); endtask
+    task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v);    endtask
     ///
     /// wires to reduce verbosity
     ///
@@ -245,12 +240,10 @@ module EJ32_AU #(
     ///
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
-            sp    <= '0;
-            div_v <= 0;
+            sp <= '0;
         end
         else if (au_en) begin
-            s     <= s_x ? s_n : t;
-            div_v <= code==idiv ? div_q : div_r;
+            s  <= s_x ? s_n : t;
             // data stack
             case (ss_op)
             sPOP:  sp <= sp - 1;
