@@ -43,10 +43,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   |--|--|--|--|--|--|--|--|
   |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>166.5|17<br/>272.9|49|8-bit<br/>16 EBR blocks||
   |RAM|memory|128K bytes onboard RAM|48<br/>2392.3|49<br/>2392.3|48|8-bit<br/>pseudo-dual port||
-  |AU|arithmetic unit|ALU and data stack|1826<br/>18.0|1726<br/>21.3|1755|2 EBR blocks||
-  |BR|branching unit|program counter and return stack|434<br/>31.0|438<br/>31.0|333|2 EBR blocks||
-  |DC|decoder unit|state machines|237<br/>32.4|253<br/>33.9|211||divider patch|
-  |LS|load/store unit|memory and buffer IO|350<br/>54.0|392<br/>47.4|201|54.0|||
+  |AU|arithmetic unit|ALU and data stack|1346<br/>*31.3*|1323<br/>*31.3*|1755|2 EBRs||
+  |BR|branching unit|program counter and return stack|434<br/>*31.0*|438<br/>*31.0*|333|2 EBRs||
+  |DC|decoder unit|state machines|237<br/>*32.4*|253<br/>*33.9*|211||divider patch|
+  |DP|data processor unit|shr/shl/mul/div|810<br/>*17.9*|644<br/>*21.3*|?|3 DSPs||
+  |LS|load/store unit|memory and buffer IO|350<br/>*54.0*|392<br/>*47.4*|201|54.0|||
   |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
   |||||||||
   |eJ32|top module||NA|NA|NA||segment fault|
