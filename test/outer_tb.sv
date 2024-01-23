@@ -160,7 +160,7 @@ module outer_tb #(
              `BR.asel ? xx : d8, `BR.asel ? d8 : xx,
              `BR.rp, `BR.r,
              `AU.sp, `AU.s, `AU.t,
-             code, ph, ej32.div_bsy_o ? "." : "_", code.name);
+             code, ph, ej32.dp_bsy_o ? "." : "_", code.name);
         case (code)
         invokevirtual: if (ph==2) begin
             automatic `IU nfa = to_name(ej32.p);
