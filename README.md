@@ -46,7 +46,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   |AU|arithmetic unit|ALU and data stack|1346<br/>*31.3*|1323<br/>*31.3*|1755|2 EBRs||
   |BR|branching unit|program counter and return stack|434<br/>*31.0*|438<br/>*31.0*|333|2 EBRs||
   |DC|decoder unit|state machines|237<br/>*32.4*|253<br/>*33.9*|211||divider patch|
-  |DP|data processor unit|shr/shl/mul/div|810<br/>*17.9*|644<br/>*21.3*|?|3 DSPs||
+  |DP|data processor unit|shr/shl/mul/div|810<br/>*17.9*|644<br/>*21.3*|439|3 DSPs||
   |LS|load/store unit|memory and buffer IO|350<br/>*54.0*|392<br/>*47.4*|201|54.0|||
   |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
   |||||||||
