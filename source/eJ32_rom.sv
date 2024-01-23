@@ -21,7 +21,7 @@ module EJ32_ROM #(
         .rd_clk_i(clk),
         .rst_i(rst),
         .rd_en_i(~rst),
-        .rd_clk_en_i(1'b1),
+        .rd_clk_en_i(~rst),          // clk_en=1'b0: low power mode
         .rd_addr_i(rom_a[MSZ-1:0]),
         .rd_data_o(d_o)
     );
