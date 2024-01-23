@@ -9,7 +9,7 @@ module EJ32_AU (
     EJ32_CTL ctl,
     input    `U1 au_en,         ///> arithmetic unit enable
     input    `U8 data,          ///> 8-bit data from memory bus
-    output   `U1 div_bsy_o,
+    input    `U1 div_bsy,
     output   `DU s_o,
     output   `DU au_t_o,        ///> output for arbitation
     output   `U1 au_t_x
@@ -39,43 +39,6 @@ module EJ32_AU (
     `SU sp_w;
     `U1 s_x;
     /// @}
-    /// @defgroup ALU pre-calc wires
-    /// @{
-    `DU  isht_o, iushr_o;
-    `U1  shr_f;
-    `DU2 mul_v;
-    `U1  div_en, div_bsy;
-    `DU  div_q, div_r;
-    `U1  div_z;
-    ///
-    /// extended ALU units
-    ///
-    mult      mult_inst(
-    .a(t),
-    .b(s),
-    .r(mul_v)
-    );
-    div_int   div_inst(
-    .clk(ctl.clk),
-    .rst(~div_en),
-    .x(s),
-    .y(t),
-    .busy(div_bsy),
-    .z(div_z),
-    .q(div_q),
-    .r(div_r)
-    );
-    shifter   shifter_inst(
-    .d(s),
-    .dir(shr_f),
-    .bits(t[4:0]),
-    .r(isht_o)
-    );
-    ushifter  ushifter_inst(
-    .d(s),
-    .bits(t[4:0]),
-    .r(iushr_o)
-    );
     ///
     /// data stack (using embedded block memory)
     ///
@@ -93,9 +56,10 @@ module EJ32_AU (
         .rd_data_o(s_n)        ///> read back into NOS
     );
     // data stack tasks (as macros)
-    task TOS(input `DU v); t_n = v; `SET(t_x); endtask               ///> update TOS
-    task ALU(input `DU v); TOS(v); sp_r = sp - 1; `S(sPOP); endtask  ///> t <= v, drop NOS
-    task LOAD(); ss_wen = 1'b1; `S(sPUSH); endtask                   ///> sp_r = sp, sp_w = sp + 1
+    task TOS(input `DU v); t_n = v; `SET(t_x); endtask  ///> update TOS
+    task DP(); sp_r = sp - 1; `S(sPOP);        endtask  ///> active data processor unit
+    task ALU(input `DU v); TOS(v); DP();       endtask  ///> t <= v, drop NOS
+    task LOAD(); ss_wen = 1'b1; `S(sPUSH);     endtask  ///> sp_r = sp, sp_w = sp + 1
     task PUSH(input `DU v);
         TOS(v);                
         ss_wen = 1'b1;         ///> default sp_r = sp; sp_w = sp + 1 (i.e. s <= ss[sp + 1])
@@ -111,7 +75,7 @@ module EJ32_AU (
     endtask: IBRAN
     task ZBRAN();          if (phase==1) POP();                 endtask
     task STOR(int n);      if (phase==n || phase==(n+1)) POP(); endtask
-    task DIV(input `DU v); if (phase==1 && !div_bsy) ALU(v);    endtask
+    task DIV(); if (phase==1 && !div_bsy) begin sp_r = sp - 1; `S(sPOP); end; endtask
     ///
     /// wires to reduce verbosity
     ///
@@ -119,12 +83,10 @@ module EJ32_AU (
     assign phase  = ctl.phase;
     assign t      = ctl.t;                  ///> shadow TOS from control bus
     assign t_d    = {t[`DSZ-9:0], data};    ///> merge lowest byte into TOS
-    assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     assign d2t    = `X8D(data);
     ///
     /// wired to output
     ///
-    assign div_bsy_o = div_bsy;
     assign s_o    = (s_x) ? s_n : t;
     assign au_t_o = t_n;
     assign au_t_x = t_x;
@@ -143,7 +105,6 @@ module EJ32_AU (
         ///
         /// external module control flags
         ///
-        shr_f = 1'b0;         /// shifter flag
     endtask: INIT
 
     always_comb begin
@@ -200,13 +161,13 @@ module EJ32_AU (
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
-        imul:      ALU(mul_v[`DSZ-1:0]);
-        idiv:      DIV(div_q);
-        irem:      DIV(div_r);
+        imul:      DP();
+        idiv:      DIV();
+        irem:      DIV();
         ineg:      ALU(0 - t);
-        ishl:      ALU(isht_o);
-        ishr:      begin ALU(isht_o); `SET(shr_f); end
-        iushr:     ALU(iushr_o);
+        ishl:      DP();
+        ishr:      DP();
+        iushr:     DP();
         iand:      ALU(s & t);
         ior:       ALU(s | t);
         ixor:      ALU(s ^ t);
@@ -247,21 +208,6 @@ module EJ32_AU (
             sPOP:  sp <= sp - 1;
             sPUSH: sp <= sp + 1;
             endcase
-            ///
-            /// verify divider
-            ///
-            if (div_en && !div_bsy) div_check();
          end
     end
-
-    task div_check();
-        automatic `U8 op  = code==idiv ? "/" : "%";
-        case (phase)
-        1: begin             // done div_int
-            assert(div_q == (s / t) && div_r == (s % t)) else begin
-                $display("AU.1.ERR %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
-            end
-        end
-        endcase
-    endtask: div_check
 endmodule: EJ32_AU
