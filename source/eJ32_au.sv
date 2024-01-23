@@ -73,9 +73,8 @@ module EJ32_AU (
         1: POP();
         endcase
     endtask: IBRAN
-    task ZBRAN();          if (phase==1) POP();                 endtask
-    task STOR(int n);      if (phase==n || phase==(n+1)) POP(); endtask
-    task DIV(); if (phase==1 && !div_bsy) begin sp_r = sp - 1; `S(sPOP); end; endtask
+    task ZBRAN();     if (phase==1) POP();                 endtask
+    task STOR(int n); if (phase==n || phase==(n+1)) POP(); endtask
     ///
     /// wires to reduce verbosity
     ///
@@ -162,8 +161,8 @@ module EJ32_AU (
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
         imul:      DP();
-        idiv:      DIV();
-        irem:      DIV();
+        idiv:      if (phase==1 && !div_bsy) DP();
+        irem:      if (phase==1 && !div_bsy) DP();
         ineg:      ALU(0 - t);
         ishl:      DP();
         ishr:      DP();
