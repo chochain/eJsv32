@@ -9,6 +9,7 @@ module EJ32_ROM #(
     ) (
     input  `U1 clk,
     input  `U1 rst,
+    input  `U1 rom_en,                  // 0: low power mode
     input  `IU rom_a,
     output `U8 rom_d
     );
@@ -21,7 +22,7 @@ module EJ32_ROM #(
         .rd_clk_i(clk),
         .rst_i(rst),
         .rd_en_i(~rst),
-        .rd_clk_en_i(~rst),          // clk_en=1'b0: low power mode
+        .rd_clk_en_i(rom_en),          // clk_en=1'b0: enter low power mode
         .rd_addr_i(rom_a[MSZ-1:0]),
         .rd_data_o(d_o)
     );
