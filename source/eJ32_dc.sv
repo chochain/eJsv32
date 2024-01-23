@@ -5,10 +5,12 @@
 `define AU1  au_en=1'b1
 `define BR1  br_en=1'b1
 `define LS1  ls_en=1'b1
-`define AB1  begin `AU1; `BR1; end
-`define AL1  begin `AU1; `LS1; end
-`define BL1  begin `BR1; `LS1; end
-`define ABL1 begin `AU1; `BR1; `LS1; end
+`define DP1  dp_en=1'b1
+`define AD1  {au_en,dp_en}=2'b1
+`define AB1  {au_en,br_en}=2'b1
+`define AL1  {au_en,ls_en}=2'b1
+`define BL1  {br_en,ls_en}=2'b1
+`define ABL1 {au_en,br_en,ls_en}=3'b1
 
 import ej32_pkg::*;
 
@@ -20,6 +22,7 @@ module EJ32_DC (
        output `U1 au_en,        // enable AU
        output `U1 br_en,        // enable BR
        output `U1 ls_en,        // enable LS
+       output `U1 dp_en,        // enable DIV
        output `U1 p_inc         // advance program counter
     );
     ///
@@ -85,7 +88,7 @@ module EJ32_DC (
     ///
     task BRAN(); `AB1; STEP2(); endtask  // branching ops
     task DIV();  
-        `AU1;
+        `AD1;
         case (phase)
         0: if (div_bsy) HOLD(1);
            else begin             // CC: this branch works OK
@@ -105,9 +108,7 @@ module EJ32_DC (
     /// decoder unit
     ///
     task INIT();
-        au_en   = 1'b0;
-        br_en   = 1'b0;
-        ls_en   = 1'b0;
+        {au_en, br_en, ls_en, dp_en} = 4'b0;
         code_x  = 1'b1;         ///> update opcode by default
         phase_n = 3'b0;
         p_x     = 1'b1;         ///> advance program counter by default
@@ -130,12 +131,12 @@ module EJ32_DC (
         bipush:  begin `AU1; if (phase==0) NXPH(1); end // CC: why STEP1() does not work here?
         sipush:  begin `AU1; STEP2(); end
         // return stack => data stack
-        iload:        `AB1
-        iload_0:      `AB1
-        iload_1:      `AB1
-        iload_2:      `AB1
-        iload_3:      `AB1
-        istore_0:     `AB1
+        iload:        `AB1;
+        iload_0:      `AB1;
+        iload_1:      `AB1;
+        iload_2:      `AB1;
+        iload_3:      `AB1;
+        istore_0:     `AB1;
         // LS unit (multi-cycle, waiting for TOS)
         iaload:  begin `LS1; WAIT5(); end
         baload:  begin `LS1; WAIT2(); end
@@ -154,13 +155,13 @@ module EJ32_DC (
         // AU arithmetics
         iadd:    `AU1;
         isub:    `AU1;
-        imul:    `AU1;
+        imul:    `AD1;
         idiv:    DIV();
         irem:    DIV();
         ineg:    `AU1;
-        ishl:    `AU1;
-        ishr:    `AU1;
-        iushr:   `AU1;
+        ishl:    `AD1;
+        ishr:    `AD1;
+        iushr:   `AD1;
         iand:    `AU1;
         ior:     `AU1;
         ixor:    `AU1;
@@ -184,9 +185,9 @@ module EJ32_DC (
         invokevirtual: BRAN();
         // eForth VM specific
         donext:        BRAN();
-        dupr:    `AB1
-        popr:    `AB1
-        pushr:   `AB1
+        dupr:    `AB1;
+        popr:    `AB1;
+        pushr:   `AB1;
         ldi:     begin `AL1; STEP4(); end
         get:     begin `AL1; WAIT2(); end
         put:     begin `AL1; WAIT1(); end
