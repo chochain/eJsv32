@@ -62,12 +62,7 @@ module EJ32_DP (
     );
     // data stack tasks (as macros)
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask
-    task DIV(input `DU v); 
-        case (phase)
-        0: t_x = !div_bsy;
-        1: t_n = v;
-        endcase
-    endtask: DIV
+    task DIV(input `DU v); if (phase==1 && !div_bsy) TOS(v); endtask
     ///
     /// wires to reduce verbosity
     ///
