@@ -5,9 +5,7 @@
 
 `define S(op) ss_op=op
 
-module EJ32_AU #(
-    parameter DSZ = 32          ///> 32-bit data width
-    ) (
+module EJ32_AU (
     EJ32_CTL ctl,
     input    `U1 au_en,         ///> arithmetic unit enable
     input    `U8 data,          ///> 8-bit data from memory bus
@@ -120,7 +118,7 @@ module EJ32_AU #(
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;                  ///> shadow TOS from control bus
-    assign t_d    = {t[DSZ-9:0], data};     ///> merge lowest byte into TOS
+    assign t_d    = {t[`DSZ-9:0], data};    ///> merge lowest byte into TOS
     assign div_en = (code==idiv || code==irem) && phase!=0;  // wait 1 cycle for TOS
     assign d2t    = `X8D(data);
     ///
@@ -202,7 +200,7 @@ module EJ32_AU #(
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
-        imul:      ALU(mul_v[DSZ-1:0]);
+        imul:      ALU(mul_v[`DSZ-1:0]);
         idiv:      DIV(div_q);
         irem:      DIV(div_r);
         ineg:      ALU(0 - t);

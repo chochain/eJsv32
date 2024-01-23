@@ -5,10 +5,7 @@
 
 `define R(op) rs_op=op
 
-module EJ32_BR #(
-    parameter DSZ = 32,         ///> 32-bit data width
-    parameter ASZ = 17          ///> 128K address space
-    ) (
+module EJ32_BR (
     EJ32_CTL ctl,               ///> eJ32 control bus
     input    `U1 br_en,         ///> branching unit active
     input    `IU p,             ///> instruction pointer
@@ -100,9 +97,9 @@ module EJ32_BR #(
     assign phase  = ctl.phase;
     assign t      = ctl.t;
     assign t_z    = t == 0;               ///> zero flag
-    assign t_neg  = t[DSZ-1];             ///> negative flag
-    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into t
-    assign a_d    = {a[ASZ-9:0], data};   ///> merge lowest byte into addr
+    assign t_neg  = t[`DSZ-1];            ///> negative flag
+    assign t_d    = {t[`DSZ-9:0], data};  ///> merge lowest byte into t
+    assign a_d    = {a[`ASZ-9:0], data};  ///> merge lowest byte into addr
     assign d2a    = `X8A(data);
     ///
     /// wired to output
@@ -115,17 +112,17 @@ module EJ32_BR #(
     /// combinational
     ///
     task INIT();
-        a_n     = {ASZ{1'b0}};
+        a_n     = {`ASZ{1'b0}};
         asel_n  = 1'b0;
         a_x     = 1'b0;
-        t_n     = {DSZ{1'b0}};  /// TOS
+        t_n     = {`DSZ{1'b0}};  /// TOS
         t_x     = 1'b0;
         rs_op   = sNOP;
         rs_ren  = 1'b1;
         rs_wen  = 1'b0;
         rp_w    = rp + 1;
         rp_r    = rp;
-        r_n     = {DSZ{1'b0}};
+        r_n     = {`DSZ{1'b0}};
     endtask: INIT
 
     always_comb begin
@@ -185,7 +182,7 @@ module EJ32_BR #(
 
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
-            a    <= {ASZ{1'b0}};     /// init address
+            a    <= {`ASZ{1'b0}};    /// init address
             asel <= 1'b0;
             rp   <= '0;
         end

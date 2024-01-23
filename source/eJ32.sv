@@ -10,10 +10,6 @@ module EJ32 #(
     parameter MEM0 = 'h0,       ///> base memory address
     parameter TIB  = 'h1000,    ///> input buffer ptr
     parameter OBUF = 'h1400,    ///> output buffer ptr
-    parameter DSZ  = 32,        ///> 32-bit data width
-    parameter ASZ  = 17,        ///> 17-bit (128Kb) address width
-    parameter SS_DEPTH = 64,    ///> data stack depth (v2 - hardcoded in ERB netlist)
-    parameter RS_DEPTH = 64,    ///> return stack depth (v2 - hardcoded in ERB netlist)
     parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
     ) (
@@ -45,10 +41,10 @@ module EJ32 #(
     ///
     /// EJ32 core modules
     ///
-    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);              ///> decoder unit
-    EJ32_AU     #(DSZ)       au(.*);                      ///> arithmetic unit
-    EJ32_BR     #(DSZ, ASZ)  br(.*);                      ///> branching unit
-    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.s(s_o), .*);   ///> load/store unit
+    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);     ///> decoder unit
+    EJ32_AU     au(.*);                          ///> arithmetic unit
+    EJ32_BR     br(.*);                          ///> branching unit
+    EJ32_LS     #(TIB, OBUF) ls(.s(s_o), .*);    ///> load/store unit
     ///
     /// eForth image loader from ROM into RAM
     ///
@@ -61,7 +57,7 @@ module EJ32 #(
         else if (rom_a < ROM_SZ) begin           ///> copy ROM into RAM byte-by-byte
             p_n    <= rom_a - 1;                 ///> RAM is 1-cycle behind
             rom_a  <= rom_a + 1;
-            ctl.t  <= {{ASZ-8{1'b0}}, rom_d};
+            ctl.t  <= {{`ASZ-8{1'b0}}, rom_d};
         end
         else begin
             p_n    <= COLD;                      ///> switch on DC, cold start address
@@ -108,7 +104,7 @@ module EJ32 #(
         else if (rom_en) COPY_ROM();             ///> copy eForth image from ROM into RAM
         else begin
             UPDATE_TOS();                        ///> arbitrate TOS update
-            p_n <= p + {{ASZ-1{1'b0}}, p_inc};   ///> advance instruction address
+            p_n <= p + {{`ASZ-1{1'b0}}, p_inc};  ///> advance instruction address
         end
     end
 endmodule: EJ32
