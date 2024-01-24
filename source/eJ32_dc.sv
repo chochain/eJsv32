@@ -6,11 +6,11 @@
 `define BR1  br_en=1'b1
 `define LS1  ls_en=1'b1
 `define DP1  dp_en=1'b1
-`define AD1  {au_en,dp_en}=2'b1
-`define AB1  {au_en,br_en}=2'b1
-`define AL1  {au_en,ls_en}=2'b1
-`define BL1  {br_en,ls_en}=2'b1
-`define ABL1 {au_en,br_en,ls_en}=3'b1
+`define AD1  {au_en,dp_en}=2'b11
+`define AB1  {au_en,br_en}=2'b11
+`define AL1  {au_en,ls_en}=2'b11
+`define BL1  {br_en,ls_en}=2'b11
+`define ABL1 {au_en,br_en,ls_en}=3'b111
 
 import ej32_pkg::*;
 
@@ -108,7 +108,7 @@ module EJ32_DC (
     /// decoder unit
     ///
     task INIT();
-        {au_en, br_en, ls_en, dp_en} = 4'b0;
+        {au_en, br_en, ls_en, dp_en} = 4'b0000;
         code_x  = 1'b1;         ///> update opcode by default
         phase_n = 3'b0;
         p_x     = 1'b1;         ///> advance program counter by default
