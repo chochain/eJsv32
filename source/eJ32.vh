@@ -17,7 +17,7 @@ package ej32_pkg;
 `define IU logic[`ASZ-1:0]         /* instruction address */
 `define SU logic[`SSZ-1:0]         /* stack pointers      */
 `define DU logic[`DSZ-1:0]         /* data unit           */
-`define DU2 logic[63:0]            /* double data (mul)   */
+`define DU2 logic[(`DSZ*2)-1:0]    /* double data (mul)   */
 //
 // data conversion macros
 //
