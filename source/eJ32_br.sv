@@ -9,7 +9,7 @@ module EJ32_BR (
     EJ32_CTL ctl,               ///> eJ32 control bus
     input    `U1 br_en,         ///> branching unit active
     input    `IU p,             ///> instruction pointer
-    input    `U8 data,          ///> data from memory bus
+    input    `U8 ram_d,         ///> data from memory bus
     output   `IU br_p_o,        ///> target instruction pointer
     output   `U1 br_psel,
     output   `DU br_t_o,        ///> TOS for arbitration
@@ -96,11 +96,11 @@ module EJ32_BR (
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = t == 0;               ///> zero flag
-    assign t_neg  = t[`DSZ-1];            ///> negative flag
-    assign t_d    = {t[`DSZ-9:0], data};  ///> merge lowest byte into t
-    assign a_d    = {a[`ASZ-9:0], data};  ///> merge lowest byte into addr
-    assign d2a    = `X8A(data);
+    assign t_z    = t == 0;                ///> zero flag
+    assign t_neg  = t[`DSZ-1];             ///> negative flag
+    assign t_d    = {t[`DSZ-9:0], ram_d};  ///> merge lowest byte into t
+    assign a_d    = {a[`ASZ-9:0], ram_d};  ///> merge lowest byte into addr
+    assign d2a    = `X8A(ram_d);
     ///
     /// wired to output
     ///
@@ -129,7 +129,7 @@ module EJ32_BR (
         INIT();
         case (code)
         // return stack => TOS
-        iload:     RLOAD(rp - data);    // CC: not tested, multi-cycle needed?
+        iload:     RLOAD(rp - ram_d);   // CC: not tested, multi-cycle needed?
         iload_0:   RLOAD(rp);           // CC: not tested
         iload_1:   RLOAD(rp - 1);       // CC: not tested
         iload_2:   RLOAD(rp - 2);       // CC: not tested

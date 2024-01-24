@@ -17,15 +17,15 @@ module EJ32 #(
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
     `U1  dc_en, dp_en, rom_en;
-    `IU  p, p_n;                ///> program counter
     `U8  rom_wait;              ///> ROM wait cycles for EBR to stablize read
     `IU  rom_a;                 ///> ROM address pointer
-    `U8  rom_d, data;           ///> data return from memory bus
-    `U1  p_inc;                 ///> program counter advance flag
-    `U1  dp_bsy_o;              ///> Data processor/divider busy flag
+    `U8  rom_d, ram_d;          ///> data return from ROM and RAM bus
     `DU  s_o;                   ///> NOS (AU -> LS)
+    `IU  p, p_n;                ///> program counter
+    `U1  p_inc;                 ///> program counter advance flag
     `IU  br_p_o;                ///> BR branching target
     `U1  br_psel;               ///> BR branching target select
+    `U1  dp_bsy_o;              ///> Data processor/divider busy flag
     ///
     /// TOS from modules for arbitration
     ///
@@ -80,7 +80,11 @@ module EJ32 #(
         4'b0100: ctl.t <= br_t_o;
         4'b0010: ctl.t <= ls_t_o;
         4'b0001: ctl.t <= dp_t_o;
-        default: $display("TOS Arbiter ERR t_x=%x", sel);
+        default: begin
+            $display("ERR: TOS Arbiter code=%s, phase=%d, t_x=%x", 
+                     ctl.code.name, ctl.phase, sel);
+            ctl.t <= au_t_o;                      ///> patch
+        end
         endcase
     endtask: UPDATE_TOS
     ///
@@ -89,7 +93,7 @@ module EJ32 #(
     assign ctl.clk = clk;                        ///> clock driver
     assign ctl.rst = rst;
     assign p       = br_psel ? br_p_o : p_n;     ///> branch target
-    assign data    = b8_if.vo;                   ///> data fetched from SRAM (1-cycle)
+    assign ram_d   = b8_if.vo;                   ///> data fetched from SRAM (1-cycle)
 
     always_ff @(posedge clk) begin
         if (rst) begin

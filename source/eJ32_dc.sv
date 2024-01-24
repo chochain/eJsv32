@@ -17,7 +17,7 @@ import ej32_pkg::*;
 module EJ32_DC (
        EJ32_CTL ctl,
        input  `U1 dc_en,        // decoder unit enable
-       input  `U8 data,         // byte return from memory bus
+       input  `U8 ram_d,        // byte return from memory bus
        input  `U1 div_bsy,      // AU divider busy
        output `U1 au_en,        // enable AU
        output `U1 br_en,        // enable BR
@@ -204,7 +204,7 @@ module EJ32_DC (
     ///
     always_comb begin
         // fetch instruction
-        if (!$cast(code_n, data)) begin
+        if (!$cast(code_n, ram_d)) begin
             /// JVM opcodes, some are not avialable yet
             code_n = op_err;
         end
