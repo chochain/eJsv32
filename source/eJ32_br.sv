@@ -115,7 +115,7 @@ module EJ32_BR (
         a_n     = {`ASZ{1'b0}};
         asel_n  = 1'b0;
         a_x     = 1'b0;
-        t_n     = {`DSZ{1'b0}};  /// TOS
+        t_n     = 'hbbfeedbb;
         t_x     = 1'b0;
         rs_op   = sNOP;
         rs_ren  = 1'b1;

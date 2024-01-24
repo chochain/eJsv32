@@ -91,7 +91,7 @@ module EJ32_LS #(
     /// combinational
     ///
     task INIT();
-        t_n       = {`DSZ{1'b0}}; /// TOS
+        t_n       = 'hccfeedcc;   /// TOS
         t_x       = 1'b0;
         a_n       = {`ASZ{1'b0}}; /// default to clear address
         a_x       = 1'b0;

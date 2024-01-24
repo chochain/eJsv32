@@ -93,7 +93,7 @@ module EJ32_AU (
     /// combinational
     ///
     task INIT();
-        t_n   = t;
+        t_n   = 'haafeedaa;
         t_x   = 1'b0;
         ss_op = sNOP;         /// data stack
         ss_ren= 1'b1;

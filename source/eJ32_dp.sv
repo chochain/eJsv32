@@ -79,7 +79,7 @@ module EJ32_DP (
     /// combinational
     ///
     always_comb begin
-        t_n   = t;
+        t_n   = 'hddfeeddd;
         t_x   = 1'b0;
         shr_f = 1'b0;         /// shift left
         ///
