@@ -73,17 +73,25 @@ module EJ32 #(
     /// TOS update arbitrator
     ///
     task UPDATE_TOS();
-        automatic logic[3:0] sel = { au_t_x, br_t_x, ls_t_x, dp_t_x };
+        automatic logic[3:0] sel = { 
+            au_en && au_t_x, br_en && br_t_x, ls_en && ls_t_x, dp_en && dp_t_x 
+        };
+        automatic logic[3:0] xx = {
+            !au_en && au_t_x, !br_en && br_t_x, !ls_en && ls_t_x, !dp_en && dp_t_x
+        };
+        if (xx != 4'b0) begin
+            $display("WARN: TOS Arbiter code=%d.%s, au=%x%x, br=%x%x, ls=%x%x, dp=%x%x", 
+                     ctl.phase, ctl.code.name,
+                     au_en, au_t_x, br_en, br_t_x, ls_en, ls_t_x, dp_en, dp_t_x);
+        end
         case (sel)
-        4'b0000: begin end // OK, ctl.t stays the same
+        4'b0000: begin end         // OK, ctl.t stays the same
         4'b1000: ctl.t <= au_t_o;
         4'b0100: ctl.t <= br_t_o;
         4'b0010: ctl.t <= ls_t_o;
         4'b0001: ctl.t <= dp_t_o;
         default: begin
-            $display("ERR: TOS Arbiter code=%s, phase=%d, t_x=%x", 
-                     ctl.code.name, ctl.phase, sel);
-            ctl.t <= au_t_o;                      ///> patch
+            $display("ERR: TOS Arbiter code=%.%s, t_x=%x", ctl.phase, ctl.code.name, sel);
         end
         endcase
     endtask: UPDATE_TOS
