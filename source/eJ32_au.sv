@@ -8,7 +8,7 @@
 module EJ32_AU (
     EJ32_CTL ctl,
     input    `U1 au_en,         ///> arithmetic unit enable
-    input    `U8 data,          ///> 8-bit data from memory bus
+    input    `U8 ram_d,         ///> 8-bit data from memory bus
     input    `U1 div_bsy,
     output   `DU s_o,
     output   `DU au_t_o,        ///> output for arbitation
@@ -57,16 +57,16 @@ module EJ32_AU (
     );
     // data stack tasks (as macros)
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask  ///> update TOS
-    task DP(); sp_r = sp - 1; `S(sPOP);        endtask  ///> active data processor unit
-    task ALU(input `DU v); TOS(v); DP();       endtask  ///> t <= v, drop NOS
+    task DROP(); sp_r = sp - 1; `S(sPOP);      endtask  ///> drop NOS
+    task ALU(input `DU v); TOS(v); DROP();     endtask  ///> t <= (t op s)
     task LOAD(); ss_wen = 1'b1; `S(sPUSH);     endtask  ///> sp_r = sp, sp_w = sp + 1
+    task POP(); ALU(s);                        endtask  ///> replace TOS with NOS
     task PUSH(input `DU v);
         TOS(v);                
         ss_wen = 1'b1;         ///> default sp_r = sp; sp_w = sp + 1 (i.e. s <= ss[sp + 1])
         s_x    = 1'b0;         ///> current cycle: s <= t (s_o no need to wait one extra cycle)
         `S(sPUSH);
     endtask: PUSH
-    task POP(); ALU(s); endtask                                      ///> replace TOS with NOS
     task IBRAN();              ///> conditional branch
         case (phase)
         0: ALU(s - t);
@@ -81,12 +81,12 @@ module EJ32_AU (
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;                  ///> shadow TOS from control bus
-    assign t_d    = {t[`DSZ-9:0], data};    ///> merge lowest byte into TOS
-    assign d2t    = `X8D(data);
+    assign t_d    = {t[`DSZ-9:0], ram_d};   ///> merge lowest byte into TOS
+    assign d2t    = `X8D(ram_d);
     ///
     /// wired to output
     ///
-    assign s_o    = (s_x) ? s_n : t;
+    assign s_o    = s;  // (s_x) ? s_n : t;
     assign au_t_o = t_n;
     assign au_t_x = t_x;
     ///
@@ -122,7 +122,7 @@ module EJ32_AU (
         iconst_4:    PUSH(4);
         iconst_5:    PUSH(5);
         // data => TOS
-        bipush: if (phase==0) PUSH(d2t);
+        bipush:      if (phase==0) PUSH(d2t);
         sipush:                     // CC: not tested
             case (phase)
             0: PUSH(d2t);
@@ -160,13 +160,13 @@ module EJ32_AU (
         // arithmetic ops
         iadd:      ALU(s + t);
         isub:      ALU(s - t);
-        imul:      DP();
-        idiv:      if (phase==1 && !div_bsy) DP();
-        irem:      if (phase==1 && !div_bsy) DP();
+        imul:      DROP();
+        idiv:      if (phase==1 && !div_bsy) DROP();
+        irem:      if (phase==1 && !div_bsy) DROP();
         ineg:      ALU(0 - t);
-        ishl:      DP();
-        ishr:      DP();
-        iushr:     DP();
+        ishl:      DROP();
+        ishr:      DROP();
+        iushr:     DROP();
         iand:      ALU(s & t);
         ior:       ALU(s | t);
         ixor:      ALU(s ^ t);
