@@ -28,8 +28,8 @@ module EJ32_DP (
     `DU  isht, iushr;
     `DU2 mul_v;
     `U1  div_bsy;
-    `DU  div_q, div_r, div_v;
-    `U1  div_z, shr_f;
+    `DU  div_q, div_r;
+    `U1  div_z, div_op, shr_f;
     /// @}
     ///
     /// Extended Arithmetic units
@@ -62,17 +62,18 @@ module EJ32_DP (
     );
     // data stack tasks (as macros)
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask
-    task DIV(input `DU v); if (phase==1 && !div_bsy) TOS(v); endtask
+    task DIV(input `DU v); if (phase==1 && !div_bsy) TOS(v); endtask // wait for s <= pop
     ///
     /// wires to reduce verbosity
     ///
     assign code   = ctl.code;               ///> input from ej32 control
     assign phase  = ctl.phase;
     assign t      = ctl.t;
+    assign div_op = (code==idiv || code==irem);
     ///
     /// wired to output
     ///
-    assign dp_bsy_o = div_bsy;
+    assign dp_bsy_o = div_op && div_bsy;
     assign dp_t_o   = t_n;
     assign dp_t_x   = t_x;
     ///
@@ -92,26 +93,22 @@ module EJ32_DP (
         ishl:  TOS(isht);
         ishr:  begin `SET(shr_f); TOS(isht); end
         iushr: TOS(iushr);
+        default: begin end
         endcase
     end
-   
+
     always_ff @(posedge ctl.clk) begin
-        if (ctl.rst) begin
-            div_v <= t;
+        if (dp_en) begin
+            if (div_op && !div_bsy) div_check();
         end
-        else if (dp_en) begin
-            div_v <= code==idiv ? div_q : (code==irem ? div_r : t);
-           
-            if (!div_bsy) div_check();
-         end
     end
 
     task div_check();
-        automatic `U8 op  = code==idiv ? "/" : "%";
+        automatic `U8 op = code==idiv ? "/" : "%";
         case (phase)
-        1: begin             // done div_int
+        1: begin              // when divider completed
             assert(div_q == (s / t) && div_r == (s % t)) else begin
-                $display("AU.1.ERR %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
+                $display("DIV.ERR %8x %c %8x => %8x..%8x", s, op, t, div_q, div_r);
             end
         end
         endcase
