@@ -44,7 +44,7 @@ module EJ32_DP (
     .rst(~dp_en),
     .x(s),
     .y(t),
-    .busy(div_bsy),
+    .bsy(div_bsy),
     .z(div_z),
     .q(div_q),
     .r(div_r)
