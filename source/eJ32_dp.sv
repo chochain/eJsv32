@@ -41,7 +41,7 @@ module EJ32_DP (
     );
     div_int   div_inst(
     .clk(ctl.clk),
-    .rst(~dp_en),
+    .rst(~div_en),
     .x(s),
     .y(t),
     .bsy(div_bsy),
@@ -70,6 +70,7 @@ module EJ32_DP (
     assign phase  = ctl.phase;
     assign t      = ctl.t;
     assign div_op = (code==idiv || code==irem);
+    assign div_en = div_op && phase!=0;     ///> wait one cycle for s 
     ///
     /// wired to output
     ///
