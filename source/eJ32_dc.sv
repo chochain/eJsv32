@@ -199,7 +199,7 @@ module EJ32_DC (
     ///
     assign ctl.phase = phase;
     assign ctl.code  = code;
-    assign p_inc     = p_x; // || (phase==0 && !div_bsy);   // CC: patch, why DIV skip branch?
+    assign p_inc     = p_x;
     ///
     /// instruction unit
     ///

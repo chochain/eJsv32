@@ -86,7 +86,7 @@ module EJ32_AU (
     ///
     /// wired to output
     ///
-    assign s_o    = s;  // (s_x) ? s_n : t;
+    assign s_o    = s;
     assign au_t_o = t_n;
     assign au_t_x = t_x;
     ///
@@ -187,7 +187,7 @@ module EJ32_AU (
         // eForth VM specific
         dupr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
         popr:      begin LOAD(); s_x = 1'b0; end        ///> load from return stack
-        pushr:     POP();
+        pushr:     POP();                               ///> with short cut (see s_o above)
         ldi:       if (phase==0) PUSH(d2t);
         get:       if (phase==0) LOAD();
         put:       if (phase==1) POP();
