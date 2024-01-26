@@ -43,11 +43,11 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   |--|--|--|--|--|--|--|--|
   |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>166.5|17<br/>272.9|49|8-bit<br/>16 EBR blocks||
   |RAM|memory|128K bytes onboard RAM|48<br/>2392.3|49<br/>2392.3|48|8-bit<br/>pseudo-dual port||
-  |AU|arithmetic unit|ALU and data stack|1346<br/>*31.3*|1323<br/>*31.3*|1755|2 EBRs||
-  |BR|branching unit|program counter and return stack|434<br/>*31.0*|438<br/>*31.0*|333|2 EBRs||
-  |DC|decoder unit|state machines|237<br/>*32.4*|253<br/>*33.9*|211||divider patch|
-  |DP|data processor unit|shr/shl/mul/div|810<br/>*17.9*|644<br/>*21.3*|439|3 DSPs||
-  |LS|load/store unit|memory and buffer IO|350<br/>*54.0*|392<br/>*47.4*|201|54.0|||
+  |AU|arithmetic unit|ALU and data stack|928<br/>*31.3*|939<br/>*31.3*|1755|2 EBRs||
+  |BR|branching unit|program counter and return stack|425<br/>*26.8*|435<br/>*31.0*|333|2 EBRs||
+  |DC|decoder unit|state machines|194<br/>*34.7*|193<br/>*39.8*|211||divider patch|
+  |DP|data processor unit|shr/shl/mul/div|731<br/>*17.9*|621<br/>*21.3*|439|3 DSPs||
+  |LS|load/store unit|memory and buffer IO|522<br/>*54.0*|530<br/>*47.4*|201|54.0|||
   |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
   |||||||||
   |eJ32|top module||NA|NA|NA||segment fault|
@@ -57,7 +57,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   
   TODO:
   * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
-  * tune AU for 24MHz (i.g. set_multicycle_path on divider, immd register)
+  * tune DP for 24MHz (i.g. set_multicycle_path on divider, immd register)
   * combine IU (instruction unit, in eJ32.sv) and BR
   * BR add R (top of return stack) register to help EBR slow path
   * AU add S (NOS) register to help EBR slow path
@@ -112,8 +112,9 @@ For the 6 test cases Dr. Ting gave, they take ~520K cycles.
 
   |units|instructions (in K)|total cycles(in K)|note|
   |--|--|--|--|
-  |AU ony|108|173|idiv,irem takes 14K cycles|
+  |AU only|108|159|mostly 1 cycle|
   |BR only|10|20|jreturn|
+  |DP only|0.4|14|idiv,irem,imul,ishr|
   |LS only|24|112|b/i/saload|
   |AU + BR|50|145||
   |AU + LS|14|69||
