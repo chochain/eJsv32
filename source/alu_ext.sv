@@ -42,7 +42,7 @@ module div_int(
     input  `U1  rst,       // start signal
     input  `DU  x,         // dividend
     input  `DU  y,         // divisor
-    output `U1  busy,      // calculation in progress
+    output `U1  bsy,       // calculation in progress
     output `U1  z,         // divide by zero flag
     output `DU  q,         // quotient
     output `DU  r          // remainder
@@ -55,33 +55,33 @@ module div_int(
     assign z = r==0;
       
     always_comb begin
-        automatic `U1 pos = r1 >= {1'b0, r};
-        automatic `DX ry  = r1 - r;
-        { r_n, q_n } = pos
+        automatic `U1 ca = r1 >= {1'b0, r};     ///> carry flag
+        automatic `DX ry = r1 - r;              ///> subtract
+        { r_n, q_n } = ca
                        ? { ry[`DSZ-1:0], q, 1'b1 }
                        : { r1[`DSZ-1:0], q, 1'b0 };
     end
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            i    <= ~0;                // cycle counter 31->0
-            r    <= y;                 // keep y's copy, b/c ss[sp] update in 1st cycle
-            busy <= 1'b1;
-            {r1, q}  <= {{`DSZ{1'b0}}, x, 1'b0};   // 65-bit shifter
+            i   <= ~0;                // cycle counter 31->0
+            r   <= y;                 // keep y's copy, b/c ss[sp] update in 1st cycle
+            bsy <= 1'b1;
+            {r1, q} <= {{`DSZ{1'b0}}, x, 1'b0};   // 65-bit shifter
         end
         else if (x==0) begin
            r   <= 0;
            q   <= 0;
-           busy<= 1'b0;
+           bsy <= 1'b0;
         end
-        else if (busy) begin
-            if (i==0) begin            // last bit
-                busy <= 1'b0;
-                r    <= r_n[`DSZ:1];   // undo final shift
+        else if (bsy) begin
+            if (i==0) begin           // last bit
+                bsy <= 1'b0;
+                r   <= r_n[`DSZ:1];   // undo final shift
             end
-            else r1  <= r_n;           // next digit
+            else r1 <= r_n;           // next digit
             q <= q_n;
-            i <= i - 'h1;              // cycle counter
+            i <= i - 'h1;             // cycle counter
         end
     end
 endmodule: div_int
