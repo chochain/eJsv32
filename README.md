@@ -55,7 +55,8 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
   
-  TODO:
+  To refactor:
+  * make all outputs registered (sync sub-blocks)
   * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
   * tune DP for 24MHz (i.g. set_multicycle_path on divider, immd register)
   * combine IU (instruction unit, in eJ32.sv) and BR
