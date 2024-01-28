@@ -13,27 +13,27 @@ import ej32_pkg::*;
 `define U5 logic[4:0]           /* 32-bit shift */
 
 module shifter(
-	input	`DU  d,
-	input	`U1  dir,
-	input	`U5  bits,
-	output	`DU  r
+    input    `DU  d,
+    input    `U1  dir,
+    input    `U5  bits,
+    output   `DU  r
     );
-    assign r = dir ? d << bits : d >> bits;
+    assign r = dir ? d >> bits : d << bits;
 endmodule
 
 module ushifter(
-	input	`DU  d,
-	input	`U5  bits,
-	output	`DU  r
+    input    `DU  d,
+    input    `U5  bits,
+    output   `DU  r
     );
     assign r = $unsigned(d) >> bits;
 endmodule
 
 module mult(
-	input  `DU  a,
+    input  `DU  a,
     input  `DU  b,
-	output `DU2 r
-	);
+    output `DU2 r
+    );
     assign r = a * b;
 endmodule
 
@@ -48,12 +48,12 @@ module div_int(
     output `DU  r          // remainder
     );
     logic [$clog2(`DSZ)-1:0] i;        // iteration counter
-    `DX r_n, r1;           // accumulators (1 bit wider) 
+    `DX r_n, r1;           // accumulators (1 bit wider)
     `DU q_n;               // intermediate quotient
     ///
     /// wire output port
     assign z = r==0;
-      
+
     always_comb begin
         automatic `U1 ca = r1 >= {1'b0, r};     ///> carry flag
         automatic `DX ry = r1 - r;              ///> subtract
@@ -81,7 +81,7 @@ module div_int(
             end
             else r1 <= r_n;           // next digit
             q <= q_n;
-            i <= i - 'h1;             // cycle counter
+            i <= i - 1'b1;            // cycle counter
         end
     end
 endmodule: div_int
