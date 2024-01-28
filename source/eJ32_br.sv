@@ -65,8 +65,8 @@ module EJ32_BR (
         .rd_data_o(r)           ///> read back into r
     );
     // return stack ops
-    task TOS(input `DU d); t_n = d; `SET(t_x); endtask
-    task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
+    task TOS(input `DU d); t_n = d; `SET(t_x);           endtask
+    task RLOAD(input `IU a); rp_r = a[`SSZ-1:0]; TOS(r); endtask
     task RPUSH(input `DU d); 
          rs_wen = 1'b1;         ///> rp_w = rp + 1, default
          r_n    = d;
@@ -120,7 +120,7 @@ module EJ32_BR (
         rs_op   = sNOP;
         rs_ren  = 1'b1;
         rs_wen  = 1'b0;
-        rp_w    = rp + 1;
+        rp_w    = rp + 1'b1;
         rp_r    = rp;
         r_n     = {`DSZ{1'b0}};
     endtask: INIT
@@ -193,8 +193,8 @@ module EJ32_BR (
 
             // return stack
             case (rs_op)
-            sPOP:  rp <= rp - 1;
-            sPUSH: rp <= rp + 1;
+            sPOP:  rp <= rp - 1'b1;
+            sPUSH: rp <= rp + 1'b1;
             endcase
         end
     end

@@ -186,8 +186,8 @@ module EJ32_LS #(
             asel <= asel_n;
             if (a_x)     a    <= a_n;
             if (dsel_x)  dsel <= dsel_n;
-            if (ibuf_x)  ibuf <= ibuf + 'h1;
-            if (obuf_x)  obuf <= obuf + 'h1;
+            if (ibuf_x)  ibuf <= ibuf + 1'b1;
+            if (obuf_x)  obuf <= obuf + 1'b1;
         end
     end
 endmodule: EJ32_LS

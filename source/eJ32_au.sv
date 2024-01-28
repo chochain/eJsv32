@@ -57,12 +57,12 @@ module EJ32_AU (
     );
     // data stack tasks (as macros)
     task TOS(input `DU v); t_n = v; `SET(t_x); endtask  ///> update TOS
-    task DROP(); sp_r = sp - 1; `S(sPOP);      endtask  ///> drop NOS
+    task DROP(); sp_r = sp - 1'b1; `S(sPOP);   endtask  ///> drop NOS
     task ALU(input `DU v); TOS(v); DROP();     endtask  ///> t <= (t op s)
     task LOAD(); ss_wen = 1'b1; `S(sPUSH);     endtask  ///> sp_r = sp, sp_w = sp + 1
     task POP(); ALU(s);                        endtask  ///> replace TOS with NOS
     task PUSH(input `DU v);
-        TOS(v);                
+        TOS(v);
         ss_wen = 1'b1;         ///> default sp_r = sp; sp_w = sp + 1 (i.e. s <= ss[sp + 1])
         s_x    = 1'b0;         ///> current cycle: s <= t (s_o no need to wait one extra cycle)
         `S(sPUSH);
@@ -98,7 +98,7 @@ module EJ32_AU (
         ss_op = sNOP;         /// data stack
         ss_ren= 1'b1;
         ss_wen= 1'b0;
-        sp_w  = sp + 1;
+        sp_w  = sp + 1'b1;
         sp_r  = sp;
         s_x   = 1'b1;         /// use ss return
         ///
@@ -153,7 +153,7 @@ module EJ32_AU (
         swap:      begin           ///> s <= t, t <= s (in one cycle), ss_op = sNOP
             TOS(s);
             ss_wen = 1'b1;
-            sp_r   = sp - 1;
+            sp_r   = sp - 1'b1;
             sp_w   = sp;           ///> update NOS (and read in next cycle)
             s_x    = 1'b0;         ///> s <= t (update s directly in current cycle)
         end
@@ -204,9 +204,9 @@ module EJ32_AU (
             s  <= s_x ? s_n : t;
             // data stack
             case (ss_op)
-            sPOP:  sp <= sp - 1;
-            sPUSH: sp <= sp + 1;
+            sPOP:  sp <= sp - 1'b1;
+            sPUSH: sp <= sp + 1'b1;
             endcase
-         end
+        end
     end
 endmodule: EJ32_AU

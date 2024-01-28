@@ -56,11 +56,11 @@ module EJ32 #(
         if (rom_wait > 0) begin
             p_n    <= 'h0;
             rom_a  <= 'h0;
-            rom_wait <= rom_wait - 1;
+            rom_wait <= rom_wait - 1'b1;
         end
         else if (rom_a < ROM_SZ) begin           ///> copy ROM into RAM byte-by-byte
-            p_n    <= rom_a - 1;                 ///> RAM is 1-cycle behind
-            rom_a  <= rom_a + 1;
+            p_n    <= rom_a - 1'b1;              ///> RAM is 1-cycle behind
+            rom_a  <= rom_a + 1'b1;
             ctl.t  <= {{`ASZ-8{1'b0}}, rom_d};
         end
         else begin
