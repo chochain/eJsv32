@@ -1,0 +1,40 @@
+<Project Name="/home/gnii/devel/fpga/eJsv32/config/eJsv32_jtag.rvl" Date="2024-01-29" ModBy="Inserter" SigType="0">
+    <IP Version="1_6_042617"/>
+    <Design DesignName="ej32" DeviceFamily="iCE40UP" Synthesis="lse" JTAG="soft" DesignEntry="Schematic/Verilog HDL"/>
+    <Core Insert="1" Name="top_LA0" ID="0" InsertDataset="0" Reveal_sig="544905957">
+        <Setting>
+            <Clock SampleClk="oclk" SampleEnable="0" EnableClk="" EnableClk_Pri="0"/>
+            <TraceBuffer Implementation="0" IncTrigSig="1" hasTimeStamp="1" BitTimeStamp="13" BufferDepth="512"/>
+            <Capture Mode="1" MinSamplesPerTrig="16"/>
+            <Event CntEnable="0" MaxEventCnt="8"/>
+            <TrigOut TrigOutNetType="0" Polarity="0" EnableTrigOut="0" MinPulseWidth="0" TrigOutNet="reveal_debug_top_LA0_net"/>
+            <DistRAM Disable="1"/>
+        </Setting>
+        <Dataset Name="Base">
+            <Trace>
+                <Bus Name="p16">
+                    <Sig Name="p:0" Type="SIG"/>
+                    <Sig Name="p:1" Type="SIG"/>
+                    <Sig Name="p:2" Type="SIG"/>
+                    <Sig Name="p:4" Type="SIG"/>
+                    <Sig Name="p:5" Type="SIG"/>
+                    <Sig Name="p:6" Type="SIG"/>
+                    <Sig Name="p:7" Type="SIG"/>
+                    <Sig Name="p:8" Type="SIG"/>
+                    <Sig Name="p:9" Type="SIG"/>
+                    <Sig Name="p:10" Type="SIG"/>
+                    <Sig Name="p:11" Type="SIG"/>
+                    <Sig Name="p:12" Type="SIG"/>
+                    <Sig Name="p:13" Type="SIG"/>
+                    <Sig Name="p:14" Type="SIG"/>
+                    <Sig Name="p:15" Type="SIG"/>
+                </Bus>
+                <Sig Name="rst" Type="SIG"/>
+            </Trace>
+            <Trigger>
+                <TU Sig="p:0,p:1,p:2,p:3," ID="1" Type="0" Serialbits="0"/>
+                <TE Resource="1" MaxEvnCnt="1" ID="1" MaxSequence="1"/>
+            </Trigger>
+        </Dataset>
+    </Core>
+</Project>

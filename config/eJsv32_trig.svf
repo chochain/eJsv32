@@ -1,0 +1,12 @@
+!
+! Diamond Reveal Analyzer SVF
+!
+! initialize SDR and SIR end state
+ENDDR IDLE;
+ENDIR IDLE;
+! initialize Header and Trailer
+HDR 0;
+HIR 0;
+TDR 0;
+TIR 0;
+
