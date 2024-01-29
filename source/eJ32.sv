@@ -13,7 +13,9 @@ module EJ32 #(
     parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
     ) (
-    input `U1 clk, rst /*synthesis syn_force_pads=1 syn_noprune=1*/
+    input rst,
+    output RGB0,
+    output `U1 bsy
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
     `U1  dc_en, dp_en, rom_en;
@@ -31,6 +33,42 @@ module EJ32 #(
     ///
     `DU  au_t_o, br_t_o, ls_t_o, dp_t_o;
     `U1  au_t_x, br_t_x, ls_t_x, dp_t_x;
+    `U1  oclk, clk;
+    logic [23:0] count;
+
+    HSOSC #(                    ///> built-in high speed oscillator
+        .CLKHF_DIV("0b00")
+        ) osc0 (
+        .CLKHFEN(1'b1),
+        .CLKHFPU(1'b1),
+        .CLKHF(clk)
+        );
+    RGB #(                      ///> RGB LED driver
+        .CURRENT_MODE(1),
+        .RGB0_CURRENT("0b000011"),
+        .RGB1_CURRENT("0b000111"),
+        .RGB2_CURRENT("0b001111")
+        ) led (
+        .CURREN(1'b1),
+        .RGBLEDEN(1'b1),
+        .RGB0PWM(bsy),
+        .RGB1PWM(),
+        .RGB2PWM(),
+        .RGB2(),
+        .RGB1(),
+        .RGB0(RGB0)
+        );
+
+    assign oclk = clk;
+
+    always_ff @(posedge oclk or posedge rst) begin
+        count <= rst ? 24'd0 : count + 1'b1;
+    end
+
+    always_ff @(posedge oclk) begin
+        if      (count == 'h0)       bsy <= 1'b0 ;
+        else if (count == 'hffffff)  bsy <= 1'b1 ;
+    end
     ///
     /// EJ32 buses
     ///
@@ -73,8 +111,8 @@ module EJ32 #(
     /// TOS update arbitrator
     ///
     task UPDATE_TOS();
-        automatic logic[3:0] sel = { 
-            au_en && au_t_x, br_en && br_t_x, ls_en && ls_t_x, dp_en && dp_t_x 
+        automatic logic[3:0] sel = {
+            au_en && au_t_x, br_en && br_t_x, ls_en && ls_t_x, dp_en && dp_t_x
         };
         automatic logic[3:0] xx = {
             !au_en && au_t_x, !br_en && br_t_x, !ls_en && ls_t_x, !dp_en && dp_t_x
