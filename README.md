@@ -100,7 +100,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 
 ### Results - Staging for future development
 * The design works OK on ModelSim
-  + ~2.9K LUTs which should fit in iCE40 (3K or 5K), still ironing out some synthesis error
+  + Core ~2.9K LUTs which should fit in iCE40 (3K or 5K)
 * ModelSim COLD start - completed
   + v1 - 10K cycles, ~/docs/eJ32_trace.txt
   + v2 - 10K cycles, ~/docs/eJ32v2_trace_20240108.txt
@@ -128,7 +128,7 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
 * Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
-* learn how to really Map, Place & Route
+* learn how to really Map, Place & Route (here's the 1st try with JTAG + RGB, at 11.4MHz)
   > ![eJ32 PnR first try](https://chochain.github.io/eJsv32/docs/eJ32_v2_pnr.png)
 * Consider memory clock at higher freq i.g. 4x CPU's (so 32-bit returns in 1 cycle)
 * Consider i-cache + branch prediction to reduce branching delay
