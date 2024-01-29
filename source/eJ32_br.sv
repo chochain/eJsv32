@@ -5,14 +5,11 @@
 
 `define R(op) rs_op=op
 
-module EJ32_BR #(
-    parameter DSZ = 32,         ///> 32-bit data width
-    parameter ASZ = 17          ///> 128K address space
-    ) (
+module EJ32_BR (
     EJ32_CTL ctl,               ///> eJ32 control bus
     input    `U1 br_en,         ///> branching unit active
     input    `IU p,             ///> instruction pointer
-    input    `U8 data,          ///> data from memory bus
+    input    `U8 ram_d,         ///> data from memory bus
     output   `IU br_p_o,        ///> target instruction pointer
     output   `U1 br_psel,
     output   `DU br_t_o,        ///> TOS for arbitration
@@ -23,7 +20,8 @@ module EJ32_BR #(
     /// @{
     // instruction
     `IU  a;                     ///> instrunction address
-    `DU  r, r0;                 ///> top of RS and shadow
+    `DU  r;                     ///> top of RS
+    `U1  rz;                    ///> precalc r==0 flag
     `SU  rp;                    ///> return stack pointers
     stack_op rs_op;             ///> return stack opcode
     // IO
@@ -67,19 +65,18 @@ module EJ32_BR #(
         .rd_data_o(r)           ///> read back into r
     );
     // return stack ops
-    task TOS(input `DU d); t_n = d; `SET(t_x); endtask
-    task RLOAD(input `IU a); rp_r = a; TOS(r); endtask
+    task TOS(input `DU d); t_n = d; `SET(t_x);           endtask
+    task RLOAD(input `IU a); rp_r = a[`SSZ-1:0]; TOS(r); endtask
     task RPUSH(input `DU d); 
-         rs_wen = 1'b1; 
+         rs_wen = 1'b1;         ///> rp_w = rp + 1, default
          r_n    = d;
-         rp_w   = rp + 1;
          rs_op  = sPUSH;
     endtask: RPUSH
     task RMOVE(input `DU d);
          rs_ren = 1'b0;         ///> no write to prevent ERB R/W conflict
          rs_wen = 1'b1;
          r_n    = d;
-         rp_w   = rp;
+         rp_w   = rp;           ///> write to top of stack
          rs_op  = sMOVE;
     endtask: RMOVE
     // branching
@@ -99,11 +96,11 @@ module EJ32_BR #(
     assign code   = ctl.code;
     assign phase  = ctl.phase;
     assign t      = ctl.t;
-    assign t_z    = t == 0;               ///> zero flag
-    assign t_neg  = t[DSZ-1];             ///> negative flag
-    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into t
-    assign a_d    = {a[ASZ-9:0], data};   ///> merge lowest byte into addr
-    assign d2a    = `X8A(data);
+    assign t_z    = t == 0;                ///> zero flag
+    assign t_neg  = t[`DSZ-1];             ///> negative flag
+    assign t_d    = {t[`DSZ-9:0], ram_d};  ///> merge lowest byte into t
+    assign a_d    = {a[`ASZ-9:0], ram_d};  ///> merge lowest byte into addr
+    assign d2a    = `X8A(ram_d);
     ///
     /// wired to output
     ///
@@ -115,24 +112,24 @@ module EJ32_BR #(
     /// combinational
     ///
     task INIT();
-        a_n     = {ASZ{1'b0}};
+        a_n     = {`ASZ{1'b0}};
         asel_n  = 1'b0;
         a_x     = 1'b0;
-        t_n     = {DSZ{1'b0}};  /// TOS
+        t_n     = 'hbbfeedbb;
         t_x     = 1'b0;
         rs_op   = sNOP;
         rs_ren  = 1'b1;
         rs_wen  = 1'b0;
-        rp_w    = rp + 1;
+        rp_w    = rp + 1'b1;
         rp_r    = rp;
-        r_n     = {DSZ{1'b0}};
+        r_n     = {`DSZ{1'b0}};
     endtask: INIT
 
     always_comb begin
         INIT();
         case (code)
         // return stack => TOS
-        iload:     RLOAD(rp - data);    // CC: not tested, multi-cycle needed?
+        iload:     RLOAD(rp - ram_d);   // CC: not tested, multi-cycle needed?
         iload_0:   RLOAD(rp);           // CC: not tested
         iload_1:   RLOAD(rp - 1);       // CC: not tested
         iload_2:   RLOAD(rp - 2);       // CC: not tested
@@ -171,9 +168,9 @@ module EJ32_BR #(
         donext:
             case (phase)
             0: SETA(d2a);
-            1: if (r0 == 0) `R(sPOP);          // 12=>22MHz with r0
+            1: if (rz) `R(sPOP);      // 12.0=>31.0MHz with rz
                else begin
-                  RMOVE(r0 - 1);               // 12=>22MHz with r0
+                  RMOVE(r - 1);
                   JMP(a_d);
                end
             endcase
@@ -185,20 +182,19 @@ module EJ32_BR #(
 
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
-            a    <= {ASZ{1'b0}};     /// init address
+            a    <= {`ASZ{1'b0}};    /// init address
             asel <= 1'b0;
             rp   <= '0;
-            r0   <= {DSZ{1'b0}};
         end
         else if (br_en) begin
             asel <= asel_n;
-            r0   <= r;               ///> shadow r to shorten critical path
+            rz   <= r == 0;          /// precalc r==0 flag on critical path
             if (a_x) a <= a_n;
 
             // return stack
             case (rs_op)
-            sPOP:  rp <= rp - 1;
-            sPUSH: rp <= rp + 1;
+            sPOP:  rp <= rp - 1'b1;
+            sPUSH: rp <= rp + 1'b1;
             endcase
         end
     end

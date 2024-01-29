@@ -146,7 +146,7 @@ module outer_tb #(
     task trace;
         automatic `U3 ph = `CTL.phase;
         automatic `SU rp = `BR.rp;
-        automatic `U8 d8 = `DBUS.vo; // `DBUS.we ? `DBUS.vi : `DBUS.vo;
+        automatic `U8 d8 = `DBUS.we ? `DBUS.vi : `DBUS.vo;
         automatic `U8 xx;
         automatic opcode_t code;
         if (!$cast(code, `CTL.code)) begin
@@ -157,10 +157,10 @@ module outer_tb #(
              "%6t> p:a[io]=%4x:%4x[%2x:%2x] rp=%2x<%4x> sp=%2x<%8x, %8x> %2x=%d%s%-16s",
              $time/10, 
              ej32.p, `LS.a,
-             `BR.asel ? xx : d8, `BR.asel ? d8 : xx,
+             `LS.asel ? xx : d8, `LS.asel ? d8 : xx,
              `BR.rp, `BR.r,
              `AU.sp, `AU.s, `AU.t,
-             code, ph, ej32.div_bsy_o ? "." : "_", code.name);
+             code, ph, ej32.dp_bsy_o ? "_" : ".", code.name);
         case (code)
         invokevirtual: if (ph==2) begin
             automatic `IU nfa = to_name(ej32.p);

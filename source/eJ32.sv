@@ -10,28 +10,55 @@ module EJ32 #(
     parameter MEM0 = 'h0,       ///> base memory address
     parameter TIB  = 'h1000,    ///> input buffer ptr
     parameter OBUF = 'h1400,    ///> output buffer ptr
-    parameter DSZ  = 32,        ///> 32-bit data width
-    parameter ASZ  = 17,        ///> 17-bit (128Kb) address width
-    parameter SS_DEPTH = 64,    ///> data stack depth (v2 - hardcoded in ERB netlist)
-    parameter RS_DEPTH = 64,    ///> return stack depth (v2 - hardcoded in ERB netlist)
     parameter ROM_SZ   = 8192,  ///> ROM hosted eForth image size in bytes
     parameter ROM_WAIT = 3      ///> wait cycle to stablize ROM read
     ) (
-    input `U1 clk, rst /*synthesis syn_force_pads=1 syn_noprune=1*/
+    input rst,
+    output RGB0,
+    output `U1 bsy
     );
     `U1  au_en, br_en, ls_en;   ///> unit enables
-    `U1  dc_en, rom_en;
-    `IU  p, p_n;                ///> program counter
+    `U1  dc_en, dp_en, rom_en;
     `U8  rom_wait;              ///> ROM wait cycles for EBR to stablize read
     `IU  rom_a;                 ///> ROM address pointer
-    `U8  rom_d, data;           ///> data return from memory bus
-    `U1  p_inc;                 ///> program counter advance flag
-    `U1  div_bsy_o;             ///> AU divider busy flag
+    `U8  rom_d, ram_d;          ///> data return from ROM and RAM bus
     `DU  s_o;                   ///> NOS (AU -> LS)
+    `IU  p, p_n;                ///> program counter
+    `U1  p_inc;                 ///> program counter advance flag
     `IU  br_p_o;                ///> BR branching target
     `U1  br_psel;               ///> BR branching target select
-    `DU  au_t_o, br_t_o, ls_t_o;///> TOS from modules for arbitration
-    `U1  au_t_x, br_t_x, ls_t_x;
+    `U1  dp_bsy_o;              ///> Data processor/divider busy flag
+    ///
+    /// TOS from modules for arbitration
+    ///
+    `DU  au_t_o, br_t_o, ls_t_o, dp_t_o;
+    `U1  au_t_x, br_t_x, ls_t_x, dp_t_x;
+    `U1  oclk, clk;
+
+    HSOSC #(                    ///> built-in high speed oscillator
+        .CLKHF_DIV("0b00")
+        ) osc0 (
+        .CLKHFEN(1'b1),
+        .CLKHFPU(1'b1),
+        .CLKHF(clk)
+        );
+    RGB #(                      ///> RGB LED driver
+        .CURRENT_MODE(1),
+        .RGB0_CURRENT("0b000011"),
+        .RGB1_CURRENT("0b000111"),
+        .RGB2_CURRENT("0b001111")
+        ) led (
+        .CURREN(1'b1),
+        .RGBLEDEN(1'b1),
+        .RGB0PWM(bsy),
+        .RGB1PWM(),
+        .RGB2PWM(),
+        .RGB2(),
+        .RGB1(),
+        .RGB0(RGB0)
+        );
+
+    assign oclk = clk;                           ///> CC: why cannot OSC=>clk directly
     ///
     /// EJ32 buses
     ///
@@ -45,10 +72,11 @@ module EJ32 #(
     ///
     /// EJ32 core modules
     ///
-    EJ32_DC     dc(.div_bsy(div_bsy_o), .*);              ///> decoder unit
-    EJ32_AU     #(DSZ)       au(.*);                      ///> arithmetic unit
-    EJ32_BR     #(DSZ, ASZ)  br(.*);                      ///> branching unit
-    EJ32_LS     #(TIB, OBUF, DSZ, ASZ) ls(.s(s_o), .*);   ///> load/store unit
+    EJ32_DC     dc(.div_bsy(dp_bsy_o), .*);      ///> decoder unit
+    EJ32_AU     au(.div_bsy(dp_bsy_o), .*);      ///> arithmetic unit
+    EJ32_DP     dp(.s(s_o), .*);                 ///> data processor/divider module
+    EJ32_BR     br(.*);                          ///> branching unit
+    EJ32_LS     #(TIB, OBUF) ls(.s(s_o), .*);    ///> load/store unit
     ///
     /// eForth image loader from ROM into RAM
     ///
@@ -56,12 +84,12 @@ module EJ32 #(
         if (rom_wait > 0) begin
             p_n    <= 'h0;
             rom_a  <= 'h0;
-            rom_wait <= rom_wait - 1;
+            rom_wait <= rom_wait - 1'b1;
         end
         else if (rom_a < ROM_SZ) begin           ///> copy ROM into RAM byte-by-byte
-            p_n    <= rom_a - 1;                 ///> RAM is 1-cycle behind
-            rom_a  <= rom_a + 1;
-            ctl.t  <= {{ASZ-8{1'b0}}, rom_d};
+            p_n    <= rom_a - 1'b1;              ///> RAM is 1-cycle behind
+            rom_a  <= rom_a + 1'b1;
+            ctl.t  <= {{`ASZ-8{1'b0}}, rom_d};
         end
         else begin
             p_n    <= COLD;                      ///> switch on DC, cold start address
@@ -73,30 +101,35 @@ module EJ32 #(
     /// TOS update arbitrator
     ///
     task UPDATE_TOS();
-        automatic `U3 sel = { au_t_x, br_t_x, ls_t_x };
+        automatic logic[3:0] sel = {
+            au_en && au_t_x, br_en && br_t_x, ls_en && ls_t_x, dp_en && dp_t_x
+        };
+        automatic logic[3:0] xx = {
+            !au_en && au_t_x, !br_en && br_t_x, !ls_en && ls_t_x, !dp_en && dp_t_x
+        };
+        if (xx != 4'b0) begin
+            $display("WARN: TOS Arbiter code=%d.%s, au=%x%x, br=%x%x, ls=%x%x, dp=%x%x", 
+                     ctl.phase, ctl.code.name,
+                     au_en, au_t_x, br_en, br_t_x, ls_en, ls_t_x, dp_en, dp_t_x);
+        end
         case (sel)
-        3'b000: begin end // OK, ctl.t stays the same
-        3'b100: ctl.t <= au_t_o;
-        3'b010: ctl.t <= br_t_o;
-        3'b001: ctl.t <= ls_t_o;
-        default: $display("TOS Arbiter ERR t_x=%x", sel);
+        4'b0000: begin end         // OK, ctl.t stays the same
+        4'b1000: ctl.t <= au_t_o;
+        4'b0100: ctl.t <= br_t_o;
+        4'b0010: ctl.t <= ls_t_o;
+        4'b0001: ctl.t <= dp_t_o;
+        default: begin
+            $display("ERR: TOS Arbiter code=%.%s, t_x=%x", ctl.phase, ctl.code.name, sel);
+        end
         endcase
     endtask: UPDATE_TOS
     ///
     /// Instruction Unit
     ///
-/* iCE40up5k high speed clock (48MHz) in built-in library
-    `U1 clk0;
-    HSOSC #(.CLKHF_DIV("b01")) clock(            // 48MHz divide by 2
-    .CLKHFEN(1'b1),                              // Enable the output  
-    .CLKHFPU(1'b1),                              // Power up the oscillator  
-    .CLKHF(clk)                                  // Oscillator output  
-    );
-*/   
     assign ctl.clk = clk;                        ///> clock driver
     assign ctl.rst = rst;
     assign p       = br_psel ? br_p_o : p_n;     ///> branch target
-    assign data    = b8_if.vo;                   ///> data fetched from SRAM (1-cycle)
+    assign ram_d   = b8_if.vo;                   ///> data fetched from SRAM (1-cycle)
 
     always_ff @(posedge clk) begin
         if (rst) begin
@@ -108,7 +141,7 @@ module EJ32 #(
         else if (rom_en) COPY_ROM();             ///> copy eForth image from ROM into RAM
         else begin
             UPDATE_TOS();                        ///> arbitrate TOS update
-            p_n <= p + {{ASZ-1{1'b0}}, p_inc};   ///> advance instruction address
+            p_n <= p + {{`ASZ-1{1'b0}}, p_inc};  ///> advance instruction address
         end
     end
 endmodule: EJ32

@@ -1,0 +1,35 @@
+<Project Name="/home/gnii/devel/fpga/eJsv32/config/eJsv32_jtag.rvl" ModBy="Inserter" Date="2024-01-29">
+    <Core Name="top_LA0">
+        <Setting>
+            <Capture NumTrigsCap="3" SamplesPerTrig="256"/>
+            <Event CntEnableRun="0" EventCnt="0"/>
+            <TrigSetting TURadix="0" PostTrgSamples="" PreTrgSamples="" AND_ALL="0"/>
+        </Setting>
+        <Dataset Name="Base">
+            <Trace>
+                <Bus Name="p16" Radix="0">
+                    <Sig Name="p:0"/>
+                    <Sig Name="p:1"/>
+                    <Sig Name="p:2"/>
+                    <Sig Name="p:4"/>
+                    <Sig Name="p:5"/>
+                    <Sig Name="p:6"/>
+                    <Sig Name="p:7"/>
+                    <Sig Name="p:8"/>
+                    <Sig Name="p:9"/>
+                    <Sig Name="p:10"/>
+                    <Sig Name="p:11"/>
+                    <Sig Name="p:12"/>
+                    <Sig Name="p:13"/>
+                    <Sig Name="p:14"/>
+                    <Sig Name="p:15"/>
+                </Bus>
+                <Sig Name="rst"/>
+            </Trace>
+            <Trigger>
+                <TU Name="TU1" Index="0" Value="9" Operator="0" Radix="3" ID="1"/>
+                <TE Name="TE1" Enable="1" Index="0" Expression="tu1" ID="1"/>
+            </Trigger>
+        </Dataset>
+    </Core>
+</Project>

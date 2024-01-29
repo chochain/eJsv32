@@ -5,9 +5,7 @@
 
 module EJ32_LS #(
     parameter TIB  = 'h1000,    ///> input buffer address
-    parameter OBUF = 'h1400,    ///> output buffer address
-    parameter DSZ  = 32,        ///> 32-bit data width
-    parameter ASZ  = 17         ///> 128K address space
+    parameter OBUF = 'h1400     ///> output buffer address
     ) (
     EJ32_CTL ctl,               ///> ej32 control bus
     mb8_io   b8_if,             ///> 8-bit memory bus
@@ -75,8 +73,8 @@ module EJ32_LS #(
     ///
     /// address, data shifter
     ///
-    assign a_d    = {a[ASZ-9:0], data};       ///> merge lowest byte into addr
-    assign t_d    = {t[DSZ-9:0], data};   ///> merge lowest byte into TOS
+    assign a_d    = {a[`ASZ-9:0], data};       ///> merge lowest byte into addr
+    assign t_d    = {t[`DSZ-9:0], data};       ///> merge lowest byte into TOS
     ///
     /// wired to outputs
     ///
@@ -93,9 +91,9 @@ module EJ32_LS #(
     /// combinational
     ///
     task INIT();
-        t_n       = {DSZ{1'b0}};  /// TOS
+        t_n       = 'hccfeedcc;   /// TOS
         t_x       = 1'b0;
-        a_n       = {ASZ{1'b0}};  /// default to clear address
+        a_n       = {`ASZ{1'b0}}; /// default to clear address
         a_x       = 1'b0;
         asel_n    = 1'b0;         /// address default to program counter
         dsel_x    = 1'b0;         /// data bus
@@ -119,7 +117,7 @@ module EJ32_LS #(
         baload:
             case (phase)
             0: MEM(t2a);
-            1: TOS(`X8D(data));
+            1: TOS(d2t);
             endcase
         saload:
             case (phase)
@@ -155,7 +153,7 @@ module EJ32_LS #(
         jsr:
             case (phase)
             0: MEM(t2a);
-            1: begin MEM(a + 1); TOS(`X8D(data)); end
+            1: begin MEM(a + 1); TOS(d2t); end
             endcase
         ldi: 
             case (phase)
@@ -166,7 +164,7 @@ module EJ32_LS #(
         get:
             case (phase)
             0: MEM(ibuf);
-            1: begin TOS(`X8D(data)); `SET(ibuf_x); end
+            1: begin TOS(d2t); `SET(ibuf_x); end
             endcase
         put:
             case (phase)
@@ -178,7 +176,7 @@ module EJ32_LS #(
 
     always_ff @(posedge ctl.clk) begin
         if (ctl.rst) begin
-            a     <= {ASZ{1'b0}};   ///> clear address
+            a     <= {`ASZ{1'b0}};  ///> clear address
             asel  <= 1'b0;          ///> note: cold start by decoder
             dsel  <= 3;
             ibuf  <= TIB;
@@ -188,8 +186,8 @@ module EJ32_LS #(
             asel <= asel_n;
             if (a_x)     a    <= a_n;
             if (dsel_x)  dsel <= dsel_n;
-            if (ibuf_x)  ibuf <= ibuf + 'h1;
-            if (obuf_x)  obuf <= obuf + 'h1;
+            if (ibuf_x)  ibuf <= ibuf + 1'b1;
+            if (obuf_x)  obuf <= obuf + 1'b1;
         end
     end
 endmodule: EJ32_LS

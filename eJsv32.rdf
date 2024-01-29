@@ -3,6 +3,9 @@
     <Options/>
     <Implementation title="impl_1" dir="impl_1" description="impl_1" synthesis="lse" default_strategy="Strategy1">
         <Options def_top="EJ32" top="EJ32"/>
+        <Source name="source/eJ32.vh" type="Verilog" type_short="Verilog" excluded="TRUE">
+            <Options/>
+        </Source>
         <Source name="source/alu_ext.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
@@ -24,6 +27,9 @@
         <Source name="source/eJ32_dc.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
+        <Source name="source/eJ32_dp.sv" type="Verilog" type_short="Verilog">
+            <Options VerilogStandard="System Verilog"/>
+        </Source>
         <Source name="source/eJ32_br.sv" type="Verilog" type_short="Verilog">
             <Options VerilogStandard="System Verilog"/>
         </Source>
@@ -43,6 +49,18 @@
             <Options/>
         </Source>
         <Source name="source/brom8k/brom8k.ipx" type="IPX_Module" type_short="IPX" excluded="TRUE">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32.ldc" type="LSE Design Constraints File" type_short="LDC">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32.pdc" type="Physical Constraints File" type_short="PDC">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32_jtag.rvl" type="Reveal" type_short="Reveal">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32_trig.rva" type="Reveal Analyzer Project File" type_short="RVA">
             <Options/>
         </Source>
         <Source name="vsim/vsim.spf" type="Simulation Project File" type_short="SPF">

@@ -6,23 +6,27 @@ package ej32_pkg;
 //
 // Universal data type
 //
+`define DSZ 32                     /* data width          */
+`define ASZ 17                     /* address width       */
+`define SSZ 6                      /* stack depth         */
+   
 `define U1 logic                   /* 1-bit flag          */
 `define U2 logic[1:0]              /* stack opcode        */
 `define U3 logic[2:0]              /* phase               */
 `define U8 logic[7:0]              /* 8-bit data (memory) */
-`define IU logic[16:0]             /* instruction address */
-`define SU logic[5:0]              /* stack pointers      */
-`define DU logic[31:0]             /* data unit           */
-`define DU2 logic[63:0]            /* double data (mul)   */
+`define IU logic[`ASZ-1:0]         /* instruction address */
+`define SU logic[`SSZ-1:0]         /* stack pointers      */
+`define DU logic[`DSZ-1:0]         /* data unit           */
+`define DU2 logic[(`DSZ*2)-1:0]    /* double data (mul)   */
 //
 // data conversion macros
 //
 `define SET(v) v=1'b1
 `define CLR(v) v=1'b0
-`define X8A(b) { 9'b0,  b }
-`define X8D(b) { 24'b0, b }
-`define XAD(a) { 15'b0, a }
-`define XDA(d) d[16:0]
+`define X8A(b) { {`ASZ-'h8{1'b0}},  b }
+`define X8D(b) { {`DSZ-'h8{1'b0}},  b }
+`define XAD(a) { {`DSZ-`ASZ{1'b0}}, a }
+`define XDA(d) d[`ASZ-1:0]
 
 typedef enum `U8 {  ///> JVM opcodes
         //

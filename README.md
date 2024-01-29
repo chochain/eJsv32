@@ -15,7 +15,7 @@ I appreciate that Dr. Ting took me in his last projects and considered me one of
 My goal is to make the learning journey of building eJ32 as an example of designing and implementing an FPGA CPU regardless whether Java will be the prevailing ISA or not.
 
 ### Status
-Currently, though eJ32 has been successfully simulated with Dr. Ting's test cases but yet synthesized on the targeted ICE40. It will take sometime to realize for lack of hardware design knowledge on my part. If interested in a fully functional Forth CPU, *J1a* is a great one. Check [here](https://www.excamera.com/sphinx/article-j1a-swapforth.html). Anyway, for a kick, here're what I've done for eJ32 so far.
+Currently, though eJ32 has been successfully simulated with Dr. Ting's test cases but yet synthesized on the targeted ICE40. It will take sometime to realize for lack of hardware design knowledge on my part. If interested in a fully functional Forth CPU, Dr. Ting's origial [eP16](https://github.com/dicpeynado/eP16-Altera-Cyclone-IV) or Bowman's [J1a](https://www.excamera.com/sphinx/article-j1a-swapforth.html) are both great to start. Anyway, for a kick, here're what I've done for eJ32 so far.
 
 ### Adaptations of eJsv32k
 * keep Dr. Ting's original code in ~/orig/eJsv32k
@@ -35,27 +35,31 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * modulize into a 2-bus hierachical design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
 * use EBR as ROM which is populated from hex image file (contains 3.4K eForth + 1K test cases)
+* add JTAG, HSOSC, RGB in top module for Map, P&R,...
   
 ### Modulization, flat->hierarchical (v2)
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
 
   |module|desc|components|LUTs/freq<br/>area|LUTs/freq<br/>timing|LUTs<br/>(47op)|note|err|
   |--|--|--|--|--|--|--|--|
-  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>166.5|17<br/>272.9|49|8-bit<br/>16 EBR blocks||
-  |RAM|memory|128K bytes onboard RAM|48<br/>2392.3|49<br/>2392.3|48|8-bit<br/>pseudo-dual port||
-  |AU|arithmetic unit|ALU and data stack|1826<br/>18.0|1726<br/>21.3|1755|2 EBR blocks||
-  |BR|branching unit|program counter and return stack|446<br/>22.0|444<br/>22.7|333|2 EBR blocks||
-  |DC|decoder unit|state machines|237<br/>32.4|253<br/>33.9|211||divider patch|
-  |LS|load/store unit|memory and buffer IO|350<br/>54.0|392<br/>47.4|201|54.0|||
-  |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
+  |ROM|eForth image (3.4K bytes)|8K bytes onboard ROM|49<br/>*166.5*|17<br/>*272.9*|49|8-bit<br/>16 EBR blocks||
+  |RAM|memory|128K bytes onboard RAM|48<br/>*2392.3*|49<br/>*2392.3*|48|8-bit<br/>pseudo-dual port||
+  |AU|arithmetic unit|ALU and data stack|928<br/>*31.3*|939<br/>*31.3*|1755|2 EBRs||
+  |BR|branching unit|program counter and return stack|425<br/>*26.8*|435<br/>*31.0*|333|2 EBRs||
+  |DC|decoder unit|state machines|194<br/>*34.7*|193<br/>*39.8*|211||divider patch|
+  |DP|data processor unit|shr/shl/mul/div|731<br/><span style='color:red'>*17.9*</span>|621<br/><span style='color:red'>*21.3*</span>|439|3 DSPs||
+  |LS|load/store unit|memory and buffer IO|522<br/>*54.0*|530<br/>*47.4*|201|54.0|||
+  |CTL|control bus|TOS, code, phase|NA|NA|NA|interface<br/>not synthsized||
   |||||||||
-  |eJ32|top module||NA|NA|NA||segment fault|
+  |EJ32|top module|JTAG,HSOSC,RGB|3905<br/>*11.4*|3721<br/>*11.4*|NA|JTAG=778|slow...|
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
   
-  TODO:
+  To refactor:
+  * make all outputs registered (sync sub-blocks)
   * compare to [eP16 design](https://chochain.github.io/eJsv32/docs/eP16inVHDL.pdf)
+  * tune DP for 24MHz (i.g. set_multicycle_path on divider, immd register)
   * combine IU (instruction unit, in eJ32.sv) and BR
   * BR add R (top of return stack) register to help EBR slow path
   * AU add S (NOS) register to help EBR slow path
@@ -110,8 +114,9 @@ For the 6 test cases Dr. Ting gave, they take ~520K cycles.
 
   |units|instructions (in K)|total cycles(in K)|note|
   |--|--|--|--|
-  |AU ony|108|173|idiv,irem takes 14K cycles|
+  |AU only|108|159|mostly 1 cycle|
   |BR only|10|20|jreturn|
+  |DP only|0.4|14|idiv,irem,imul,ishr|
   |LS only|24|112|b/i/saload|
   |AU + BR|50|145||
   |AU + LS|14|69||
@@ -123,8 +128,9 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
 * Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
-* learn to Map
-* learn to Place & Route
+* learn how to really Map, Place & Route
+  > ![eJ32 PnR first try](https://chochain.github.io/eJsv32/docs/eJ32_v2_pnr.png)
+* Consider memory clock at higher freq i.g. 4x CPU's (so 32-bit returns in 1 cycle)
 * Consider i-cache + branch prediction to reduce branching delay
 * Consider 32-bit and/or d-cache to reduce load/store delay
 * Consider Pipelined design (see bus design above)
