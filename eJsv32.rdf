@@ -51,7 +51,16 @@
         <Source name="source/brom8k/brom8k.ipx" type="IPX_Module" type_short="IPX" excluded="TRUE">
             <Options/>
         </Source>
-        <Source name="impl_1/ej32.sdc" type="Pre-Synthesis Constraints File" type_short="SDC">
+        <Source name="config/eJsv32.ldc" type="LSE Design Constraints File" type_short="LDC">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32.pdc" type="Physical Constraints File" type_short="PDC">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32_jtag.rvl" type="Reveal" type_short="Reveal">
+            <Options/>
+        </Source>
+        <Source name="config/eJsv32_trig.rva" type="Reveal Analyzer Project File" type_short="RVA">
             <Options/>
         </Source>
         <Source name="vsim/vsim.spf" type="Simulation Project File" type_short="SPF">
