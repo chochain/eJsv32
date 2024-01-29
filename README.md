@@ -128,7 +128,8 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
 * Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
-* learn how to Map, Place & Route
+* learn how to really Map, Place & Route
+  > ![eJ32 PnR first try](https://chochain.github.io/eJsv32/docs/eJ32_v2_pnr.png)
 * Consider memory clock at higher freq i.g. 4x CPU's (so 32-bit returns in 1 cycle)
 * Consider i-cache + branch prediction to reduce branching delay
 * Consider 32-bit and/or d-cache to reduce load/store delay
