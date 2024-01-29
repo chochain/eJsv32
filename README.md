@@ -35,6 +35,7 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
 * modulize into a 2-bus hierachical design
 * use iCE40 EBR (embedded block memory) for 64-deep data and return stacks (was 32-deep)
 * use EBR as ROM which is populated from hex image file (contains 3.4K eForth + 1K test cases)
+* add JTAG, HSOSC, RGB in top module for Map, P&R,...
   
 ### Modulization, flat->hierarchical (v2)
   ![eJ32 architecture](https://chochain.github.io/eJsv32/docs/eJ32_v2_blocks.png)
@@ -48,9 +49,9 @@ Currently, though eJ32 has been successfully simulated with Dr. Ting's test case
   |DC|decoder unit|state machines|194<br/>*34.7*|193<br/>*39.8*|211||divider patch|
   |DP|data processor unit|shr/shl/mul/div|731<br/><span style='color:red'>*17.9*</span>|621<br/><span style='color:red'>*21.3*</span>|439|3 DSPs||
   |LS|load/store unit|memory and buffer IO|522<br/>*54.0*|530<br/>*47.4*|201|54.0|||
-  |CTL|control bus|TOS, code, phase|NA|NA|NA|not synthsized||
+  |CTL|control bus|TOS, code, phase|NA|NA|NA|interface<br/>not synthsized||
   |||||||||
-  |eJ32|top module||NA|NA|NA||segment fault|
+  |EJ32|top module|JTAG,HSOSC,RGB|3905<br/>*11.4*|3721<br/>*11.4*|NA|JTAG=778|slow...|
 
 ### Bus Design
   ![eJ32 bus design](https://chochain.github.io/eJsv32/docs/eJ32_v2_bus.png)
@@ -127,8 +128,7 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
 * Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
-* learn to Map
-* learn to Place & Route
+* learn how to Map, Place & Route
 * Consider memory clock at higher freq i.g. 4x CPU's (so 32-bit returns in 1 cycle)
 * Consider i-cache + branch prediction to reduce branching delay
 * Consider 32-bit and/or d-cache to reduce load/store delay
