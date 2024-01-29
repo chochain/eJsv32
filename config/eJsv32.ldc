@@ -1,4 +1,4 @@
-create_clock -name {mytck} -period 100 [get_ports JTAG_TCK]
+create_clock -name {tck} -period 100 [get_ports JTAG_TCK]
 create_clock -name {oclk} -period 100 [get_pins osc0/CLKHF]
-set_false_path -from {mytck} -to {oclk}
-set_false_path -from {oclk} -to {mytck}
+set_false_path -from [get_clocks tck] -to [get_clocks oclk]
+set_false_path -from [get_clocks oclk] -to [get_clocks tck]
