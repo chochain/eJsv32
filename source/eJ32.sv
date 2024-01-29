@@ -34,7 +34,6 @@ module EJ32 #(
     `DU  au_t_o, br_t_o, ls_t_o, dp_t_o;
     `U1  au_t_x, br_t_x, ls_t_x, dp_t_x;
     `U1  oclk, clk;
-    logic [23:0] count;
 
     HSOSC #(                    ///> built-in high speed oscillator
         .CLKHF_DIV("0b00")
@@ -59,16 +58,7 @@ module EJ32 #(
         .RGB0(RGB0)
         );
 
-    assign oclk = clk;
-
-    always_ff @(posedge oclk or posedge rst) begin
-        count <= rst ? 24'd0 : count + 1'b1;
-    end
-
-    always_ff @(posedge oclk) begin
-        if      (count == 'h0)       bsy <= 1'b0 ;
-        else if (count == 'hffffff)  bsy <= 1'b1 ;
-    end
+    assign oclk = clk;                           ///> CC: why cannot OSC=>clk directly
     ///
     /// EJ32 buses
     ///
