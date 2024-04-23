@@ -128,6 +128,7 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
 * Load/Store takes about 1/3, all multi-cycles (avg. 5/instructions) 
 
 ### TODO
+* check P16 variant [here](https://www.forth.org/svfig/kk/FEFFF.pdf)
 * learn how to really Map, Place & Route (here's the 1st try with JTAG + RGB, at 11.4MHz)
   > ![eJ32 PnR first try](https://chochain.github.io/eJsv32/docs/eJ32_v2_pnr.png)
 * Consider memory clock at higher freq i.g. 4x CPU's (so 32-bit returns in 1 cycle)
@@ -138,6 +139,7 @@ So, within the total cycles. [details here](https://chochain.github.io/eJsv32/do
   + build hardwired control table
   + learn how to resolve Hazards
   + learn [CSR + Hyper Pipelining](http://www.euroforth.org/ef15/papers/strauch.pdf)
+  
 
 ### Reference
 * IceStorm, open source synthesis, https://clifford.at/icestorm
